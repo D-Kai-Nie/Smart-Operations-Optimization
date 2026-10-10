@@ -112,6 +112,8 @@ html, body {
     var(--gradient-brand);
   background-repeat: no-repeat;
   background-size: 100% var(--band-height);
+  /* 蓝带固定在视口：页面竖向滚动时顶栏/面包屑下方始终是品牌蓝 */
+  background-attachment: fixed;
 }
 
 /* 看板类内部系统：窄屏保底宽度 + 横向滚动，避免侧栏/图表被压塌、列数减少 */
@@ -133,11 +135,23 @@ a { color: var(--color-primary); text-decoration: none; }
   position: fixed;
   top: 0; left: 0; right: 0;
   height: var(--header-height);
-  background: transparent;
   display: flex;
   align-items: center;
   padding: 0 var(--sp-lg);
   z-index: 1000;
+}
+
+/* 顶栏与面包屑都吸顶，背景取同一条「固定」蓝带的切片：
+   位置与 body 蓝带像素级对齐，滚动时下方内容不会从这两条透出来 */
+.layout-topbar,
+.layout-breadcrumb {
+  background-image:
+    linear-gradient(90deg, #56ABF8 0, #56ABF8 7px, rgba(86, 171, 248, 0) 7px),
+    var(--gradient-brand);
+  background-repeat: no-repeat;
+  background-size: 100% var(--band-height);
+  background-attachment: fixed;
+  background-position: 0 0;
 }
 
 .layout-topbar__brand {
@@ -156,6 +170,10 @@ a { color: var(--color-primary); text-decoration: none; }
 .layout-topbar__cname em {
   font-style: normal; font-size: 7px; letter-spacing: 0.4px;
   color: rgba(255, 255, 255, 0.72); transform: scale(0.92); transform-origin: left center;
+}
+.layout-topbar__sep {
+  width: 1px; height: 18px; margin: 0 var(--sp-xs);
+  background: rgba(255, 255, 255, 0.55);
 }
 .layout-topbar__app {
   margin-left: var(--sp-md);
@@ -205,10 +223,11 @@ a { color: var(--color-primary); text-decoration: none; }
   transition: all var(--transition-fast);
 }
 .layout-topbar__module-item:hover { color: #FFF; background: rgba(255, 255, 255, 0.1); }
+/* 当前模块：整块深色填充（产品与参考截图一致），非下划线 */
 .layout-topbar__module-item--active {
   color: #FFF;
   font-weight: var(--fw-medium);
-  box-shadow: inset 0 -3px 0 #FFF;
+  background: rgba(0, 45, 92, 0.38);
 }
 /* 其他业务域（不在本原型范围）：禁用态，明确"点不了"而不是点了没反应 */
 .layout-topbar__module-item--disabled { color: rgba(255, 255, 255, 0.42); cursor: not-allowed; }
@@ -397,7 +416,12 @@ body.is-screen-mode .dsc-content--screen { margin-top: 0; margin-bottom: 0; }
 .layout-backtop[hidden] { display: none; }
 .layout-backtop:hover { color: #FFF; background: var(--color-primary); border-color: var(--color-primary); }
 
+/* 面包屑吸顶：随滚动固定在顶栏下方。背景用同一条「固定」蓝带切片，
+   位置与 body 的蓝带完全对齐，滚动时下方的浅色内容不会透出来 */
 .layout-breadcrumb {
+  position: sticky;
+  top: var(--header-height);
+  z-index: 900;
   height: var(--breadcrumb-height);
   display: flex;
   align-items: center;
