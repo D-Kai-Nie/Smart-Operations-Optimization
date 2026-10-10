@@ -1,0 +1,313 @@
+/* ============================================================
+   F1 数据大屏 · 深色科技风（版式基准：数据大屏页面1.png）
+   六边形网格底纹 + 标题胶囊徽标 + 描边发光数字卡 + 角标
+   面板、数据与交互沿用原型既有实现，仅调整视觉表现
+   ============================================================ */
+
+.dsc-content--screen {
+  padding: 0 !important;
+  margin-top: 13px;
+  margin-bottom: 38px;
+  background: var(--scr-bg-1, #010A13);
+  border-radius: 5px;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.screen-page {
+  --scr-bg-0: #02121F;
+  --scr-bg-1: #010A13;
+  --scr-glow: #033D6B;
+  --scr-border: #074A78;
+  --scr-line: rgba(30, 130, 200, 0.55);
+  --scr-line-2: rgba(63, 208, 255, 0.9);
+  --scr-text: #E6E6E6;
+  --scr-text-2: #7FA8C4;
+  --scr-title: #FFFFFF;
+  --scr-data: #B2E1F0;
+  --scr-accent: #049DE4;
+  --scr-accent-2: #00E5FF;
+  --scr-blue: #008EE0;
+  --scr-blue-2: #57C7FF;
+  --scr-blue-light: #1890FF;
+  --scr-gold: #F59A23;
+  --scr-green: #8FD9B8;
+  --scr-box: linear-gradient(180deg, rgba(10, 62, 104, 0.55) 0%, rgba(4, 26, 48, 0.6) 100%);
+
+  position: relative; width: 100%;
+  height: calc(100vh - var(--content-top) - 9px - 16px);
+  min-height: 620px; overflow: hidden;
+  /* 六边形网格 + 星点 + 中央辉光 + 底色 */
+  background-color: var(--scr-bg-1);
+  background-image:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='52' height='90' viewBox='0 0 52 90'><g fill='none' stroke='%230A3D63' stroke-width='1'><path d='M26 0 L52 15 L52 45 L26 60 L0 45 L0 15 Z'/><path d='M0 45 L26 60 L26 90 L0 105 L-26 90 L-26 60 Z'/><path d='M52 45 L78 60 L78 90 L52 105 L26 90 L26 60 Z'/></g></svg>"),
+    radial-gradient(circle at 18% 22%, rgba(120, 200, 255, 0.5) 0 1px, transparent 2px),
+    radial-gradient(circle at 72% 34%, rgba(120, 200, 255, 0.4) 0 1px, transparent 2px),
+    radial-gradient(circle at 44% 76%, rgba(120, 200, 255, 0.35) 0 1px, transparent 2px),
+    radial-gradient(760px 600px at 62% 55%, rgba(3, 61, 107, 1) 0%, rgba(2, 30, 52, 0.55) 45%, rgba(1, 10, 19, 0) 80%);
+  background-size: 52px 90px, 260px 220px, 320px 260px, 280px 240px, auto;
+  color: var(--scr-text);
+  display: flex; flex-direction: column;
+}
+
+/* ---------- 标题带：左标识 · 中横幅 · 右时间 ---------- */
+.screen-page__titlebar {
+  position: relative; z-index: 2; flex: 0 0 auto;
+  height: 62px; display: flex; align-items: center; gap: 16px; padding: 0 26px;
+}
+.screen-page__brand { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }
+.screen-page__brand-mark {
+  width: 30px; height: 30px; display: grid; place-items: center; color: #7FE7FF;
+  border: 1px solid var(--scr-line-2); border-radius: 4px;
+  background: linear-gradient(180deg, rgba(9, 78, 128, 0.85), rgba(3, 34, 62, 0.85));
+  box-shadow: 0 0 12px rgba(0, 200, 255, 0.35);
+}
+.screen-page__title-left {
+  font-size: 19px; letter-spacing: 1px; color: var(--scr-blue-2);
+  text-shadow: 0 0 14px rgba(87, 199, 255, 0.55);
+}
+.screen-page__banner {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  padding: 7px 42px; pointer-events: none;
+  background: linear-gradient(90deg, rgba(6, 52, 92, 0.2) 0%, rgba(10, 96, 158, 0.85) 22%,
+    rgba(12, 120, 190, 0.9) 50%, rgba(10, 96, 158, 0.85) 78%, rgba(6, 52, 92, 0.2) 100%);
+  border-top: 1px solid rgba(90, 210, 255, 0.85);
+  border-bottom: 1px solid rgba(90, 210, 255, 0.85);
+  clip-path: polygon(34px 0, 100% 0, calc(100% - 34px) 100%, 0 100%);
+  box-shadow: 0 0 28px rgba(0, 170, 255, 0.35);
+}
+.screen-page__title-main {
+  font-size: 26px; font-weight: 700; letter-spacing: 6px; color: #FFFFFF;
+  text-shadow: 0 0 18px rgba(0, 229, 255, 0.75);
+}
+.screen-page__title-right {
+  margin-left: auto; display: flex; align-items: center; gap: 16px; flex: 0 0 auto;
+  font-size: 13px; color: var(--scr-blue-2); font-variant-numeric: tabular-nums;
+}
+.screen-page__clock { min-width: 66px; text-align: right; padding-left: 16px; border-left: 1px solid var(--scr-line); }
+
+/* ---------- 主体栅格（沿用原结构） ---------- */
+.screen-page__grid {
+  position: relative; z-index: 1; flex: 1 1 auto; min-height: 0;
+  display: grid;
+  grid-template-columns: 342px minmax(0, 1fr) 404px;
+  grid-template-rows: minmax(0, 1.02fr) minmax(0, 0.86fr);
+  gap: 16px 22px;
+  padding: 6px 26px 10px;
+}
+.screen-page__rank-panel { grid-column: 1; grid-row: 1; }
+.screen-page__overview-panel { grid-column: 2; grid-row: 1; }
+/* 中栏：KPI 行固定高、地图吃剩余高度（面板体必须是 flex 列，.scr-mapbox 的 flex 才生效） */
+.screen-page__overview-panel .screen-panel__body { display: flex; flex-direction: column; overflow: hidden; }
+.screen-page__overview-panel .scr-kvrow { flex: 0 0 auto; }
+/* 右栏：面板按内容高度排布、不够高时整列滚动。
+   面板若被压缩（flex 默认 0 1 auto + min-height:0）会低于内容高度，
+   而 .screen-panel__body 不裁切，卡片就会溢出压住下一个面板的标题带 */
+.screen-page__side {
+  grid-column: 3; grid-row: 1 / 3; display: flex; flex-direction: column;
+  gap: 10px; min-height: 0; overflow-y: auto; overflow-x: hidden; padding-right: 4px;
+}
+.screen-page__side .screen-panel { flex: 0 0 auto; }
+.screen-page__side .screen-panel__head { margin-bottom: 8px; }
+.screen-page__supplier-panel { grid-column: 1 / 3; grid-row: 2; }
+
+/* ---------- 面板：标题胶囊徽标 + 右侧延伸线 ---------- */
+.screen-panel { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.screen-panel__head {
+  flex: 0 0 auto; display: flex; align-items: center; gap: 12px;
+  margin-bottom: 12px;
+}
+.screen-panel__head::after {
+  content: ''; order: 1; flex: 1 1 auto; height: 1px; min-width: 20px;
+  background: linear-gradient(90deg, var(--scr-line) 0%, rgba(30, 130, 200, 0) 100%);
+}
+.screen-panel__title {
+  order: 0; flex: 0 0 auto;
+  display: inline-flex; align-items: center; gap: 9px;
+  height: 30px; padding: 0 20px 0 12px; border-radius: 999px;
+  border: 1px solid rgba(30, 140, 200, 0.8);
+  background: linear-gradient(90deg, rgba(8, 92, 146, 0.9) 0%, rgba(5, 44, 76, 0.35) 100%);
+  box-shadow: inset 0 0 14px rgba(0, 180, 255, 0.28);
+  font-size: 18px; font-weight: 700; letter-spacing: 1px; color: var(--scr-title);
+  white-space: nowrap;
+}
+.screen-panel__title::before {
+  content: ''; width: 11px; height: 11px; border-radius: 50%; flex: 0 0 auto;
+  background: radial-gradient(circle, #EAFEFF 0%, #4FE3FF 45%, rgba(0, 180, 255, 0) 100%);
+  box-shadow: 0 0 10px #35D6FF, 0 0 20px rgba(0, 200, 255, 0.6);
+}
+.screen-panel__extra {
+  order: 2; flex: 0 0 auto; margin-left: 0;
+  font-size: 13px; color: var(--scr-text-2);
+}
+.screen-panel__extra b { font-weight: 700; }
+.screen-panel__extra .is-cyan { color: var(--scr-accent-2); }
+.screen-panel__body {
+  flex: 1 1 auto; min-height: 0; overflow: auto;
+  padding-top: 2px;
+}
+
+/* ---------- 数字卡：描边 + 四角高亮 ---------- */
+.scr-kvrow { display: grid; gap: 10px; }
+.scr-kvrow--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.scr-kvrow--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.scr-kvrow + .scr-kvrow { margin-top: 12px; }
+.scr-kv {
+  position: relative; min-width: 0; padding: 9px 12px 10px;
+  background: var(--scr-box);
+  border: 1px solid var(--scr-line);
+  border-radius: 3px;
+}
+.scr-kv::before, .scr-kv::after {
+  content: ''; position: absolute; width: 11px; height: 11px; pointer-events: none;
+  border-color: var(--scr-line-2); border-style: solid;
+}
+.scr-kv::before { left: -1px; top: -1px; border-width: 2px 0 0 2px; }
+.scr-kv::after { right: -1px; top: -1px; border-width: 2px 2px 0 0; }
+.scr-kv__label {
+  font-size: 13px; color: var(--scr-text-2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.scr-kv__value {
+  margin-top: 5px; font-size: 22px; font-weight: 700; line-height: 1.1;
+  color: #FFFFFF; font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 14px rgba(90, 200, 255, 0.55);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.scr-kv__unit { font-size: 12px; font-weight: 400; margin-left: 4px; color: var(--scr-data); }
+/* 右栏三列较窄，数值降一档避免截断 */
+.screen-page__side .scr-kv { padding: 8px 9px 9px; }
+.screen-page__side .scr-kv__value { font-size: 18px; letter-spacing: -0.2px; }
+.screen-page__side .scr-kv__unit { font-size: 10px; margin-left: 3px; }   /* 值:单位 与全站一致 ≈2:1 */
+.screen-page__side .scr-kv__label { font-size: 12px; }
+
+/* ---------- 地图 + 光环平台 ---------- */
+/* flex-basis 取 0：地图只吃 KPI 行之外剩余的高度。
+   若用 flex:1 1 auto，basis=auto 会取内容高度（内联 svg 的固定 px 高），
+   地图就不缩不涨、把面板撑出滚动条 */
+.scr-mapbox { position: relative; margin-top: 8px; flex: 1 1 0; min-height: 0; }
+/* 地图按容器实际高度绘制（height:100% → clientHeight 即视窗高度），并裁切在容器内 */
+.scr-mapbox .scr-chart { height: 100%; overflow: hidden; }
+.scr-mapbox::after {
+  content: ''; position: absolute; left: 50%; bottom: -10px; transform: translateX(-50%);
+  width: 62%; height: 96px; pointer-events: none; border-radius: 50%;
+  background:
+    repeating-radial-gradient(ellipse at center,
+      rgba(0, 200, 255, 0.20) 0 1px, rgba(0, 200, 255, 0) 1px 13px),
+    radial-gradient(ellipse at center, rgba(0, 190, 255, 0.22) 0%, rgba(0, 120, 200, 0.08) 46%, transparent 72%);
+  box-shadow: 0 0 46px rgba(0, 180, 255, 0.28);
+}
+.scr-mapbox__badge {
+  position: absolute; left: 6%; bottom: 16%; z-index: 2;
+  display: flex; align-items: flex-end; gap: 8px; pointer-events: none;
+}
+.scr-mapbox__badge span {
+  font-size: 12px; color: var(--scr-data); writing-mode: horizontal-tb;
+}
+.scr-mapbox__badge b {
+  display: block; margin-top: 2px; font-size: 15px; font-weight: 700; color: #FFF;
+  font-variant-numeric: tabular-nums;
+}
+.scr-mapbox__bar {
+  width: 14px; height: 52px; border-radius: 2px 2px 0 0;
+  background: linear-gradient(180deg, #FFD98A 0%, var(--scr-gold) 100%);
+  box-shadow: 0 0 12px rgba(245, 154, 35, 0.6);
+}
+.scr-mapbox__tip { display: flex; flex-direction: column; }
+
+/* ---------- 分段控件 ---------- */
+.scr-seg {
+  display: inline-flex; align-items: center; gap: 2px; padding: 2px;
+  border: 1px solid rgba(4, 157, 228, 0.45); border-radius: 3px;
+}
+.scr-seg__item {
+  padding: 3px 10px; border-radius: 2px; font-style: normal; font-size: 12px;
+  color: var(--scr-data); cursor: pointer; transition: all .15s ease;
+}
+.scr-seg__item:hover { color: #FFF; }
+.scr-seg__item--active { background: var(--scr-blue); color: #FFF; }
+
+/* ---------- 采购动态 ---------- */
+.scr-news { position: relative; min-height: 34px; }
+.scr-news__row {
+  position: absolute; left: 0; right: 0; top: 0;
+  font-size: 13px; line-height: 1.5; color: var(--scr-gold);
+  opacity: 0; transition: opacity .5s ease;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.scr-news__row--active { opacity: 1; }
+
+/* ---------- 分供商规模：左侧类型切换 + 右侧柱状 ---------- */
+.scr-supwrap { display: grid; grid-template-columns: 118px minmax(0, 1fr); gap: 18px; height: 100%; min-height: 0; }
+.scr-suptabs { display: flex; flex-direction: column; justify-content: center; gap: 14px; }
+.scr-suptab {
+  height: 38px; display: grid; place-items: center; cursor: pointer;
+  border: 1px solid var(--scr-line); border-radius: 4px;
+  background: var(--scr-box);
+  font-size: 13px; color: var(--scr-text-2); white-space: nowrap;
+  transition: all .15s ease;
+}
+.scr-suptab:hover { color: #FFF; border-color: var(--scr-line-2); }
+.scr-suptab--active {
+  color: #FFF; font-weight: 700; border-color: var(--scr-line-2);
+  background: linear-gradient(90deg, rgba(10, 120, 190, 0.95) 0%, rgba(6, 70, 120, 0.9) 100%);
+  box-shadow: 0 0 14px rgba(0, 180, 255, 0.45), inset 0 0 12px rgba(0, 200, 255, 0.3);
+}
+.scr-supchart { min-width: 0; height: 100%; min-height: 170px; }
+
+/* ---------- 大屏表格 ---------- */
+.scr-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+/* 左栏榜单：行高压 1px，TOP10 才能完整落在面板内（否则每屏都露出被切的一行） */
+.screen-page__rank-panel .scr-table th, .screen-page__rank-panel .scr-table td { height: 25px; }
+.scr-table th, .scr-table td { padding: 0 10px; height: 26px; text-align: left; white-space: nowrap; }
+.scr-table thead th {
+  position: sticky; top: 0; z-index: 1;
+  height: 28px; background: transparent;
+  color: var(--scr-blue-2); font-weight: 400; font-size: 13px;
+  border-bottom: 1px solid var(--scr-line);
+}
+.scr-table tbody tr:hover { background: rgba(0, 142, 224, 0.14); }
+.scr-table td { color: var(--scr-text); font-variant-numeric: tabular-nums; }
+.scr-table .is-num { text-align: right; }
+.scr-table .is-gold { color: #FFF; }
+.scr-rank__no {
+  display: inline-grid; place-items: center; width: 17px; height: 17px; border-radius: 50%;
+  font-size: 11px; color: #FFF; background: rgba(255, 255, 255, 0.14);
+}
+.scr-rank__no--top {
+  background: radial-gradient(circle at 40% 35%, #FF6B6B 0%, #D1161B 100%);
+  box-shadow: 0 0 10px rgba(230, 40, 40, 0.65);
+}
+
+/* ---------- 底部播报条 ---------- */
+.screen-page__footer {
+  position: relative; z-index: 2; flex: 0 0 auto;
+  height: 34px; display: flex; align-items: center; gap: 12px;
+  padding: 0 26px; font-size: 12px; color: var(--scr-text-2);
+  border-top: 1px solid var(--scr-border);
+}
+.screen-page__footer-tag { flex: 0 0 auto; color: var(--scr-accent-2); font-weight: 600; letter-spacing: 1px; }
+.screen-page__footer-track { flex: 1; overflow: hidden; white-space: nowrap; }
+.screen-page__footer-track > span { display: inline-block; padding-left: 100%; animation: scr-ticker 30s linear infinite; }
+.screen-page__footer-status { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; }
+.screen-page__footer-dot {
+  width: 7px; height: 7px; border-radius: 50%; background: var(--scr-green);
+  box-shadow: 0 0 8px var(--scr-green); animation: scr-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes scr-ticker { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } }
+@keyframes scr-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+/* ---------- 滚动条 ---------- */
+.screen-page ::-webkit-scrollbar { width: 6px; height: 6px; }
+.screen-page ::-webkit-scrollbar-track { background: transparent; }
+.screen-page ::-webkit-scrollbar-thumb { background: rgba(0, 142, 224, 0.4); border-radius: 3px; }
+.screen-page ::-webkit-scrollbar-thumb:hover { background: rgba(0, 142, 224, 0.65); }
+
+@media (max-width: 1600px) {
+  .screen-page__grid { grid-template-columns: 304px minmax(0, 1fr) 364px; gap: 12px 16px; padding: 6px 18px 10px; }
+  .screen-page__title-main { font-size: 22px; letter-spacing: 4px; }
+  .screen-panel__title { font-size: 16px; height: 27px; }
+  .scr-kv__value { font-size: 19px; }
+  .scr-supwrap { grid-template-columns: 104px minmax(0, 1fr); gap: 12px; }
+}

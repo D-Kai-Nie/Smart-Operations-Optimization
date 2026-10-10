@@ -1,0 +1,288 @@
+/* ============================================================
+   F2 局驾驶舱 · 截图基准版式
+   区块 = 浅灰标题带 + 白色卡片体；筛选条多列；指标卡浅蓝渐变
+   截图实测：操作蓝 #2468F2、数据蓝 #087CFF、卡头蓝 #0093E5
+   ============================================================ */
+.ck-view { display: flex; flex-direction: column; }
+
+/* ---------- 区块 ---------- */
+.ck-sec { margin-bottom: var(--sp-md); }
+.ck-sec:last-child { margin-bottom: 0; }
+.ck-sec__head {
+  display: flex; align-items: center; gap: var(--sp-md);
+  padding: 12px var(--sp-lg); background: var(--color-bg-page);
+}
+.ck-sec__title { font-size: 20px; font-weight: 700; color: #1A1A1A; }
+.ck-sec__collapse {
+  margin-left: auto; border: 0; background: transparent; color: var(--color-text-tertiary);
+  cursor: pointer; padding: 4px; line-height: 0; transition: transform var(--transition-fast);
+}
+.ck-sec__collapse:hover { color: var(--action-blue); }
+.ck-sec--collapsed .ck-sec__collapse { transform: rotate(180deg); }
+.ck-sec--collapsed .ck-sec__body { display: none; }
+.ck-sec__body { background: #FFF; padding: var(--sp-lg) var(--sp-xl) var(--sp-xl); }
+
+.ck-subhead { display: flex; align-items: center; gap: var(--sp-md); margin: var(--sp-lg) 0 var(--sp-md); }
+.ck-subhead:first-child { margin-top: 0; }
+/* 副标题比区块标题（20px）低两档，避免两级混成一片 */
+.ck-subhead__title { font-size: 15px; font-weight: 700; color: #334155; }
+/* 副标题右端的补充说明：弱化处理，避免与下一栏标题连读成一串 */
+.ck-subhead__extra { margin-left: auto; font-size: 12px; color: #8C93A0; font-weight: 400; }
+
+/* ---------- 筛选条 ---------- */
+.ck-filter { margin-bottom: var(--sp-md); }
+.ck-filter__row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px var(--sp-xl); margin-bottom: 10px; }
+.ck-filter__item { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.ck-filter__item--blank { flex: 1 1 200px; }
+.ck-filter__label { font-size: 14px; color: #333; white-space: nowrap; }
+.ck-req { color: var(--color-danger); margin-left: 2px; font-weight: 400; }
+.ck-filter__actions { margin-left: auto; display: inline-flex; align-items: center; gap: var(--sp-lg); }
+.ck-filter__more { display: flex; flex-wrap: wrap; gap: 10px var(--sp-xl); padding-top: 4px; }
+.ck-filter__more[hidden] { display: none; }
+
+.ck-field {
+  display: inline-flex; align-items: center; height: 34px; padding: 0 12px; min-width: 190px;
+  border: 1px solid var(--color-border-light); border-radius: var(--radius-sm);
+  background: #FFF; font-size: 13px; color: #333; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.ck-field--ph { color: #BFBFBF; }
+.ck-field--date { min-width: 230px; }
+/* 真控件版筛选字段：与静态框同尺寸同外观，但可点可选 */
+select.ck-field {
+  min-width: 190px; cursor: pointer; padding-right: 26px;
+  appearance: none; -webkit-appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M2.5 4.5 6 8l3.5-3.5' fill='none' stroke='%23999' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+  background-repeat: no-repeat; background-position: right 9px center;
+}
+input.ck-field { display: inline-block; min-width: 190px; }
+.ck-field--select:focus, .ck-field--input:focus { outline: none; border-color: var(--action-blue); }
+/* 只读展示值（如物料小类，由上方卡片联动决定）：非输入框样式，避免误认成能填 */
+.ck-field--ro { background: #FAFBFC; color: #4A5568; cursor: default; }
+.ck-info {
+  display: inline-grid; place-items: center; width: 13px; height: 13px; margin-left: 4px;
+  border-radius: 50%; background: #CBD5E1; color: #FFF; font-size: 9px; font-style: normal;
+  cursor: help; vertical-align: middle;
+}
+.ck-info:hover { background: var(--action-blue); }
+/* 筛选结果就地反馈 */
+.ck-filter__hint { margin-right: auto; font-size: 12px; color: #4A5568; }
+.ck-grain {
+  display: inline-flex; align-items: center; justify-content: space-between; gap: 6px;
+  height: 34px; padding: 0 10px; width: 62px;
+  border: 1px solid var(--color-border-light); border-radius: var(--radius-sm);
+  font-size: 13px; color: #333; cursor: pointer;
+}
+.ck-grain:hover { border-color: var(--action-blue); color: var(--action-blue); }
+
+.ck-btn {
+  height: 32px; padding: 0 18px; border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border-light); background: #FFF; color: #333;
+  font-size: 13px; cursor: pointer;
+}
+.ck-btn:hover { border-color: var(--action-blue); color: var(--action-blue); }
+.ck-btn--primary { background: var(--action-blue); border-color: var(--action-blue); color: #FFF; }
+.ck-btn--primary:hover { background: var(--action-blue-hover); color: #FFF; }
+.ck-link { border: 0; background: transparent; color: #333; font-size: 13px; cursor: pointer; padding: 0; }
+.ck-link:hover { color: var(--action-blue); }
+.ck-link--adv { color: var(--action-blue); }
+.ck-link--on { font-weight: 700; }
+
+/* ---------- 采购金额：饼图 + 6 KPI 卡 ---------- */
+.ck-amount { display: grid; grid-template-columns: minmax(0, 560px) minmax(0, 1fr); gap: var(--sp-xl); }
+.ck-amount__kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-lg); align-content: start; }
+.ck-bigkpi {
+  display: flex; align-items: center; gap: var(--sp-md); padding: var(--sp-lg);
+  background: #FFF; border: 1px solid var(--color-border-light); border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+.ck-bigkpi__icon { flex: 0 0 auto; color: var(--card-head-blue); display: grid; place-items: center; }
+.ck-bigkpi__glyph { font-size: 34px; font-weight: 700; line-height: 1; color: var(--card-head-blue); }
+.ck-bigkpi__main { min-width: 0; }
+.ck-bigkpi__label { font-size: 15px; color: #333; }
+.ck-bigkpi__value { margin-top: 4px; font-size: 27px; font-weight: 700; color: #1A1A1A; font-variant-numeric: tabular-nums; }
+.ck-bigkpi__value span { font-size: 13px; font-weight: 400; color: var(--color-text-secondary); margin-left: 4px; }
+.ck-bigkpi__sub { margin-top: 4px; font-size: 12px; color: var(--color-text-secondary); }
+
+/* ---------- 图例 ---------- */
+.ck-legend { display: flex; justify-content: center; gap: var(--sp-xl); margin-top: 6px; font-size: 13px; color: #333; }
+.ck-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.ck-legend i { width: 14px; height: 10px; border-radius: 2px; display: inline-block; }
+.ck-legend__line { width: 14px !important; height: 2px !important; background: var(--action-blue); position: relative; }
+.ck-legend__line::after {
+  content: ""; position: absolute; left: 4px; top: -2px; width: 6px; height: 6px;
+  border: 2px solid var(--action-blue); border-radius: 50%; background: #FFF;
+}
+.ck-legend__line--red { background: #D0021B; }
+.ck-legend__line--green { background: #17B98A; }
+.ck-legend__line--green::after { border-color: #17B98A; }
+.ck-legend__line--red::after { border-color: #D0021B; }
+
+/* ---------- 物资小类四卡 ---------- */
+.ck-matcards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sp-lg); margin-bottom: var(--sp-lg); }
+.ck-matcard {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--sp-md);
+  padding: var(--sp-lg); background: #FFF;
+  border: 1px solid var(--action-blue); border-radius: var(--radius-md); cursor: pointer;
+  transition: box-shadow var(--transition-fast);
+}
+.ck-matcard:hover { box-shadow: var(--shadow-md); }
+.ck-matcard--active { background: #F5FAFF; box-shadow: var(--shadow-sm); }
+.ck-matcard__head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.ck-matcard__icon { color: var(--card-head-blue); display: grid; place-items: center; }
+.ck-matcard__name { font-size: 16px; font-weight: 700; color: #1A1A1A; }
+.ck-matcard__row { display: flex; align-items: baseline; gap: 5px; margin-top: 8px; font-size: 13px; color: #333; white-space: nowrap; }
+.ck-matcard__row span { flex: 0 0 auto; }
+.ck-matcard__row b { font-size: 17px; color: #1A1A1A; font-variant-numeric: tabular-nums; }
+.ck-matcard__row i { font-style: normal; font-size: 12px; color: var(--color-text-secondary); }
+.ck-matcard__right { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.ck-matcard__pctlabel { font-size: 12px; color: #333; white-space: nowrap; }
+
+/* ---------- 采购榜单三栏 ---------- */
+.ck-board { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-xl); }
+.ck-board__col { min-width: 0; }
+.ck-board__title {
+  padding: 12px; text-align: center; font-size: 19px; font-weight: 700; color: #1A1A1A;
+  background: var(--color-primary-light); border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+}
+.ck-medal { display: inline-grid; place-items: center; }
+.ck-medal__no { font-size: 14px; color: #333; }
+
+/* ---------- 表格 ---------- */
+.ck-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.ck-table th, .ck-table td { padding: 0 12px; height: 38px; }
+.ck-table thead th {
+  background: var(--color-bg-table-header); color: #505050; font-weight: 400;
+  border-bottom: 1px solid var(--color-border-light); text-align: left;
+}
+.ck-table td { border-bottom: 1px solid var(--color-divider); color: #333; }
+.ck-table tbody tr:hover td { background: #F5FBFF; }
+.ck-table .is-num { text-align: right; font-variant-numeric: tabular-nums; }
+.ck-table .is-center { text-align: center; }
+.ck-table__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 0; }
+.ck-table--board { table-layout: fixed; }
+.ck-table--board td { height: 40px; }
+.ck-table__danger { color: var(--color-danger); }
+.ck-table__total td { background: #F5FBFF; font-weight: 700; }
+
+/* ---------- 指标总览：8 指标卡 ---------- */
+.ck-metrics { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: var(--sp-lg); margin-bottom: var(--sp-lg); }
+/* 物资管理看板：6 指标卡 / 六项降本 7 卡 */
+.ck-metrics--6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.ck-metrics--7 { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+/* 分供商管理看板：8 张指标卡排成 2 行 × 4 列 */
+.ck-metrics--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+/* 资产管理看板：5 指标卡一行 */
+.ck-metrics--5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.ck-metriccard--kpi { text-align: left; padding: var(--sp-lg); }
+.ck-kpi__head { display: flex; align-items: center; gap: var(--sp-sm); }
+.ck-kpi__name { font-size: 13px; color: #4A5568; }
+.ck-kpi__trend { flex: 0 0 auto; padding: 0 7px; line-height: 18px; border-radius: 9px; font-size: 12px; font-weight: 700; }
+.ck-kpi__trend--good { color: #00A870; background: #E8F8F1; }
+.ck-kpi__trend--bad { color: #D0021B; background: #FDECEE; }
+.ck-metriccard--kpi .ck-metriccard__value { margin-top: 10px; font-size: 28px; text-align: left; }
+.ck-metriccard--kpi .ck-metriccard__value span { font-size: 13px; }
+.ck-kpi__sub { margin-top: 8px; font-size: 12px; color: #8C93A0; }
+/* 分供商履约情况：左指标 + 右双轴图 */
+.ck-sbsplit { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: var(--sp-xxl); align-items: start; margin-top: var(--sp-lg); }
+.ck-sbstat__label { font-size: 13px; color: #4A5568; margin-bottom: 6px; }
+.ck-sbstat__big { margin-top: var(--sp-xl); font-size: 13px; color: #4A5568; }
+.ck-sbstat__big b { font-size: 30px; font-weight: 700; color: var(--data-blue); margin: 0 4px; font-variant-numeric: tabular-nums; }
+.ck-sbmain { min-width: 0; }
+/* 相关报表条 */
+.dsc-relbar { display: flex; align-items: center; gap: var(--sp-md); flex-wrap: wrap; }
+.dsc-relbar__label { font-size: 13px; font-weight: 700; color: #334155; }
+.dsc-relbar__hint { margin-left: auto; font-size: 12px; color: #8C93A0; }
+/* 卡片点击跳转后的目标区块闪一下，让用户确认落点 */
+@keyframes ckSecFlash { 0%,100% { box-shadow: none; } 30% { box-shadow: 0 0 0 2px rgba(36,104,242,.45); } }
+.ck-sec--flash { animation: ckSecFlash 1.2s ease; }
+/* 居中结论行（如「分供商使用率：30.7%」） */
+.ck-statline { margin: var(--sp-sm) 0 var(--sp-md); text-align: center; font-size: 15px; color: #4A5568; }
+.ck-statline b { font-size: 20px; color: var(--data-blue); font-weight: 700; }
+.ck-metriccard {
+  padding: var(--sp-lg) var(--sp-md); text-align: center; cursor: pointer;
+  background: linear-gradient(180deg, #F0F6FF 0%, #E7F1FF 100%);
+  border: 1px solid #D5E2FD; border-radius: var(--radius-lg);
+  transition: box-shadow var(--transition-fast), border-color var(--transition-fast);
+}
+.ck-metriccard:hover { box-shadow: var(--shadow-md); }
+.ck-metriccard--active { border-color: var(--action-blue); box-shadow: inset 0 0 0 1px var(--action-blue); }
+.ck-metriccard__value {
+  font-size: 30px; font-weight: 700; color: var(--data-blue); line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+}
+.ck-metriccard__value span { font-size: 15px; font-weight: 400; margin-left: 2px; }
+.ck-metriccard__label { margin-top: 8px; font-size: 14px; color: #4A5568; }
+/* 名称在上、数值居中、比率在下的统计卡（物资管理看板「六项降本」） */
+.ck-metriccard--stat { text-align: left; }
+.ck-metriccard--stat .ck-metriccard__label { margin: 0 0 10px; font-size: 13px; color: #4A5568; }
+.ck-metriccard--stat .ck-metriccard__value { font-size: 24px; }
+.ck-metriccard--stat .ck-metriccard__value span { font-size: 12px; }   /* 值:单位 保持 2:1 */
+.ck-metriccard__sub { margin-top: 8px; font-size: 13px; color: #4A5568; }
+
+/* ---------- 指标页签 ---------- */
+.ck-tabsrow {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-xl);
+  border-bottom: 2px solid var(--color-divider); margin-bottom: var(--sp-lg); padding: 0 4px;
+}
+/* 指标页签：常态不加粗，选中才加粗——此前 8 个页签全 700，视觉重量盖过它所控制的图表标题 */
+.ck-tab {
+  position: relative; padding: 10px 2px; font-size: 16px; font-weight: 400; color: #1A1A1A;
+  cursor: pointer; white-space: nowrap;
+}
+.ck-tab:hover { color: var(--action-blue); }
+.ck-tab--active { color: var(--action-blue); font-weight: 700; }
+.ck-tab--active::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: -2px; height: 3px;
+  background: var(--action-blue); border-radius: 2px;
+}
+.ck-filter--panel { padding-top: var(--sp-lg); }
+
+/* ---------- 招采分析 ---------- */
+.ck-prockpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sp-xl); margin: var(--sp-xl) 0; }
+.ck-prockpi { display: flex; align-items: center; gap: var(--sp-lg); }
+.ck-prockpi__icon { flex: 0 0 auto; color: var(--card-head-blue); display: grid; place-items: center; }
+.ck-prockpi__main { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.ck-prockpi__label { font-size: 16px; font-weight: 700; color: #1A1A1A; }
+.ck-prockpi__value { font-size: 25px; font-weight: 700; color: var(--data-blue); font-variant-numeric: tabular-nums; }
+.ck-prockpi__value i { font-style: normal; font-size: 14px; font-weight: 400; margin-left: 3px; }
+
+.ck-stages { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: var(--sp-md); }
+.ck-stage { border: 1px solid var(--color-border-light); border-radius: var(--radius-sm); overflow: hidden; background: #FFF; }
+.ck-stage__head {
+  height: 38px; display: grid; place-items: center;
+  background: var(--card-head-blue); color: #FFF; font-size: 16px; font-weight: 700;
+}
+.ck-stage__value {
+  height: 46px; display: grid; place-items: center;
+  font-size: 20px; font-weight: 700; color: #1A1A1A; font-variant-numeric: tabular-nums;
+}
+.ck-stage__chart { padding: 0 4px 4px; }
+
+/* 窄屏：只压缩尺寸与字号，保持与截图一致的栏数（列数不减少） */
+@media (max-width: 1700px) {
+  .ck-amount { grid-template-columns: minmax(0, 440px) minmax(0, 1fr); gap: var(--sp-lg); }
+  .ck-board { gap: var(--sp-lg); }
+  .ck-matcard { padding: var(--sp-md); gap: 10px; }
+  .ck-matcard__row { font-size: 12px; margin-top: 6px; }
+  .ck-matcard__row b { font-size: 15px; }
+  .ck-matcard__name { font-size: 15px; }
+  .ck-matcard__head { margin-bottom: 6px; }
+  .ck-bigkpi { padding: var(--sp-md); gap: 10px; }
+  .ck-bigkpi__icon svg { width: 38px; height: 38px; }
+  .ck-bigkpi__glyph { font-size: 28px; }
+  .ck-bigkpi__label { font-size: 13px; }
+  .ck-bigkpi__value { font-size: 22px; }
+  .ck-metrics { gap: var(--sp-md); }
+  .ck-metriccard { padding: var(--sp-md) var(--sp-sm); }
+  .ck-metriccard__value { font-size: 25px; }
+  .ck-metriccard__label { font-size: 13px; }
+  .ck-tab { font-size: 15px; }
+  .ck-prockpi__value { font-size: 21px; }
+  .ck-prockpi__label { font-size: 14px; }
+  .ck-prockpi__icon svg { width: 42px; height: 42px; }
+  .ck-stage__head { font-size: 14px; }
+  .ck-stage__value { font-size: 18px; }
+  .ck-table { font-size: 13px; }
+  .ck-board__title { font-size: 17px; }
+}
