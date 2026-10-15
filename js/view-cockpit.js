@@ -13,8 +13,20 @@
   /* ============================================================
      视图状态
      ============================================================ */
-  /* 局驾驶舱「物资进场数据」图例的熄灭状态 */
-  const CS_IN_HIDE = {};
+  /* 局驾驶舱各图表的图例熄灭状态（key → { 系列下标: true }）：
+     in = 物资进场数据，lv0/lv1/lv2 = 全局 / 二级 / 三级单位物资分析 */
+  const CS_LEGEND = { in: {}, lv0: {}, lv1: {}, lv2: {} };
+  /* 只把「未熄灭」的系列交给图表 */
+  function ckLegendOn(key, series) {
+    const off = CS_LEGEND[key] || {};
+    return series.filter(function (se, i) { return !off[i]; });
+  }
+  /* 图例项：可点亮 / 熄灭 */
+  function ckLegendItem(key, i, swatch, text) {
+    return '<span data-ck-legend="' + key + '|' + i + '"' +
+      ((CS_LEGEND[key] || {})[i] ? ' class="is-off"' : '') +
+      ' title="点击点亮 / 熄灭该系列">' + swatch + esc(text) + '</span>';
+  }
   const CS = {
     view: 'overview',          // overview | metrics
     metric: 'costDown',        // 指标总览当前页签
@@ -311,12 +323,9 @@
       '</div>' +
       '<div class="dsc-chart" id="ckInData" style="height:340px"></div>' +
       '<div class="ck-legend">' +
-      '<span data-ck-legend="0"' + (CS_IN_HIDE[0] ? ' class="is-off"' : '') +
-      ' title="点击点亮 / 熄灭该系列"><i style="background:#2F80ED"></i>金额</span>' +
-      '<span data-ck-legend="1"' + (CS_IN_HIDE[1] ? ' class="is-off"' : '') +
-      ' title="点击点亮 / 熄灭该系列"><i style="background:#34A853"></i>数量</span>' +
-      '<span data-ck-legend="2"' + (CS_IN_HIDE[2] ? ' class="is-off"' : '') +
-      ' title="点击点亮 / 熄灭该系列"><i class="ck-legend__line ck-legend__line--red"></i>均价</span>' +
+      ckLegendItem('in', 0, '<i style="background:#2F80ED"></i>', '金额') +
+      ckLegendItem('in', 1, '<i style="background:#34A853"></i>', '数量') +
+      ckLegendItem('in', 2, '<i class="ck-legend__line ck-legend__line--red"></i>', '均价') +
       '</div>' +
 
       subHead('物资小类分析') +
@@ -346,9 +355,10 @@
       LEVELS.map(function (lv, i) {
         return subHead(lv.title) + '<div class="dsc-chart" id="ckLv' + i + '" style="height:240px"></div>' +
           '<div class="ck-legend">' +
-          '<span><i style="background:#2FBD8A"></i>金额</span>' +
-          '<span><i style="background:#7FC8F1"></i>数量</span>' +
-          '<span><i class="ck-legend__line ck-legend__line--red"></i>均价</span></div>';
+          ckLegendItem('lv' + i, 0, '<i style="background:#2FBD8A"></i>', '金额') +
+          ckLegendItem('lv' + i, 1, '<i style="background:#7FC8F1"></i>', '数量') +
+          ckLegendItem('lv' + i, 2, '<i class="ck-legend__line ck-legend__line--red"></i>', '均价') +
+          '</div>';
       }).join(''));
   }
 
@@ -1960,7 +1970,7 @@
           { name: '数量', data: qty.map(function (v) { return v / 20; }), type: 'bar', axis: 'right',
             color: '#34A853', color2: '#7FC8F1', unit: '万个' },
           { name: '均价', data: price, type: 'line', color: '#D0021B' }
-        ].filter(function (se, i) { return !CS_IN_HIDE[i]; })
+        ].filter(function (se, i) { return !(CS_LEGEND.in || {})[i]; })
       }, { height: 340, rotateX: 45, yDigits: 0, yUnit: '亿元', y2Unit: '万个', padB: 96 });
     }
 
@@ -1970,10 +1980,12 @@
       if (el) D.ringChart(el, c.pct, { size: 100 });
     });
     D.delegate(root, [
-      /* 物资进场数据（多坐标柱状图）：点图例点亮 / 熄灭对应系列 */
+      /* 多坐标柱状图（物资进场数据 + 三级物资分析）：点图例点亮 / 熄灭对应系列 */
       { sel: '[data-ck-legend]', fn: function (el) {
-        const i = +el.getAttribute('data-ck-legend');
-        CS_IN_HIDE[i] = !CS_IN_HIDE[i];
+        const pr = el.getAttribute('data-ck-legend').split('|');
+        const key = pr[0], i = +pr[1];
+        if (!CS_LEGEND[key]) CS_LEGEND[key] = {};
+        CS_LEGEND[key][i] = !CS_LEGEND[key][i];
         D.render();
       } },
       { sel: '[data-ck-matcard]', fn: function (el) {
@@ -1995,12 +2007,12 @@
       const p = labels.map(function () { return D.round(300 + rnd2() * 2600, 2); });
       D.comboChart(el, {
         categories: labels,
-        series: [
+        series: ckLegendOn('lv' + i, [
           { name: '金额', data: a, type: 'bar', color: '#2FBD8A', color2: '#7FE3B8', unit: '亿元' },
           { name: '数量', data: q.map(function (v) { return v / 10; }), type: 'bar', axis: 'right',
             color: '#7FC8F1', color2: '#CDE9FB', unit: '万吨' },
           { name: '均价', data: p, type: 'line', color: '#D0021B' }
-        ]
+        ])
       }, { height: 240, rotateX: lv.key === 'all' ? 0 : 40, yDigits: 0, yUnit: '亿元', y2Unit: '万吨',
         padB: lv.key === 'all' ? 44 : 72, padR: 42 });
     });

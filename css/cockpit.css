@@ -99,8 +99,13 @@ input.ck-field { display: inline-block; min-width: 190px; }
 .ck-link--on { font-weight: 700; }
 
 /* ---------- 采购金额：饼图 + 6 KPI 卡 ---------- */
-.ck-amount { display: grid; grid-template-columns: minmax(0, 560px) minmax(0, 1fr); gap: var(--sp-xl); }
-.ck-amount__kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-lg); align-content: start; }
+/* 六张数字卡：两行等分（行高一致 → 六个框等高），整块高度 = 左侧饼图列的高度
+   （此前 align-content:start + 自动行高：带「上年度」副标题的第一行比第二行高，六个框高度不一致） */
+.ck-amount { display: grid; grid-template-columns: minmax(0, 560px) minmax(0, 1fr); gap: var(--sp-xl); align-items: stretch; }
+.ck-amount__kpis {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr)); gap: var(--sp-lg); align-content: stretch;
+}
 .ck-bigkpi {
   display: flex; align-items: center; gap: var(--sp-md); padding: var(--sp-lg);
   background: #FFF; border: 1px solid var(--color-border-light); border-radius: var(--radius-md);
