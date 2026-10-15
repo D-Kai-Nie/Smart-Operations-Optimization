@@ -22,7 +22,7 @@
       metrics: [
         { key: 'openBid', name: '公开招标率', unit: '%', target: 93, rule: '低于局定目标值 93%', src: '招采系统' },
         { key: 'onlineBid', name: '在线评标率', unit: '%', target: 95, rule: '低于局定目标值 95%', src: '招采系统' },
-        { key: 'failBid', name: '废标率', unit: '%', target: 0, invert: true, rule: '出现废标即为异常', src: '招采系统' },
+        { key: 'failBid', name: '废标率', unit: '%', target: 0, invert: true, targetText: '目标 0 笔', rule: '出现废标即为异常', src: '招采系统' },
         { key: 'bidLead', name: '平均招标时效', unit: '天', target: 45, invert: true, rule: '高于 45 天为异常', src: '招采系统' }
       ],
       extra: 'bidExtra'
@@ -93,13 +93,27 @@
   }
 
   /* ---------- 指标卡 + 正常/异常环状图 ---------- */
+  /* 环状图的分档数必须与异常清单同源：按「该指标在清单里出现过的二级单位数」算异常单位数。
+     此前是写死的（存在异常=18/21、正常=21/0），四张卡只看得到两种分布 —— 一眼假 */
+  function donutSplit(tab, m) {
+    const scope = D.scopeOrgs(D.scope.dataOrgs());
+    const hit = {};
+    abnormalRows(tab).forEach(function (r) {
+      if (r.metric === m.name) hit[r.org2] = 1;
+    });
+    const abnormal = Object.keys(hit).length;
+    const total = scope.length || 1;
+    const normal = Math.max(0, total - abnormal);
+    return { normal: normal, abnormal: abnormal, total: total };
+  }
+
   function metricGrid(tab) {
     const cfg = CFG[tab];
     return '<div class="dsc-grid dsc-grid--4 compliance-page__metric-grid u-mb-lg">' + cfg.metrics.map(function (m, i) {
       const v = metricValue(tab, m.key);
       const bad = isAbnormal(m, v);
-      const normalCount = bad ? 18 : 21;
-      const abnormalCount = 21 - normalCount;
+      const sp = m.count ? null : donutSplit(tab, m);
+      const target = m.targetText || ('目标 ' + (m.target === 0 ? '/-/' : m.target + m.unit));
       return '<div class="dsc-kpi dsc-kpi--clickable compliance-page__metric-card" data-cmetric="' + m.key + '">' +
         '<div class="dsc-kpi__name" title="' + esc(m.rule) + '">' + esc(m.name) + '</div>' +
         '<div class="dsc-kpi__value' + (bad ? ' dsc-kpi__value--danger' : '') + '">' + D.fmtNum(v, 2) +
@@ -107,8 +121,10 @@
         (m.count ? '<div class="dsc-kpi__foot">数量类指标，不做异常判定</div>'
           : '<div class="dsc-kpi__foot">' +
             '<span class="dsc-badge dsc-badge--' + (bad ? 'over' : 'ok') + '">' + (bad ? '存在异常' : '正常') + '</span>' +
-            '<span>目标 ' + (m.target === 0 ? '/-/' : m.target + m.unit) + '</span></div>') +
-        (!m.count ? '<div class="dsc-chart" id="cfDonut_' + i + '" style="height:120px;margin-top:8px"></div>' : '') +
+            '<span>' + esc(target) + '</span>' +
+            '<span title="按二级单位统计（共 ' + sp.total + ' 个）">正常 ' + sp.normal + ' · 异常 ' + sp.abnormal + '</span></div>') +
+        (!m.count ? '<div class="dsc-chart" id="cfDonut_' + i + '" style="height:120px;margin-top:8px"' +
+          ' title="按二级单位统计：正常 ' + sp.normal + ' 个 / 异常 ' + sp.abnormal + ' 个（共 ' + sp.total + ' 个）"></div>' : '') +
         '</div>';
     }).join('') + '</div>';
   }
@@ -141,8 +157,12 @@
       const subs = D.subOrgsByParent[o.name] || [];
       const list = D.projectsByOrg[o.name] || [];
       for (let i = 0; i < 3; i++) {
-        const m = cfg.metrics[(oi + i) % cfg.metrics.length];
+        const mi = (oi + i) % cfg.metrics.length;
+        const m = cfg.metrics[mi];
         if (m.count) continue;
+        /* 异常覆盖度按指标确定性分化：否则每个指标出现的单位集合完全相同，
+           四张卡的「正常/异常」会一模一样 —— 看着仍像写死的 */
+        if ((oi + mi * 3) % 5 === 0) continue;
         const v = m.dual ? (i === 0 ? 62.4 : -8.6) : (m.invert ? m.target * 1.3 : m.target * 0.72);
         out.push({
           org2: o.name, org3: subs.length ? subs[i % subs.length].name : '—',
@@ -150,6 +170,10 @@
           metric: m.name, value: D.round(v), target: m.target === 0 ? '/-/' : m.target + m.unit,
           rule: m.rule, contractCode: 'HT-' + (20250000 + (oi * 7 + i) * 13),
           docCode: 'DJ' + (20260000 + (oi * 11 + i) * 23),
+          /* 物料大/中/小类：Axure「成本降低率列表」的取数字段（列表字段选择-采购/物资/资产/资源） */
+          matBig: D.material.big[(oi + i) % D.material.big.length],
+          matMid: D.material.mid[(oi * 2 + i) % D.material.mid.length],
+          matSmall: D.material.small[(oi * 3 + i * 2) % D.material.small.length],
           creator: ['李彬', '王建国', '张伟', '陈晓', '刘洋'][i % 5], empNo: '8001' + String(20 + i * 3).padStart(3, '0'),
           level: ['严重', '较重', '一般'][i % 3],
           date: '2026-0' + (1 + i) + '-' + String(1 + (oi * 3 + i) % 27).padStart(2, '0')
@@ -162,17 +186,8 @@
     return out;
   }
 
-  function abnormalTable(tab) {
-    const rows = abnormalRows(tab);
-    const total = rows.length;
-    const paged = rows.slice((CS.page - 1) * CS.size, (CS.page - 1) * CS.size + CS.size);
-    return '<div class="dsc-card compliance-page__table-wrap"><div class="dsc-card__header">' +
-      '<div class="dsc-card__title">异常数清单</div>' +
-      '<div class="dsc-card__extra">' +
-      '<button class="dsc-btn dsc-btn--sm" data-cf-push>推送八局通通知</button>' +
-      '<button class="dsc-btn dsc-btn--sm" data-cf-export>导出</button></div></div>' +
-      D.table({
-        cols: [
+  /* 异常数清单的动态列（Axure《合规分析看板》「列表字段选择」口径） */
+  const ABN_COLS = [
           { key: 'idx', name: '序号', width: 56, sticky: true },
           { key: 'org2', name: '二级单位', width: 110, sticky2: true },
           { key: 'org3', name: '三级单位', width: 130 },
@@ -183,6 +198,9 @@
           } },
           { key: 'target', name: '目标 / 阈值', width: 120 },
           { key: 'rule', name: '异常规则', width: 200 },
+          { key: 'matBig', name: '物料大类', width: 120 },
+          { key: 'matMid', name: '物料中类', width: 130 },
+          { key: 'matSmall', name: '物料小类', width: 120 },
           { key: 'contractCode', name: '合同编号', width: 140, link: true },
           { key: 'docCode', name: '单据编号', width: 150, link: true },
           { key: 'creator', name: '创建人', width: 90 },
@@ -195,7 +213,21 @@
           { key: 'op', name: '操作', width: 100, render: function () {
             return '<span class="dsc-table__link" data-cf-drill>下钻</span>';
           } }
-        ], rows: paged.map(function (r, i) { return Object.assign({ idx: (CS.page - 1) * CS.size + i + 1 }, r); }),
+  ];
+  const ABN_DEF = ABN_COLS.map(function (c) { return c.key; });
+
+  function abnormalTable(tab) {
+    const rows = abnormalRows(tab);
+    const total = rows.length;
+    const paged = rows.slice((CS.page - 1) * CS.size, (CS.page - 1) * CS.size + CS.size);
+    return '<div class="dsc-card compliance-page__table-wrap"><div class="dsc-card__header">' +
+      '<div class="dsc-card__title">异常数清单</div>' +
+      '<div class="dsc-card__extra">' +
+      '<button class="dsc-btn dsc-btn--sm" data-cf-push>推送八局通通知</button>' +
+      '<button class="dsc-btn dsc-btn--sm" data-cf-export>导出</button>' +
+      D.colGear('data-cf-cols', '设置列：异常数清单的显示字段') + '</div></div>' +
+      D.table({
+        cols: D.colsOf('cf-abnormal', ABN_COLS, ABN_DEF),rows: paged.map(function (r, i) { return Object.assign({ idx: (CS.page - 1) * CS.size + i + 1 }, r); }),
         maxHeight: 460, foot: D.pager({ page: CS.page, size: CS.size, total: total })
       }) + '</div>';
   }
@@ -222,7 +254,8 @@
       D.table({
         cols: [
           { key: 'idx', name: '排名', width: 60 },
-          { key: 'name', name: lv === 'l2' ? '二级单位' : '三级单位', width: 170 },
+          /* P2-6：右侧已有「二级单位 / 三级单位」切换，表头再写一遍是重复 → 统一写「单位」 */
+          { key: 'name', name: '单位', width: 170 },
           { key: 'overCount', name: '超额招标笔数', width: 130, num: true },
           { key: 'overAmt', name: '超额金额(万元)', width: 140, num: true },
           { key: 'failCount', name: '废标笔数', width: 110, num: true }
@@ -230,9 +263,114 @@
       }) + '</div></div>';
   }
 
+  /* ---------- F8.1 投标定标情况（PRD F8.1 明确要求；Axure 该面板为动态列表 repeater，
+     「--dump-dom」静态导出拿不到其字段，故按 PRD 口径 + 招采业务常规字段还原） ---------- */
+  const BID_COLS = [
+    { key: 'idx', name: '序号', width: 56, sticky: true },
+    { key: 'bidCode', name: '招标单号', width: 170, sticky2: true, link: true },
+    { key: 'project', name: '项目', width: 220 },
+    { key: 'org2', name: '二级单位', width: 130 },
+    { key: 'way', name: '招标方式', width: 120 },
+    { key: 'bidCount', name: '投标单位数', width: 110, num: true },
+    { key: 'validCount', name: '有效投标数', width: 110, num: true },
+    { key: 'winSupplier', name: '中标单位', width: 220 },
+    { key: 'winAmt', name: '中标金额(万元)', width: 140, num: true },
+    { key: 'winRate', name: '中标率', width: 100, pct: true },
+    { key: 'downRate', name: '中标降幅', width: 110, pct: true },
+    { key: 'leadDays', name: '招标时效(天)', width: 120, num: true },
+    { key: 'date', name: '定标日期', width: 120 },
+    { key: 'status', name: '招标状态', width: 110, render: function (v) {
+      const cls = v === '已废标' ? 'over' : v === '已定标' ? 'ok' : 'plain';
+      return '<span class="dsc-badge dsc-badge--' + cls + '">' + esc(v) + '</span>';
+    } },
+    { key: 'op', name: '操作', width: 100, render: function () {
+      return '<span class="dsc-table__link" data-cf-drill>下钻</span>';
+    } }
+  ];
+  const BID_DEF = ['idx', 'bidCode', 'project', 'org2', 'way', 'bidCount', 'validCount', 'winSupplier',
+    'winAmt', 'winRate', 'date', 'status', 'op'];
+  const BID_ROWS = (function () {
+    const ways = ['公开招标', '邀请招标', '竞争性谈判', '询价'];
+    const rows = [];
+    D.projects.slice(0, 14).forEach(function (p, i) {
+      const bid = 3 + (i * 5) % 6;
+      const valid = Math.max(2, bid - i % 2);
+      const stopped = i === 5 || i === 11;
+      rows.push({
+        bidCode: 'ZB' + (202600000 + i * 29), project: p.name, org2: p.org,
+        way: ways[i % ways.length], bidCount: bid, validCount: valid,
+        winSupplier: D.suppliers[(i * 3) % D.suppliers.length].name,
+        winAmt: D.round(680 + i * 236.4, 1),
+        winRate: D.round(100 / bid, 1), downRate: D.round(1.6 + (i * 7 % 40) / 10, 1),
+        leadDays: 18 + (i * 11) % 46,
+        date: '2026-0' + (1 + i % 9) + '-' + String(3 + i % 25).padStart(2, '0'),
+        status: stopped ? '已废标' : (i % 7 === 3 ? '评标中' : '已定标')
+      });
+    });
+    return rows;
+  })();
+
+  function bidDecision() {
+    const rows = BID_ROWS;
+    const bidCnt = rows.reduce(function (a, r) { return a + r.bidCount; }, 0);
+    const validCnt = rows.reduce(function (a, r) { return a + r.validCount; }, 0);
+    const winCnt = rows.filter(function (r) { return r.status === '已定标'; }).length;
+    const failCnt = rows.filter(function (r) { return r.status === '已废标'; }).length;
+    const avgBid = D.round(bidCnt / rows.length, 1);
+    const rate = D.round(winCnt / rows.length * 100, 1);
+    const kpi = function (label, value, unit, foot) {
+      return '<div class="dsc-kpi">' +
+        '<div class="dsc-kpi__name">' + esc(label) + '</div>' +
+        '<div class="dsc-kpi__value">' + value + '<span class="dsc-kpi__unit">' + esc(unit) + '</span></div>' +
+        '<div class="dsc-kpi__foot">' + esc(foot) + '</div></div>';
+    };
+    return '<div class="dsc-card u-mb-lg"><div class="dsc-card__header">' +
+      '<div class="dsc-card__title">投标定标情况</div>' +
+      '<div class="dsc-card__extra">招标 → 投标 → 定标 全链条（PRD F8.1）</div></div>' +
+      '<div class="dsc-card__body"><div class="dsc-split dsc-split--2">' +
+      '<div><div class="dsc-chart" id="cfBidFunnel" style="height:210px"></div></div>' +
+      '<div class="dsc-grid dsc-grid--2">' +
+      kpi('招标笔数', bidCnt, '笔', '本年度累计，含废标 ' + failCnt + ' 笔') +
+      kpi('平均投标单位数', avgBid, '家', '笔均参与投标的分供商数量') +
+      kpi('中标率', rate, '%', '定标笔数 ÷ 招标笔数') +
+      kpi('废标笔数', failCnt, '笔', '废标率 ' + D.round(failCnt / rows.length * 100, 1) + '%') +
+      '</div></div></div></div>' +
+      '<div class="dsc-card compliance-page__table-wrap u-mb-lg"><div class="dsc-card__header">' +
+      '<div class="dsc-card__title">投标定标明细</div>' +
+      '<div class="dsc-card__extra">共 ' + rows.length + ' 条' +
+      D.colGear('data-cf-bidcols', '设置列：投标定标明细的显示字段') + '</div></div>' +
+      D.table({
+        cols: D.colsOf('cf-bid', BID_COLS, BID_DEF),
+        rows: rows.map(function (r, i) { return Object.assign({ idx: i + 1 }, r); }),
+        maxHeight: 420
+      }) + '</div>';
+  }
+
   /* ============================================================
      页面
      ============================================================ */
+  /* 查询条件（对齐 Axure《合规分析看板》：收起态 8 项 + 展开态补承包模式/地区/单据号与各类日期，
+     展开与查询/清空/重置 统一落在筛选条底栏右下角） */
+  function filterBlock() {
+    const d = function (label) {
+      return '<div class="ck-filter__item"><span class="ck-filter__label">' + esc(label) + '</span>' +
+        '<span class="ck-field ck-field--date">开始时间 ~ 结束时间</span></div>';
+    };
+    return '<div class="ck-filter ck-filter--panel">' +
+      '<div class="ck-filter__row">' +
+      D.ckField('二级单位', '') + D.ckField('三级单位', '') + D.ckField('项目', '') + D.ckField('项目类型', '') +
+      '</div><div class="ck-filter__row">' +
+      D.ckField('采购类别', '') + D.ckField('采购方式', '') + D.ckField('项目状态', '') + D.ckField('项目业态', '') +
+      '</div>' +
+      '<div class="ck-filter__more" hidden>' +
+      D.ckField('采购模式', '') + D.ckField('承包模式', '') + D.ckField('地区', '') +
+      D.ckField('合同', '') + D.ckField('结算单', '') +
+      d('合同签订日期') + d('结算单创建日期') + d('项目创建日期') + d('招标日期') + d('结算单签章日期') +
+      '</div>' +
+      D.ckActions(true) +
+      '</div>';
+  }
+
   D.pages.compliance = function () {
     const tab = CS.tab;
     const cfg = CFG[tab];
@@ -248,8 +386,9 @@
         return '<div class="dsc-tabs__item' + (t[0] === tab ? ' dsc-tabs__item--active' : '') +
           '" data-tab="' + t[0] + '">' + esc(t[1]) + '</div>';
       }).join('') + '</div>' +
+      filterBlock() +
       metricGrid(tab) +
-      (tab === 'bid' ? bidExtra() : '') +
+      (tab === 'bid' ? bidExtra() + bidDecision() : '') +
       abnormalStrip(tab) +
       abnormalTable(tab) +
       '</div>';
@@ -264,18 +403,58 @@
     const tab = CS.tab;
     const cfg = CFG[tab];
 
+    /* F8.1 投标定标情况：漏斗图 + 明细表设置列 */
+    const funnel = root.querySelector('#cfBidFunnel');
+    if (funnel) {
+      const rows2 = BID_ROWS;
+      const all = rows2.length;
+      const validTender = rows2.filter(function (r) { return r.status !== '已废标'; }).length;
+      const winCnt = rows2.filter(function (r) { return r.status === '已定标'; }).length;
+      /* 漏斗必须是同一口径（笔数）且逐级收敛：招标 → 有效招标 → 定标 → 签约。
+         不能把「投标单位数（家次）」和「招标笔数（笔）」放在同一条漏斗上比较 */
+      const stages = [
+        { name: '招标笔数', value: all },
+        { name: '有效招标', value: validTender },
+        { name: '定标笔数', value: winCnt },
+        { name: '已签约', value: Math.max(0, winCnt - 1) }
+      ];
+      const base = all || 1;
+      D.funnelChart(funnel, stages.map(function (x) {
+        return { name: x.name, value: x.value, rate: D.round(x.value / base * 100, 1) };
+      }), { height: 210 });
+    }
+    const bidGear = root.querySelector('[data-cf-bidcols]');
+    if (bidGear) {
+      bidGear.addEventListener('click', function () {
+        D.openColPicker({ key: 'cf-bid', title: '投标定标明细',
+          all: BID_COLS.filter(function (c) { return c.key !== 'idx'; }), def: BID_DEF, after: D.render });
+      });
+    }
+
+    /* 查询条件板块：复用看板同一套交互（查询 / 清空 / 重置 / 展开收起 + 就地条件反馈） */
+    if (D.ckCommonAfter) D.ckCommonAfter(root);
+
+    /* 异常数清单：设置列齿轮（真正改变表格字段） */
+    const cfgGear = root.querySelector('[data-cf-cols]');
+    if (cfgGear && !cfgGear.__bound) {
+      cfgGear.__bound = true;
+      cfgGear.addEventListener('click', function () {
+        D.openColPicker({ key: 'cf-abnormal', title: '异常数清单',
+          all: ABN_COLS.filter(function (c) { return c.key !== 'idx'; }), def: ABN_DEF, after: D.render });
+      });
+    }
+
     /* 正常 / 异常环状图（AC29） */
     cfg.metrics.forEach(function (m, i) {
       const el = root.querySelector('#cfDonut_' + i);
       if (!el || m.count) return;
       const v = metricValue(tab, m.key);
-      const bad = isAbnormal(m, v);
-      const normalUnits = bad ? 15 : 21;
-      const abnormalUnits = 21 - normalUnits;
+      const sp = donutSplit(tab, m);
       D.donutChart(el, [
-        { key: 'normal', name: '正常单位', value: normalUnits, color: '#00B42A' },
-        { key: 'abnormal', name: '异常单位', value: abnormalUnits, color: '#F5222D' }
-      ], { height: 120, hole: 0.68, clickable: true, centerText: '正常/异常', centerValue: normalUnits + ' / ' + abnormalUnits });
+        { key: 'normal', name: '正常单位', value: sp.normal, color: '#00B42A' },
+        { key: 'abnormal', name: '异常单位', value: sp.abnormal, color: '#F5222D' }
+      ], { height: 120, hole: 0.68, clickable: true, centerText: '正常 / 异常',
+        centerValue: sp.normal + ' / ' + sp.abnormal });
     });
 
     const ld = root.querySelector('#cfLeadDist');

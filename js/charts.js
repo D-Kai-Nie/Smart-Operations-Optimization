@@ -43,6 +43,15 @@ window.APP = window.APP || {};
     return out;
   }
 
+  /* 粗略文本宽度（px）：ASCII ≈ 6.4 / 全角 ≈ 11（以字号 11 为基准，fs 可指定）。
+     图表里用来给刻度、数值标签预留边距——留少了文字会落到 viewBox 之外 */
+  function textW(str, fs) {
+    const k = (fs || 11) / 11;
+    let px = 0;
+    for (let i = 0; i < String(str).length; i++) px += String(str).charCodeAt(i) > 255 ? 11 : 6.4;
+    return Math.round(px * k);
+  }
+
   function svgOpen(w, h) {
     return '<svg viewBox="0 0 ' + w + ' ' + h + '" width="' + w + '" height="' + h +
       '" preserveAspectRatio="xMidYMid meet" style="width:100%;height:' + h + 'px">';
@@ -123,9 +132,15 @@ window.APP = window.APP || {};
           esc(fmt(t, opt.yDigits == null ? (vmax < 10 ? 1 : 0) : opt.yDigits)) + '</text>';
       });
       const step = Math.ceil(data.categories.length / (opt.maxX || 12));
+      /* 首尾标签居中会被挤出画布 → 贴边时把锚点收到画布内（svg{overflow:visible} 会画到整页上） */
+      const clampX = function (x, txt) {
+        const half = textW(txt) / 2;
+        return Math.max(1 + half, Math.min(x, w - 1 - half));
+      };
       data.categories.forEach(function (c, i) {
         if (i % step) return;
-        s += '<text x="' + X(i).toFixed(1) + '" y="' + (h - 10) + '" text-anchor="middle" font-size="11" fill="#999">' + esc(c) + '</text>';
+        s += '<text x="' + clampX(X(i), String(c)).toFixed(1) + '" y="' + (h - 10) +
+          '" text-anchor="middle" font-size="11" fill="#999">' + esc(c) + '</text>';
       });
       data.series.forEach(function (se, si) {
         const color = se.color || PALETTE[si % PALETTE.length];
@@ -140,8 +155,9 @@ window.APP = window.APP || {};
             '" fill="#fff" stroke="' + color + '" stroke-width="2"' +
             tip('<b>' + esc(data.categories[i]) + '</b><br/>' + esc(se.name || '') + '：' + fmt(v, opt.tipDigits) + (opt.unit || '')) + '/>';
           if (opt.dataLabels) {
-            s += '<text x="' + X(i).toFixed(1) + '" y="' + (Y(v) - 9).toFixed(1) + '" text-anchor="middle" font-size="11" fill="' +
-              color + '">' + esc(fmt(v, opt.labelDigits == null ? 2 : opt.labelDigits)) + esc(opt.unit || '%') + '</text>';
+            const lt = fmt(v, opt.labelDigits == null ? 2 : opt.labelDigits) + (opt.unit || '%');
+            s += '<text x="' + clampX(X(i), lt).toFixed(1) + '" y="' + (Y(v) - 9).toFixed(1) +
+              '" text-anchor="middle" font-size="11" fill="' + color + '">' + esc(lt) + '</text>';
           }
         });
       });
@@ -171,7 +187,16 @@ window.APP = window.APP || {};
         return v.length ? [Math.min.apply(null, v), Math.max.apply(null, v)] : [0, 1];
       }
       /* 柱状图基线从 0 起：若按 min..max 取刻度，柱子会被截断，差异被视觉放大 */
-      const exL = ext(barsL), exR = ext(lines.concat(barsR));
+      /* 堆叠柱的量程必须按「每类各系列之和」取：按单系列最大值取量程时，
+         堆叠总和（如 100% 堆叠）会冲出量程顶部被画到画布之外 */
+      const stackExt = function () {
+        let hi = 0;
+        data.categories.forEach(function (c, i) {
+          hi = Math.max(hi, barsL.reduce(function (a, s) { return a + (s.data[i] || 0); }, 0));
+        });
+        return [0, hi || 1];
+      };
+      const exL = stack ? stackExt() : ext(barsL), exR = ext(lines.concat(barsR));
       const tL = axisTicks.call(null, Math.min(0, exL[0]), Math.max(0, exL[1]), 5);
       const tR = (lines.length || barsR.length)
         ? axisTicks.call(null, Math.min(0, exR[0]), Math.max(0, exR[1]), 5) : null;
@@ -263,7 +288,19 @@ window.APP = window.APP || {};
       const w = Math.max(300, el.clientWidth || 500);
       const rowH = opt.rowH || 28;
       const h = Math.max(rowH, rows.length * rowH + 10);
-      const padL = opt.padL || 130, padR = opt.padR || 70;
+      /* 左侧名称是右对齐画在 padL-8 处的，名字比 padL 宽就会画到画布外（x 变负） */
+      const nmOf = function (r) {
+        const nm = String(r.name);
+        return nm.length > (opt.nameMax || 11) ? nm.slice(0, opt.nameMax || 11) + '…' : nm;
+      };
+      const maxNameW = rows.reduce(function (a, r) { return Math.max(a, textW(nmOf(r), 12)); }, 0);
+      const padL = Math.max(opt.padL || 130, maxNameW + 12);
+      /* padR 要真正容下右侧数值标签：标签从 padL+iw+8 起画，
+         固定 padR（如 58）小于标签宽度时文字会画到 viewBox 之外（svg{overflow:visible} 会画到整页） */
+      const maxValW = rows.reduce(function (a, r) {
+        return Math.max(a, textW(fmt(r.value, opt.digits) + (opt.unit || ''), 12));
+      }, 0);
+      const padR = Math.max(opt.padR || 70, 16 + maxValW);
       const iw = w - padL - padR;
       const max = Math.max.apply(null, rows.map(function (r) { return r.value; }).concat([1]));
       let s = svgOpen(w, h);
@@ -273,7 +310,7 @@ window.APP = window.APP || {};
         const color = opt.colorOf ? opt.colorOf(r) : PALETTE[i % PALETTE.length];
         const nm = String(r.name);
         s += '<text x="' + (padL - 8) + '" y="' + (y + rowH / 2 + 4) + '" text-anchor="end" font-size="12" fill="#666">' +
-          esc(nm.length > (opt.nameMax || 11) ? nm.slice(0, opt.nameMax || 11) + '…' : nm) + '</text>';
+          esc(nmOf(r)) + '</text>';
         s += '<rect x="' + padL + '" y="' + (y + 4) + '" width="' + iw + '" height="' + (rowH - 12) + '" rx="3" fill="#F5F5F5"/>';
         s += '<rect x="' + padL + '" y="' + (y + 4) + '" width="' + bw.toFixed(1) + '" height="' + (rowH - 12) + '" rx="3" fill="' + color +
           '" opacity="0.86"' + tip('<b>' + esc(nm) + '</b><br/>' + (opt.valueLabel || '数值') + '：' + fmt(r.value, opt.digits) + (opt.unit || '')) + '/>';
@@ -703,14 +740,16 @@ window.APP = window.APP || {};
     autoRedraw(el, function () {
       const w = Math.max(360, el.clientWidth || 900);
       const rotate = opt.rotateX || 0;
-      const pad = { t: opt.padT == null ? 26 : opt.padT, r: opt.padR || 46,
-        b: opt.padB || (rotate ? 74 : 40), l: opt.padL || 52 };
       const h = opt.height || 300;
-      const iw = w - pad.l - pad.r, ih = h - pad.t - pad.b;
       const bars = data.series.filter(function (s) { return s.type !== 'line'; });
       const lines = data.series.filter(function (s) { return s.type === 'line'; });
       const left = bars.filter(function (s) { return s.axis !== 'right'; });
       const right = bars.filter(function (s) { return s.axis === 'right'; });
+      /* 右轴量程要同时看「右轴柱」和「右轴折线」：此前只看右轴柱，
+         若折线单独用右轴（如 资产周转情况的周转次数线）→ rmax 回落为 1，
+         所有 >1 的点 Y 坐标为负 → 越出 viewBox，再叠加 .dsc-chart svg{overflow:visible}
+         就被原样画到整页上（斜穿页签条与区块标题） */
+      const rightLines = lines.filter(function (s) { return s.axis === 'right'; });
       function ext(list) {
         const v = list.reduce(function (a, s) {
           return a.concat(s.data.filter(function (x) { return x != null; }));
@@ -718,7 +757,22 @@ window.APP = window.APP || {};
         return v.length ? Math.max.apply(null, v) : 1;
       }
       const tL = axisTicks(0, ext(left.length ? left : bars), 5);
-      const tR = right.length ? axisTicks(0, ext(right), 5) : null;
+      const rightPool = right.length ? right : rightLines;
+      const tR = rightPool.length ? axisTicks(0, ext(rightPool), 5) : null;
+      /* 刻度文字的预留宽度按「实际最长的一条」算：右轴刻度从 w-pad.r+8 起画、左轴刻度在 pad.l-8 处右对齐，
+         pad 小于文字宽度时文字会落到 viewBox 之外（svg{overflow:visible} 会把它画到整页上） */
+      const chars = function (list, digits, unit) {
+        return list.reduce(function (a, t) {
+          return Math.max(a, textW(fmt(t, digits) + (unit || '')));
+        }, 0);
+      };
+      const y1w = chars(tL, opt.yDigits == null ? 0 : opt.yDigits, opt.yUnit);
+      const y2w = tR ? chars(tR, 0, opt.y2Unit) : 0;
+      const pad = { t: opt.padT == null ? 26 : opt.padT,
+        r: Math.max(opt.padR || 46, y2w ? 12 + y2w : 0),
+        b: opt.padB || (rotate ? 74 : 40),
+        l: Math.max(opt.padL || 52, 14 + y1w) };
+      const iw = w - pad.l - pad.r, ih = h - pad.t - pad.b;
       const lmax = tL[tL.length - 1] || 1, rmax = tR ? tR[tR.length - 1] || 1 : 1;
       const YL = function (v) { return pad.t + ih - (v / lmax) * ih; };
       const YR = function (v) { return pad.t + ih - (v / rmax) * ih; };
@@ -735,9 +789,11 @@ window.APP = window.APP || {};
           esc(fmt(t, opt.yDigits == null ? 0 : opt.yDigits)) + esc(opt.yUnit || '') + '</text>';
       });
       if (tR) {
+        /* 右轴刻度小数位可指定：右轴挂的是比率（如 1.32 次 / 8.31%）时固定 0 位会全被四舍五入成 0、1、2 */
+        const rDig = opt.rDigits == null ? (rmax < 10 ? 1 : 0) : opt.rDigits;
         tR.forEach(function (t) {
           s += '<text x="' + (w - pad.r + 8) + '" y="' + (YR(t) + 4).toFixed(1) + '" font-size="11" fill="#999">' +
-            esc(fmt(t, 0)) + esc(opt.y2Unit || '') + '</text>';
+            esc(fmt(t, rDig)) + esc(opt.y2Unit || '') + '</text>';
         });
       }
       data.categories.forEach(function (c, i) {
@@ -756,9 +812,12 @@ window.APP = window.APP || {};
             '" height="' + Math.max(1, pad.t + ih - y).toFixed(1) + '" rx="1.5" fill="url(#' + gid + ')"' +
             tip('<b>' + esc(c) + '</b><br/>' + esc(se.name) + '：' + fmt(v, opt.yDigits) + esc(se.unit || '')) + '/>';
           if (showLabel && v > 0) {
+            /* 默认对 ≥10000 的数值自动折成「万」；但若轴本身就是「万元」，
+               再折一次会出现「1.89万」（= 18,900 万元）这种反直觉读数 → barLabelRaw 关掉换算 */
+            const lbl = opt.barLabelRaw ? fmt(v, opt.yDigits == null ? (v >= 100 ? 0 : 2) : opt.yDigits)
+              : (v >= 10000 ? fmt(v / 10000, 2) + '万' : fmt(v, v >= 100 ? 0 : 2));
             s += '<text x="' + (x + Math.max(3, bw - 4) / 2).toFixed(1) + '" y="' + (y - 4).toFixed(1) +
-              '" text-anchor="middle" font-size="10" fill="#333">' +
-              esc(v >= 10000 ? fmt(v / 10000, 2) + '万' : fmt(v, v >= 100 ? 0 : 2)) + '</text>';
+              '" text-anchor="middle" font-size="10" fill="#333">' + esc(lbl) + '</text>';
           }
         });
         if (rotate) {
@@ -777,9 +836,14 @@ window.APP = window.APP || {};
         /* 均价线默认用独立标尺，映射到绘图区下沿窄带（对齐截图观感），
            避免与左侧金额柱共轴时数值量级差异过大而溢出画布 */
         const YL2 = function (v) {
-          if (se.axis === 'right') return YR(v);
-          const t = (v - lmin) / ((lmax - lmin) || 1);
-          return pad.t + ih * (0.94 - t * 0.20);
+          let yy;
+          if (se.axis === 'right') yy = YR(v);
+          else {
+            const t = (v - lmin) / ((lmax - lmin) || 1);
+            yy = pad.t + ih * (0.94 - t * 0.20);
+          }
+          /* 兜底夹取：任何折线点都不允许落到绘图区外（越界会被画到整页上） */
+          return Math.max(pad.t - 1, Math.min(pad.t + ih + 1, yy));
         };
         const pts = se.data.map(function (v, i) {
           return (pad.l + band * i + band / 2).toFixed(1) + ',' + YL2(v).toFixed(1);
@@ -791,7 +855,7 @@ window.APP = window.APP || {};
             tip('<b>' + esc(data.categories[i]) + '</b><br/>' + esc(se.name) + '：' + fmt(v, 2)) + '/>';
           if (showLabel && i % (opt.lineLabelEvery || 1) === 0) {
             s += '<text x="' + x.toFixed(1) + '" y="' + (y + 15).toFixed(1) + '" text-anchor="middle" font-size="10" fill="' +
-              color + '">' + esc(fmt(v, v >= 100 ? 0 : 2)) + '</text>';
+              color + '">' + esc(fmt(v, v >= 100 ? 0 : 2)) + esc(opt.lineLabelUnit || '') + '</text>';
           }
         });
       });

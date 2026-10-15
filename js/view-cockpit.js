@@ -106,8 +106,51 @@
       case '采购方式': return ['公开招标', '邀请招标', '竞争性谈判', '单一来源', '询价'];
       case '采购模式': return ['集中采购', '分散采购', '厂家直采'];
       case '统计月份': return ['2026-01', '2026-02', '2026-03', '2026-04'];
+      /* 项目驾驶舱各列表的查询条件（Axure《项目驾驶舱》筛选条） */
+      case '计划月份': case '结算月份': return D.months12;
+      case '物料大类': return D.material.big;
+      case '物料中类': return D.material.mid;
+      case '物料编码': return ['WL100000', 'WL100137', 'WL100274', 'WL100411'];
+      case '分供商': case '分供商名称': return D.suppliers.slice(0, 30).map(function (s) { return s.name; });
+      case '分供商分类': return D.supplierCats;
+      case '领用单位': case '保管单位': return ['一分公司', '二分公司', '安装分公司', '装饰分公司', '第一分公司'];
+      case '一级库': return ['局本级库', '一公司本级库', '二公司本级库', '三级单位本级库'];
+      case '编制人': case '责任人': case '使用人': return ['李彬', '孙倩', '周磊', '吴迪', '王建国'];
+      case '结算周期': return ['月结30天', '月结60天', '季度结算', '节点结算'];
+      case '结算明细类型': return D.detailTypes;
+      case '是否对账': return ['已对账', '未对账'];
+      case '资产状态': return ['在用', '闲置', '报废', '维保'];
+      case '资产属性': return ['自有', '租赁', '调拨'];
+      case '资产类别': return ['项目固定资产', '项目非固定资产'];
+      case '存放地点': return ['现场', '库房', '临建区', '加工区'];
+      case '是否验收': case '是否盘点': case '是否调拨': case '是否处置':
+        return ['是', '否'];
       case '本级库': return ['局本级库', '二级单位本级库', '三级单位本级库'];
       case '合作年限': return ['1年以内', '1-3年', '3-5年', '5年以上'];
+      /* Axure《项目驾驶舱》各列表筛选条（物资 / 资产页签） */
+      case '供应商': case '收购方': return D.suppliers.slice(0, 30).map(function (x) { return x.name; });
+      case '退货类型': return ['质量退货', '规格退货', '多发货退货', '项目变更退货'];
+      case '调拨类型': return ['调入', '调出'];
+      case '调出公司': case '调入公司': return D.orgs.map(function (x) { return x.name; });
+      case '调出项目实施单位': case '调入项目实施单位':
+        return D.subOrgs.slice(0, 20).map(function (x) { return x.name; });
+      case '调出项目': case '调入项目': return D.projects.slice(0, 30).map(function (x) { return x.name; });
+      case '项目名称': return D.projects.slice(0, 30).map(function (x) { return x.name; });
+      case '处理方式': return ['销售', '销毁'];
+      case '废宝类型': return ['废钢筋', '废木材', '其他废料'];
+      case '处理人': return ['李彬', '王建国', '张伟'];
+      case '盘点类型': return ['全盘', '半明盘', '暗盘'];
+      case '盘点范围': case '库房名称':
+        return ['全部库房', '现场料场', '周转材料库', '一号库', '二号库'];
+      case '是否结算': case '是否生成日常计划': case '是否办理总结算': return ['是', '否'];
+      case '结算单状态': return ['待提交', '审批中', '已生效', '已作废'];
+      case '业务类型': return ['采购入库', '调拨入库', '退料入库'];
+      case '其他采购属性': return ['甲供', '甲控', '乙供'];
+      case '使用部位': return ['主体结构', '基础工程', '装饰装修', '机电安装', '室外工程'];
+      case '计划使用部位': return ['房建施工板块', '基础设施板块', '安装板块', '装饰装修板块'];
+      case '达处置条件': return ['已达到', '未达到'];
+      case '处理日期': case '调拨申请时间': case '调拨完成时间': case '处置日期':
+        return ['2026-01 ~ 2026-09', '2026-01 ~ 2026-03', '2026-04 ~ 2026-06', '2026-07 ~ 2026-09'];
       case '降本类型': return ['议价降本', '消耗降本', '资产降本', '验收降本', '周转降本', '闲废降本'];
       default: return null;
     }
@@ -141,16 +184,24 @@
       '<span class="ck-field ck-field--date">' + esc(v[0]) + ' ~ ' + esc(v[1]) + '</span></div>';
   }
   D.ckField = field;   // 供项目驾驶舱等页面复用同一套筛选字段
-  /* adv：只有确实存在 .ck-filter__more 的筛选条才给「高级筛选」，否则是个点了没反应的按钮 */
+  D.ckActions = actions;   // 供合规看板等页面复用同一套筛选条底栏（展开 + 查询/清空/重置）
+  /* 底栏：展开（左，与 Axure 筛选条一致）+ 条件反馈 + 查询/清空/重置（右下角）。
+     此前按钮塞在最后一行字段中间，展开后还会被「更多条件」挤开，操作位不固定。
+     adv：true → 展开/收起开关（data-ck-adv）；{ attr, label } → 自定义属性与文案 */
   function actions(adv) {
-    return '<div class="ck-filter__actions">' +
+    const a = adv === true ? { attr: 'data-ck-adv', label: '展开' } : (adv || null);
+    return '<div class="ck-filter__foot">' +
+      (a && a.attr ? '<span class="ck-link ck-link--adv" ' + a.attr + '>' + (a.label || '展开') + CARET + '</span>' : '') +
       '<span class="ck-filter__hint" hidden></span>' +
+      '<span class="ck-filter__foot-right">' +
       '<button class="ck-btn ck-btn--primary" data-ck-query>查询</button>' +
       '<button class="ck-link" data-ck-clear>清空</button>' +
       '<button class="ck-link" data-ck-reset>重置</button>' +
-      (adv ? '<button class="ck-link ck-link--adv" data-ck-adv>高级筛选</button>' : '') +
-      '</div>';
+      '</span></div>';
   }
+  /* 带状态的「展开 / 收起」入口：重绘后文案必须与 CS.advanced 的实际显隐一致，
+     否则会出现「文案=展开 但更多条件已铺开」的状态分叉 */
+  function advActions() { return actions({ attr: 'data-ck-adv', label: CS.advanced ? '收起' : '展开' }); }
   /* 读取筛选条里所有真控件的取值 */
   function readConds(box) {
     const out = [];
@@ -165,7 +216,10 @@
     const box = el.closest('.ck-filter');
     const hint = box && box.querySelector('.ck-filter__hint');
     if (!hint) return;
-    hint.textContent = conds.length ? '已按 ' + conds.length + ' 个条件查询' : '未设置筛选条件，显示全部';
+    /* P1-1：看板是汇总口径，条件不改变结果集 —— 反馈文案不能写「已按 N 个条件查询」，
+       否则点两次就能看出筛选没生效（数据报表页是真过滤，那里会写「命中 M 条」） */
+    hint.textContent = conds.length ? '已记录 ' + conds.length + ' 个筛选条件（看板为汇总视图，明细不随条件变化）'
+      : '未设置筛选条件，显示全部';
     hint.hidden = false;
   }
 
@@ -247,12 +301,11 @@
       field('二级单位', '') + field('三级单位', '') + field('项目状态', '') +
       '</div><div class="ck-filter__row">' +
       field('项目类型', '') + field('项目业态', '') +
-      '<div class="ck-filter__item ck-filter__item--blank"></div>' +
-      actions(true) +
       '</div>' +
       '<div class="ck-filter__more" ' + (CS.advanced ? '' : 'hidden') + '>' +
       field('承包模式', '') + field('地区', '') + field('实施单位', '') +
       '</div>' +
+      advActions() +
       '</div>' +
       '<div class="dsc-chart" id="ckInData" style="height:340px"></div>' +
       '<div class="ck-legend">' +
@@ -269,8 +322,8 @@
       field('省', '') + field('市', '') +
       '<div class="ck-filter__item"><span class="ck-filter__label">物料小类<b class="ck-req">*</b></span>' +
       '<span class="ck-field ck-field--ro">' + esc(CS.matSmall) + '</span></div>' +
-      actions() + '</div>' +
       '</div>' +
+      actions() + '</div>' +
       '<div class="ck-matcards">' + MAT_CARDS.map(function (c, i) {
         return '<div class="ck-matcard' + (CS.matSmall === c.name ? ' ck-matcard--active' : '') +
           '" data-ck-matcard="' + esc(c.name) + '">' +
@@ -357,11 +410,8 @@
       '<div class="ck-filter__item"><span class="ck-filter__label">日期</span>' +
       '<span class="ck-field ck-field--date">' + esc(D.defaultRange[0]) + ' ~ ' + esc(D.defaultRange[1]) + '</span></div>' +
       field('二级单位', '') + field('三级单位', '') +
-      '<div class="ck-filter__actions">' +
-      '<button class="ck-btn ck-btn--primary" data-ck-query>查询</button>' +
-      '<button class="ck-link" data-ck-clear>清空</button>' +
-      '<button class="ck-link" data-ck-reset>重置</button>' +
-      '</div></div></div>' +
+      '</div>' +
+      actions() + '</div>' +
       '<div class="ck-board">' + BOARD.map(function (b) {
         return '<div class="ck-board__col">' +
           '<div class="ck-board__title">' + esc(b.name) + '</div>' +
@@ -400,12 +450,12 @@
       field('二级单位', '') + field('三级单位', '') + field('项目名称', '') +
       '</div><div class="ck-filter__row">' +
       field('项目业态', '') + field('项目类型', '') +
-      '<div class="ck-filter__item ck-filter__item--blank"></div>' +
-      actions(true) + '</div>' +
+      '</div>' +
       '<div class="ck-filter__more" ' + (CS.advanced ? '' : 'hidden') + '>' +
       field('项目状态', '') + field('承包模式', '') + field('地区', '') +
       field('组织', '') + field('物料分类', '') +
-      '</div></div>' +
+      '</div>' +
+      advActions() + '</div>' +
 
       '<div class="ck-tabsrow">' + METRICS.map(function (x) {
         return '<div class="ck-tab' + (CS.metric === x.key ? ' ck-tab--active' : '') + '" data-ck-tab="' + x.key + '">' +
@@ -413,7 +463,8 @@
       }).join('') + '</div>' +
       '<div class="dsc-chart" id="ckTrend" style="height:280px"></div>') +
 
-      section('二级单位明细', unitTable()) +
+      section('二级单位明细', unitTable(),
+        D.colGear('data-pb-cols', '设置列：本指标的明细列表字段（基本信息 + 指标信息）')) +
       procSection() +
       '</div>';
   }
@@ -433,25 +484,136 @@
     ['中建八局新型建造工程公司', 12.94, 12.33, 4.68]
   ];
 
+  /* C1 / E2：看板单位名的统一表达——短名为主（应用内主键），法定全称进 tooltip；
+     点击切到该单位的组织视角并打开对应数据报表 */
+  function unitLink(shortName, ds) {
+    const full = (D.REPORT_UNITS[shortName] || [])[0] || '';
+    return '<span class="ck-table__unit dsc-table__link" data-goto-report="' + ds +
+      '" data-goto-org="' + esc(shortName) + '" title="' +
+      esc((full ? full + '　·　' : '') + '在数据报表中查看该单位') + '">' + esc(shortName) + '</span>';
+  }
+
+  /* ============================================================
+     指标明细列表（Axure：驾驶舱 › 核心数据 各指标页签的「设置列」）
+     列 = 排名 + 基本信息(勾选) + 指标信息(勾选)，随指标页签切换，每个指标一套字段
+     ============================================================ */
+  const BASIC_KEY = {
+    '三级单位': 'org3', '项目': 'project', '项目类型': 'pType', '项目状态': 'pStatus',
+    '项目业态': 'pFormat', '承包模式': 'pMode', '合同': 'contract', '合同来源': 'contractSrc',
+    '采购类别': 'purchaseCat', '物料大分类': 'matBig', '物料中分类': 'matMid', '物料小分类': 'matSmall',
+    '结算单/产值单': 'settleDoc', '供应商': 'supplier', '订单': 'order', '月份': 'month',
+    '区域联盟': 'regionAlliance', '项目联合体': 'projectJV'
+  };
+  /* 指标的全部可选字段（基本信息 + 指标信息），带类型便于渲染与合计 */
+  function metricFieldList(metric) {
+    const spec = D.METRIC_COLS[metric];
+    if (!spec) return { basic: [], info: [] };
+    const basic = (D.METRIC_BASIC[metric] || []).map(function (label) {
+      return { key: BASIC_KEY[label], name: label, type: 'text' };
+    });
+    const info = spec.info.map(function (f) { return { key: f[0], name: f[1], type: f[2], digits: f[3] }; });
+    /* 最后一个比率字段就是该指标本身，按 Axure 图例标红（其余分量保持常规色） */
+    const head = info.filter(function (c) { return c.type === 'pct'; }).pop();
+    if (head) head.danger = true;
+    return { basic: basic, info: info };
+  }
+  function metricDef(metric) {
+    const fl = metricFieldList(metric);
+    return ['name'].concat(fl.info.map(function (c) { return c.key; }));
+  }
+  const MONEY = function (v, c) {
+    if (v == null) return '—';
+    if (c.type === 'pct') return D.fmtNum(v, 2) + '%';
+    if (c.type === 'cnt') return D.fmtInt(v);
+    if (c.type === 'num') return D.fmtNum(v, c.digits == null ? 1 : c.digits);
+    return D.fmtNum(v, 2);
+  };
+  /* 合计行：金额/数量求和，比率取均值 */
+  function metricTotal(rows, cols) {
+    const t = {};
+    cols.forEach(function (c) {
+      const vals = rows.map(function (r) { return r[c.key]; }).filter(function (v) { return typeof v === 'number'; });
+      if (!vals.length) return;
+      const s = vals.reduce(function (a, b) { return a + b; }, 0);
+      t[c.key] = c.type === 'pct' ? D.round(s / vals.length, 2) : D.round(s, 2);
+    });
+    return t;
+  }
+  /* 指标明细表：rows 由 D.metricRows 产出（含 name 与全部指标字段） */
+  function metricListTable(o) {
+    const fl = metricFieldList(o.metric);
+    const all = [{ key: 'name', name: o.unitHead || '二级单位', type: 'text' }].concat(fl.basic, fl.info);
+    const cols = D.colsOf('metric-' + o.metric, all, o.def || metricDef(o.metric));
+    const tot = metricTotal(o.rows, cols);
+    const val = function (r, c) {
+      if (c.key === 'name') return unitLink(r.name, o.ds);      // 单位名只保留简称，全称进 tooltip
+      const v = r[c.key];
+      if (v == null || v === '') return '<span class="u-tertiary">—</span>';
+      if (c.type === 'text') return '<span class="ck-table__tx">' + esc(v) + '</span>';
+      return MONEY(v, c);
+    };
+    const totalCell = function (c) {
+      if (c.key === 'name') return o.totalName || '';
+      if (c.type === 'text' && tot[c.key] == null) return '';   // 维度字段不参与合计，留空
+      return tot[c.key] == null ? '—' : MONEY(tot[c.key], c);
+    };
+    return '<div class="ck-table-wrap dsc-scroll">' +
+      '<table class="ck-table ck-table--metrics"><thead><tr><th style="width:80px">排名</th>' +
+      cols.map(function (c) {
+        return '<th class="' + (c.type === 'text' ? '' : 'is-num') + (c.danger ? ' ck-table__danger' : '') + '">' +
+          esc(c.name) + '</th>';
+      }).join('') + '</tr></thead><tbody>' +
+      '<tr class="ck-table__total"><td class="is-center">合计</td>' +
+      cols.map(function (c) { return '<td class="' + (c.type === 'text' ? 'is-center' : 'is-num') + '">' + totalCell(c) + '</td>'; }).join('') +
+      '</tr>' +
+      o.rows.map(function (r, i) {
+        return '<tr><td class="is-center">' + ((o.page - 1) * o.size + i + 1) + '</td>' +
+          cols.map(function (c) {
+            return '<td class="' + (c.type === 'text' ? 'is-center' : 'is-num') + (c.danger ? ' ck-table__danger' : '') +
+              '">' + val(r, c) + '</td>';
+          }).join('') + '</tr>';
+      }).join('') + '</tbody></table></div>';
+  }
+  /* 齿轮：按指标打开「设置列」，字段按 基本信息 / 指标信息 分组 */
+  function metricColPicker(metric, title, after) {
+    const fl = metricFieldList(metric);
+    const unitCol = { key: 'name', name: '二级单位', type: 'text' };
+    const basic = [unitCol].concat(fl.basic);
+    const all = basic.concat(fl.info);
+    /* 分组与 Axure 一致：基本信息（含二级单位）/ 指标信息 */
+    D.openColPicker({
+      key: 'metric-' + metric, title: title, all: all, def: metricDef(metric),
+      groups: [{ title: '基本信息', items: basic }, { title: '指标信息', items: fl.info }],
+      after: after || D.render
+    });
+  }
+
+  /* 二级单位明细的动态列：字段取自 Axure《局驾驶舱 › 核心数据》「设置列」面板（基本信息 + 指标信息），
+     列出该表真实可算的字段——原来那张「列设置」只弹一个提示、不改变任何内容 */
+  const PB_UNIT_COLS = [
+    { key: 'name', name: '二级单位名称', width: 260 },
+    { key: 'stdAmt', name: '不含税标准成本金额（元）', width: 200, num: true },
+    { key: 'buyAmt', name: '不含税采购金额（元）', width: 190, num: true },
+    { key: 'saveAmt', name: '采购成本降低额（元）', width: 190, num: true },
+    { key: 'rate', name: '采购成本降低率', width: 150, num: true, danger: true },
+    { key: 'share', name: '标准成本占比', width: 130, num: true, pct: true }
+  ];
+  const PB_UNIT_DEF = ['name', 'stdAmt', 'buyAmt', 'saveAmt', 'rate', 'share'];
+
   function unitTable() {
     /* R2：受限视角下只返回本单位行（超权限行不返回） */
     const scope = D.scope.name;
     const visible = UNIT_ROWS.filter(function (r) {
       return D.scope.level === 1 || r[0].indexOf(scope.replace(/公司$/, '')) >= 0;
     });
-    return '<table class="ck-table ck-table--metrics">' +
-      '<thead><tr><th style="width:80px">序号</th><th>二级单位名称</th>' +
-      '<th class="is-num">不含税标准成本金额（元）</th><th class="is-num">不含税采购金额（元）</th>' +
-      '<th class="is-num ck-table__danger">采购成本降低率</th></tr></thead><tbody>' +
-      '<tr class="ck-table__total"><td class="is-center">合计</td><td class="is-center">-</td>' +
-      '<td class="is-num">1,563.19亿</td><td class="is-num">1,434.35亿</td>' +
-      '<td class="is-num ck-table__danger">8.24%</td></tr>' +
-      visible.map(function (r, i) {
-        return '<tr><td class="is-center">' + (i + 1) + '</td><td class="is-center">' + esc(r[0]) + '</td>' +
-          '<td class="is-num">' + D.fmtNum(r[1], 2) + '亿</td>' +
-          '<td class="is-num">' + D.fmtNum(r[2], 2) + '亿</td>' +
-          '<td class="is-num ck-table__danger">' + D.fmtNum(r[3], 2) + '%</td></tr>';
-      }).join('') + '</tbody></table>';
+    const names = visible.map(function (r) { return D.reportShortOf(r[0]); });
+    const metric = CS.metric;                 // 指标页签（8 个指标各自一套字段，随页签切换）
+    const rows = D.metricRows(names, metric, function (short) {
+      const o = D.orgMap[short];
+      return (o && o.kpi && o.kpi[metric] != null) ? o.kpi[metric] : null;
+    });
+    return metricListTable({ metric: metric, rows: rows, ds: 'purchase', page: 1, size: rows.length,
+      totalName: '全部 ' + rows.length + ' 个单位' });
   }
 
   const PROC_KPIS = [
@@ -479,10 +641,11 @@
       '<span class="ck-grain" data-ck-grain="招标开始日期">' + esc(CS.inGrain) + CARET + '</span>' +
       '<span class="ck-field ck-field--date">2025-06-01 ~ 2026-05-31</span></div>' +
       field('采购类别', '') + field('采购方式', '') + field('采购模式', '') +
-      actions(true) + '</div>' +
+      '</div>' +
       '<div class="ck-filter__more"' + (CS.advanced ? '' : ' hidden') + '>' +
       field('二级单位', '') + field('三级单位', '') + field('项目名称', '') +
-      '</div></div>' +
+      '</div>' +
+      advActions() + '</div>' +
       '<div class="ck-prockpis">' + PROC_KPIS.map(function (k) {
         return '<div class="ck-prockpi">' +
           '<span class="ck-prockpi__icon"><svg viewBox="0 0 64 64" width="52" height="52" fill="none" ' +
@@ -538,6 +701,8 @@
      版式：沿用「采购管理看板」的 ck-* 语言（指标卡带 → 筛选 → 页签 + 红色趋势 → 明细 → 区块）
      ============================================================ */
   const MS = {
+    /* 降本明细的本页内下钻路径（二级单位 → 三级单位 → 项目）；与「跳数据报表」无关 */
+    drill: { org2: '', org3: '', project: '' },
     metric: 'bargain',   // 顶部指标带 / 页签当前项
     save: 'total',       // 六项降本当前项
     rankPage: 1, detailPage: 1, size: 10,
@@ -604,19 +769,38 @@
     ['北京公司', 610.32, 823.93, 20.25],
     ['文旅博览公司', 552.34, 745.66, 21.30]
   ];
+  /* 二级单位排行的动态列（字段对齐 Axure 局驾驶舱核心数据「设置列」的基本信息 + 指标信息） */
+  const MB_RANK_COLS = [
+    { key: 'name', name: '二级单位', width: 200 },
+    { key: 'saveAmt', name: '二次议价成本降低额（万元）', width: 220, num: true },
+    { key: 'totalAmt', name: '总采购金额（万元）', width: 190, num: true },
+    { key: 'rate', name: '二次议价成本降低率', width: 180, num: true, danger: true },
+    { key: 'share', name: '议价降本占采购额比', width: 170, num: true, pct: true }
+  ];
+  const MB_RANK_DEF = ['name', 'saveAmt', 'totalAmt', 'rate'];
+
   /* 合计取全部 21 行之和；比率类指标不可累加，合计行显示「—」 */
   const MB_RANK_TOTAL = ['41,970.07', '48,542.70'];
   const MB_TOTAL_N = MB_RANK.length;
 
-  /* 六项降本（截图实测） */
+  /* 六项降本（金额与占比均截图实测）。
+     口径：金额 = 该口径的降本金额；百分比 = 降本金额 ÷ 项目确权产值 × 100%（百分比与金额同源，不另编） */
+  const SAVE_SRC = '物资系统 / 财务系统';
   const MB_SAVE = [
-    { key: 'total', name: '合计降本', value: '19,131.73', rate: 8.31 },
-    { key: 'bargain', name: '议价降本', value: '1,317', rate: 6.88 },
-    { key: 'consume', name: '消耗降本', value: '2,586', rate: 10.50 },
-    { key: 'asset', name: '资产降本', value: '3,528.17', rate: 6.68 },
-    { key: 'accept', name: '验收降本', value: '4,136.68', rate: 9.94 },
-    { key: 'turnover', name: '周转降本', value: '2,379.51', rate: 13.47 },
-    { key: 'idle', name: '闲废降本', value: '5,184.37', rate: 7.19 }
+    { key: 'total', name: '合计降本', value: '19,131.73', rate: 8.31,
+      desc: '六项降本金额合计（= 议价 + 消耗 + 资产 + 验收 + 周转 + 闲废）；占比为合计降本 ÷ 项目确权产值', src: SAVE_SRC },
+    { key: 'bargain', name: '议价降本', value: '1,317', rate: 6.88,
+      desc: '二次议价压降的采购金额（含集采引用议价、过程履约议价、结算议价）；占比为该降本额 ÷ 项目确权产值', src: SAVE_SRC },
+    { key: 'consume', name: '消耗降本', value: '2,586', rate: 10.50,
+      desc: '材料结余降耗 + 过程控耗形成的降本额；占比为该降本额 ÷ 项目确权产值', src: SAVE_SRC },
+    { key: 'asset', name: '资产降本', value: '3,528.17', rate: 6.68,
+      desc: '使用调拨资产、资产租赁减少新购形成的降本额；占比为该降本额 ÷ 项目确权产值', src: SAVE_SRC },
+    { key: 'accept', name: '验收降本', value: '4,136.68', rate: 9.94,
+      desc: '数量验收核减 + 双控验收 + 质量验收形成的降本额；占比为该降本额 ÷ 项目确权产值', src: SAVE_SRC },
+    { key: 'turnover', name: '周转降本', value: '2,379.51', rate: 13.47,
+      desc: '高周转材料替换、提升内部周转、优先使用调拨料具形成的降本额；占比为该降本额 ÷ 项目确权产值', src: SAVE_SRC },
+    { key: 'idle', name: '闲废降本', value: '5,184.37', rate: 7.19,
+      desc: '废料增值处置、废旧物资回收再利用、永临结合、闲置物资改制再利用形成的降本额；占比为该降本额 ÷ 项目确权产值', src: SAVE_SRC }
   ];
   const MB_SAVE_MONTHS = ['一月', '二月', '三月', '四月', '五月', '六月',
     '七月', '八月', '九月', '十月', '十一月', '十二月'];
@@ -643,69 +827,230 @@
     ['西北公司', 1883.54, 934.79], ['轨道公司', 1631.60, 617.14]
   ];
 
-  /* 降本明细（截图实测前 10 行） */
-  const MB_DETAIL = [
-    ['装饰公司', '第一分公司', '高比能项目', '滨江商务中心安装工程'],
-    ['一公司', '第一分公司', '滨江商务中心安装工程', '滨江商务中心安装工程'],
-    ['四公司', '第一分公司', '高比能项目', '滨江商务中心安装工程'],
-    ['三公司', '第一分公司', '滨江商务中心安装工程', '滨江商务中心安装工程'],
-    ['二公司', '第一分公司', '高比能项目', '滨江商务中心安装工程'],
-    ['土木公司', '第一分公司', '滨江商务中心安装工程', '滨江商务中心安装工程'],
-    ['新型建造公司', '第一分公司', '高比能项目', '滨江商务中心安装工程'],
-    ['发展建设分公司', '第一分公司', '滨江商务中心安装工程', '滨江商务中心安装工程'],
-    ['北京公司', '第一分公司', '高比能项目', '滨江商务中心安装工程'],
-    ['上海公司', '第一分公司', '滨江商务中心安装工程', '滨江商务中心安装工程']
+  /* ============================================================
+     六项降本 › 降本明细清单
+     · 单据口径：字段逐项抄自 Axure《列表字段选择-物资六项降本》（7 状态）
+     · 合计降本：扩展为全量 6 大项 18 小项 + 项目确权产值金额
+       （18 小项 = 六个状态指标信息的并集；「供应链金融溢价降本金额」在议价与周转中各出现一次，去重后 18 项）
+     ============================================================ */
+  const MB_SAVE_TYPES = ['bargain', 'consume', 'asset', 'accept', 'turnover', 'idle'];
+  /* 18 小项：[key, 名称, 所属大项] */
+  const MB_SAVE_SUBS = [
+    ['bidSave', '集采引用议价降本金额', 'bargain'],
+    ['perfSave', '过程履约议价降本金额', 'bargain'],
+    ['finSave', '供应链金融溢价降本金额', 'bargain'],
+    ['settleSave', '结算议价降本金额', 'bargain'],
+    ['balanceSave', '材料结余降耗金额', 'consume'],
+    ['processSave', '材料过程控耗金额', 'consume'],
+    ['transferSave', '使用调拨资产降本金额', 'asset'],
+    ['leaseSave', '资产租赁减少新购降本金额', 'asset'],
+    ['qtySave', '数量验收核减降本金额', 'accept'],
+    ['dualSave', '双控验收降本金额', 'accept'],
+    ['qualitySave', '质量验收降本金额', 'accept'],
+    ['highTurnSave', '使用高周转材料替换常规周转材料降本金额', 'turnover'],
+    ['innerTurnSave', '提升内部周转降本金额', 'turnover'],
+    ['toolSave', '优先使用调拨料具降本金额', 'turnover'],
+    ['scrapSave', '废料增值处置降本金额', 'idle'],
+    ['recycleSave', '废旧物资回收再利用降本金额', 'idle'],
+    ['tempSave', '永临结合降本金额', 'idle'],
+    ['remakeSave', '闲置物资改制再利用降本金额', 'idle']
   ];
-  const MB_DETAIL_COLS = [
-    { key: 'idx', name: '排名', width: 70, num: true },
-    { key: 'org2', name: '二级单位', width: 130 },
-    { key: 'org3', name: '三级单位', width: 130 },
-    { key: 'project', name: '项目', width: 200 },
-    { key: 'unit', name: '实施单位', width: 230 },
-    { key: 'month', name: '统计月份', width: 110 },
-    { key: 'code', name: '单号', width: 190 },
-    { key: 'saveAmt', name: '降本额（万元）', width: 140, num: true },
-    { key: 'saveRate', name: '降本率', width: 100, pct: true }
+  /* 6 大项的合计列（合计降本视图的默认展示项） */
+  const MB_SAVE_SUM_COLS = [
+    ['bargainAmt', '议价降本金额', 'bargain'], ['consumeAmt', '消耗降本金额', 'consume'],
+    ['assetAmt', '资产降本金额', 'asset'], ['acceptAmt', '验收降本金额', 'accept'],
+    ['turnoverAmt', '周转降本金额', 'turnover'], ['idleAmt', '闲废降本金额', 'idle']
   ];
-  function mbDetailRows() {
-    return MB_DETAIL.map(function (r, i) {
-      return {
-        org2: r[0], org3: r[1], project: r[2], unit: '中建八局二公司第一分公司',
-        month: '2026-04', code: 'LXJB-20260310-000001',
-        saveAmt: D.round(2874.19 - i * 173.42, 2), saveRate: D.round(4.5 + i * 0.62, 2)
-      };
+  const MB_SAVE_BASIC = [
+    ['org2', '二级单位', 130], ['org3', '三级单位', 150], ['project', '项目名称', 200],
+    ['pType', '项目类型', 120], ['unit', '实施单位', 200], ['month', '统计月份', 110],
+    ['code', '单号', 180], ['docStatus', '单据状态', 110], ['pStatus', '项目状态', 100],
+    ['pFormat', '项目业态', 110], ['pMode', '承包模式', 130]
+  ];
+  /* 各口径的专有指标信息（Axure 面板逐状态抄录） */
+  const MB_SAVE_METRICS = {
+    bargain: MB_SAVE_SUBS.filter(function (x) { return x[2] === 'bargain'; }),
+    consume: MB_SAVE_SUBS.filter(function (x) { return x[2] === 'consume'; }),
+    asset: MB_SAVE_SUBS.filter(function (x) { return x[2] === 'asset'; }),
+    accept: MB_SAVE_SUBS.filter(function (x) { return x[2] === 'accept'; }),
+    turnover: MB_SAVE_SUBS.filter(function (x) { return x[2] === 'turnover'; })
+      .concat([['finSave', '供应链金融溢价降本金额', 'turnover']]),
+    idle: MB_SAVE_SUBS.filter(function (x) { return x[2] === 'idle'; })
+  };
+  const MB_FIXED_COLS = ['idx', 'org2', 'org3', 'project'];
+
+  /* 列模型：合计降本 = 组织链（固定）+ 9 列默认 + 18 小项等隐藏项；单口径 = 组织链 + 该口径小项 + 降本额 / 占比 */
+  function mbSaveCols(key) {
+    const isTotal = key === 'total';
+    const ident = [
+      { key: 'idx', name: '排名', width: 70, num: true },
+      { key: 'org2', name: '二级单位', width: 130, render: function (v) { return mbDrillLink('org2', v); } },
+      { key: 'org3', name: '三级单位', width: 150, render: function (v) { return mbDrillLink('org3', v); } },
+      { key: 'project', name: '项目名称', width: 200, render: function (v) { return mbDrillLink('project', v); } }
+    ];
+    if (isTotal) {
+      const metric = MB_SAVE_SUM_COLS.map(function (c) {
+        return { key: c[0], name: c[1] + '(万元)', width: 140, num: true };
+      });
+      metric.push({ key: 'saveAmt', name: '降本额合计(万元)', width: 150, num: true });
+      metric.push({ key: 'entAmt', name: '项目确权产值金额(万元)', width: 180, num: true });
+      metric.push({ key: 'saveRate', name: '降低额占比', width: 120, pct: true });
+      const rest = MB_SAVE_BASIC.filter(function (b) { return MB_FIXED_COLS.indexOf(b[0]) < 0; })
+        .map(function (b) { return { key: b[0], name: b[1], width: b[2] }; })
+        .filter(function (c) { return ['code', 'docStatus'].indexOf(c.key) < 0; });
+      const subs = MB_SAVE_SUBS.map(function (x) {
+        return { key: x[0], name: x[1] + '（万元）', width: 240, num: true };
+      });
+      return ident.concat(metric).concat(rest).concat(subs);
+    }
+    const k = MB_SAVE_METRICS[key] ? key : 'bargain';
+    const metric = MB_SAVE_METRICS[k].map(function (m2) {
+      return { key: m2[0], name: m2[1] + '（万元）', width: 240, num: true };
+    });
+    metric.push({ key: 'saveAmt', name: mbSave(k).name + '（万元）', width: 150, num: true });
+    metric.push({ key: 'saveRate', name: '降本占比率', width: 110, pct: true });
+    const rest = MB_SAVE_BASIC.filter(function (b) { return MB_FIXED_COLS.indexOf(b[0]) < 0; })
+      .map(function (b) { return { key: b[0], name: b[1], width: b[2] }; });
+    return ident.concat(metric).concat(rest);
+  }
+  /* 默认显示列：合计降本 = 6 大项 + 合计 + 产值 + 占比（9 列）；单口径 = 该口径小项 + 降本额 + 占比 */
+  function mbSaveDef(key) {
+    if (key === 'total') {
+      return MB_FIXED_COLS.concat(MB_SAVE_SUM_COLS.map(function (c) { return c[0]; }))
+        .concat(['saveAmt', 'entAmt', 'saveRate']);
+    }
+    const k = MB_SAVE_METRICS[key] ? key : 'bargain';
+    return MB_FIXED_COLS.concat(MB_SAVE_METRICS[k].map(function (m2) { return m2[0]; }))
+      .concat(['saveAmt', 'saveRate']);
+  }
+  const MB_DOC_STATUS = ['已生效', '审批中', '已提交'];
+  /* 把一个大项金额按确定性权重拆到它的小项上（各小项之和恒等于该大项） */
+  function splitSubs(amt, subs, seed) {
+    const w = subs.map(function (x, j) { return 22 + ((seed + j * 7) % 9) * 3; });
+    const ws = w.reduce(function (a, b) { return a + b; }, 0);
+    const out = {};
+    let acc = 0;
+    subs.forEach(function (x, j) {
+      const v = j === subs.length - 1 ? D.round(amt - acc, 2) : D.round(amt * w[j] / ws, 2);
+      out[x[0]] = v;
+      acc = D.round(acc + v, 2);
+    });
+    return out;
+  }
+  function mbDetailRows(key) {
+    const rows = [];
+    D.orgs.forEach(function (o, oi) {
+      const subs = D.subOrgsByParent[o.name] || [];
+      const pjs = (D.projectsByOrg && D.projectsByOrg[o.name]) || [];
+      const mine = pjs.length ? pjs : D.projects.slice(oi * 2, oi * 2 + 3);
+      if (key === 'total') {
+        /* 合计降本：一行 = 一个项目，六个大项 + 18 小项 + 合计 + 产值 + 占比 */
+        mine.slice(0, 3).forEach(function (p, pi) {
+          const seed = oi * 7 + pi * 3;
+          const tAmt = {};
+          let sum = 0;
+          MB_SAVE_TYPES.forEach(function (t, ti) {
+            const base = { bargain: 1, consume: 1.9, asset: 2.6, accept: 3.1, turnover: 1.8, idle: 3.9 }[t];
+            const v = D.round(180 + base * 320 + ((seed * 37 + ti * 53) % 97) * 6.4, 2);
+            tAmt[t] = v;
+            sum = D.round(sum + v, 2);
+          });
+          const rate = D.round(4.6 + (seed % 11) * 0.58, 2);
+          /* 产值按占比反推：降低额占比 = 合计 ÷ 产值，保证行内自洽 */
+          const ent = D.round(sum / rate * 100, 2);
+          const row = {
+            org2: o.name, org3: subs.length ? subs[pi % subs.length].name : (p.subOrg || p.org),
+            project: p.name, pType: p.type, unit: (p.subOrg || p.org) + '',
+            pStatus: p.status, pFormat: p.format || '房建', pMode: p.mode,
+            month: '2026-' + String(1 + (oi + pi) % 9).padStart(2, '0'),
+            saveAmt: sum, entAmt: ent, saveRate: rate
+          };
+          MB_SAVE_SUM_COLS.forEach(function (c) { row[c[0]] = tAmt[c[2]]; });
+          MB_SAVE_TYPES.forEach(function (t, ti) {
+            const part = splitSubs(tAmt[t], MB_SAVE_METRICS[t], seed + ti);
+            Object.keys(part).forEach(function (kk) { row[kk] = part[kk]; });
+          });
+          rows.push(row);
+        });
+        return;
+      }
+      /* 单口径：一行 = 一条降本单据 */
+      mine.slice(0, 3).forEach(function (p, pi) {
+        const seed = oi * 5 + pi;
+        const amt = D.round(2874.19 - (oi % 21) * 92.4 + pi * 137.6, 2);
+        const row = {
+          org2: o.name, org3: subs.length ? subs[pi % subs.length].name : (p.subOrg || p.org),
+          project: p.name, pType: p.type, unit: (p.subOrg || p.org) + '',
+          month: '2026-' + String(1 + (oi + pi) % 9).padStart(2, '0'),
+          code: 'LXJB-20260310-' + String(oi * 3 + pi + 1).padStart(6, '0'),
+          docStatus: MB_DOC_STATUS[(oi + pi) % 3], pStatus: p.status,
+          pFormat: p.format || '房建', pMode: p.mode,
+          saveAmt: amt, saveRate: D.round(4.2 + (seed % 13) * 0.68, 2)
+        };
+        const part = splitSubs(amt, MB_SAVE_METRICS[MB_SAVE_METRICS[key] ? key : 'bargain'], seed);
+        Object.keys(part).forEach(function (kk) { row[kk] = part[kk]; });
+        rows.push(row);
+      });
+    });
+    return rows;
+  }
+  /* 本页内下钻：点单位名 / 项目名就地过滤本表（不跳数据报表） */
+  function mbDrillLink(level, v) {
+    if (!v) return '—';
+    return '<span class="dsc-table__link" data-mb-drill="' + level + '|' + esc(v) + '">' + esc(v) + '</span>';
+  }
+  function mbDrillRows(rows) {
+    const d = MS.drill;
+    return rows.filter(function (r) {
+      if (d.org2 && r.org2 !== d.org2) return false;
+      if (d.org3 && r.org3 !== d.org3) return false;
+      if (d.project && r.project !== d.project) return false;
+      return true;
     });
   }
+  function mbDrillPath() {
+    const d = MS.drill;
+    if (!d.org2) return '';
+    const parts = [['全部', 'all|']];
+    parts.push([d.org2, 'org2|' + d.org2]);
+    if (d.org3) parts.push([d.org3, 'org3|' + d.org3]);
+    if (d.project) parts.push([d.project, 'project|' + d.project]);
+    return '<div class="drill-path report-page__drill-path">' +
+      '<span>组织下钻：</span>' +
+      parts.map(function (p, i) {
+        const last = i === parts.length - 1;
+        return (i ? '<span class="drill-path__sep">&gt;</span>' : '') +
+          '<span class="drill-path__crumb' + (last ? '' : ' drill-path__crumb--link') + '"' +
+          (last ? '' : ' data-mb-drill="' + p[1] + '"') + '>' + esc(p[0]) + '</span>';
+      }).join('') +
+      '<button class="dsc-btn dsc-btn--sm drill-path__back" data-mb-drill-back>返回上一级</button></div>';
+  }
 
+  /* 二级单位排行 = 当前指标的明细列表（字段随指标切换，齿轮走 metricColPicker 的同一套 store）
+     与采购/资产看板同构：D.metricRows 生成「基本信息 + 指标信息」，metricListTable 渲染 合计 + 分页行 */
   function mbRankTable() {
-    /* R2：受限视角只返回本单位行 */
     const scope = D.scope.name;
-    const all = MB_RANK.filter(function (r) {
+    const visible = MB_RANK.filter(function (r) {
       return D.scope.level === 1 || r[0].indexOf(scope.replace(/公司$/, '')) >= 0;
     });
-    const pages = Math.max(1, Math.ceil(all.length / MS.size));
+    const pages = Math.max(1, Math.ceil(visible.length / MS.size));
     if (MS.rankPage > pages) MS.rankPage = pages;
-    const visible = all.slice((MS.rankPage - 1) * MS.size, (MS.rankPage - 1) * MS.size + MS.size);
-    return '<table class="ck-table ck-table--metrics"><thead><tr>' +
-      '<th style="width:80px">排名</th><th>二级单位</th>' +
-      '<th class="is-num">二次议价成本降低额（万元）</th><th class="is-num">总采购金额（万元）</th>' +
-      '<th class="is-num ck-table__danger">二次议价成本降低率</th></tr></thead><tbody>' +
-      visible.map(function (r, i) {
-        return '<tr><td class="is-center">' + ((MS.rankPage - 1) * MS.size + i + 1) + '</td><td class="is-center">' + esc(r[0]) + '</td>' +
-          '<td class="is-num">' + D.fmtNum(r[1], 2) + '</td>' +
-          '<td class="is-num">' + D.fmtNum(r[2], 2) + '</td>' +
-          '<td class="is-num ck-table__danger">' + D.fmtNum(r[3], 2) + '%</td></tr>';
-      }).join('') +
-      '<tr class="ck-table__total"><td class="is-center">合计</td><td class="is-center">全部 ' + MB_TOTAL_N + ' 个单位</td>' +
-      '<td class="is-num">' + MB_RANK_TOTAL[0] + '</td><td class="is-num">' + MB_RANK_TOTAL[1] + '</td>' +
-      '<td class="is-num ck-table__danger" title="比率类指标不可累加">—</td></tr>' +
-      '</tbody></table>';
+    const paged = visible.slice((MS.rankPage - 1) * MS.size, (MS.rankPage - 1) * MS.size + MS.size);
+    const names = paged.map(function (r) { return r[0]; });
+    const metric = MS.metric;
+    const rows = D.metricRows(names, metric, function (short) {
+      const hit = MB_RANK.filter(function (r) { return r[0] === short; })[0];
+      return hit ? hit[3] : null;      // 该单位在当前指标上的取值
+    });
+    return metricListTable({ metric: metric, rows: rows, ds: 'material',
+      page: MS.rankPage, size: MS.size, totalName: '全部 ' + MB_TOTAL_N + ' 个单位' });
   }
 
+  /* 物资管理看板主体：指标卡带 → 主筛选 → 指标页签 + 红色趋势 → 二级单位排行 → 六项降本 → 废旧物资处理 */
   function materialBoardView() {
     const m = mbMetric(MS.metric);
     return '<div class="ck-view ck-view--metrics">' +
-      /* 指标卡带（6 张，与页签双向联动） */
+      /* 6 指标卡（与页签双向联动） */
       '<div class="ck-metrics ck-metrics--6">' + MB_METRICS.map(function (x) {
         return '<div class="ck-metriccard' + (MS.metric === x.key ? ' ck-metriccard--active' : '') +
           '" data-mb-metric="' + x.key + '">' +
@@ -714,7 +1059,7 @@
           '<div class="ck-metriccard__label">' + esc(x.name) + '</div></div>';
       }).join('') + '</div>' +
 
-      /* 筛选条 */
+      /* 主筛选条 */
       '<div class="ck-filter ck-filter--panel">' +
       '<div class="ck-filter__row">' +
       field('项目类型', '') + field('项目状态', '') + field('承包模式', '') +
@@ -723,11 +1068,12 @@
       '<span class="ck-grain" data-ck-grain="日期选择">' + esc(CS.settleGrain) + CARET + '</span>' +
       '<span class="ck-field ck-field--date">2025-06-01 ~ 2026-05-31</span></div>' +
       field('二级单位', '') + field('三级单位', '') +
-      actions(true) + '</div>' +
+      '</div>' +
       '<div class="ck-filter__more" ' + (CS.advanced ? '' : 'hidden') + '>' +
       field('项目业态', '') + field('地区', '') + field('组织', '') +
       field('物料分类', '') + field('项目名称', '') +
-      '</div></div>' +
+      '</div>' +
+      advActions() + '</div>' +
 
       /* 指标页签 + 红色趋势 */
       '<div class="ck-tabsrow">' + MB_METRICS.map(function (x) {
@@ -738,15 +1084,13 @@
       '<div class="dsc-chart" id="mbTrend" style="height:280px"></div>' +
 
       /* 二级单位排行 */
-      subHead('二级单位排行', '共 ' + MB_RANK.length + ' 个二级单位') +
+      subHead('二级单位排行', '共 ' + MB_RANK.length + ' 个二级单位' +
+        D.colGear('data-mb-rank-cols', '设置列：本指标的明细列表字段（基本信息 + 指标信息）')) +
       mbRankTable() +
-      '<div data-mb-pager="rankPage">' + D.pager({ page: MS.rankPage, size: MS.size, total: 60 }) + '</div>' +
+      '<div data-mb-pager="rankPage">' + D.pager({ page: MS.rankPage, size: MS.size, total: MB_RANK.length }) + '</div>' +
 
-      /* 六项降本 */
+      /* 六项降本（含降本明细清单：卡片 → 统一查询 → 趋势 → 清单） */
       saveSection() +
-
-      /* 降本明细 */
-      detailSection() +
 
       /* 废旧物资处理 */
       '<section class="ck-sec"><div class="ck-sec__head"><h2 class="ck-sec__title">废旧物资处理</h2>' +
@@ -761,47 +1105,79 @@
       '</div>';
   }
 
+  /* 占项目确权产值的月度序列：末点收敛到卡片上的占比，保证卡片与趋势口径一致 */
+  function mbSaveRateTrend(key) {
+    const m = mbSave(key);
+    const n = MB_SAVE_MONTHS.length;
+    const out = MB_SAVE_MONTHS.map(function (_, i) {
+      const k = i / (n - 1);
+      const wob = (((i * 3 + key.length * 5) % 11) - 5) / 60;
+      return D.round(m.rate * (0.84 + 0.16 * k) * (1 + wob), 2);
+    });
+    out[n - 1] = m.rate;
+    return out;
+  }
+
+  /* 六项降本：卡片（降本金额 + 占项目确权产值）→ 统一查询条 → 趋势图（金额柱 + 占比线）→ 降本明细清单 */
   function saveSection() {
     const s = mbSave(MS.save);
+    const maxRate = Math.max.apply(null, MB_SAVE.map(function (x) { return x.rate; }));
+    const allRows = mbDrillRows(mbDetailRows(MS.save));
+    const rows = allRows;
+    const size = MS.size;
+    const total = rows.length;
+    if ((MS.detailPage - 1) * size >= total) MS.detailPage = 1;
+    const paged = rows.slice((MS.detailPage - 1) * size, (MS.detailPage - 1) * size + size);
+    const cols = mbSaveCols(MS.save);
+    const def = mbSaveDef(MS.save);
     return section('六项降本',
       '<div class="ck-metrics ck-metrics--7">' + MB_SAVE.map(function (x) {
+        const pct = Math.round(x.rate / maxRate * 100);
         return '<div class="ck-metriccard ck-metriccard--stat' +
           (MS.save === x.key ? ' ck-metriccard--active' : '') + '" data-mb-save="' + x.key + '">' +
           '<div class="ck-metriccard__label">' + esc(x.name) + '</div>' +
           '<div class="ck-metriccard__value">' + esc(x.value) + '<span>万元</span></div>' +
-          '<div class="ck-metriccard__sub">' + D.fmtNum(x.rate, 2) + '%</div></div>';
+          '<div class="ck-savecard__rate"><span>占项目确权产值</span><b>' + D.fmtNum(x.rate, 2) + '%</b></div>' +
+          '<div class="ck-savecard__bar"><i style="width:' + Math.max(3, pct) + '%"></i></div>' +
+          '</div>';
       }).join('') + '</div>' +
+
+      /* 统一查询条：本模块的卡片 / 趋势 / 明细清单共用（原「降本明细」那条重复的已并入此条） */
       '<div class="ck-filter"><div class="ck-filter__row">' +
       '<div class="ck-filter__item"><span class="ck-filter__label">日期选择</span>' +
+      '<span class="ck-grain" data-ck-grain="日期选择">' + esc(CS.settleGrain) + CARET + '</span>' +
       '<span class="ck-field ck-field--date">2025-06-01 ~ 2026-05-31</span></div>' +
-      field('项目名称', '') + field('实施单位', '中国建筑第八工程局有限公司') +
-      actions() + '</div></div>' +
-      subHead(s.name + '（万元）') +
-      '<div class="dsc-chart" id="mbSave" style="height:260px"></div>');
-  }
-
-  function detailSection() {
-    const rows = mbDetailRows().map(function (r, i) { return Object.assign({ idx: i + 1 }, r); });
-    return section('降本明细',
-      '<div class="ck-filter"><div class="ck-filter__row">' +
       field('实施单位', '中国建筑第八工程局有限公司') + field('项目名称', '') + field('项目业态', '') +
-      '</div><div class="ck-filter__row">' +
-      field('项目类型', '') +
-      '<div class="ck-filter__item"><span class="ck-filter__label">项目竣工日期</span>' +
-      '<span class="ck-grain" data-ck-grain="项目竣工日期">' + esc(CS.inGrain) + CARET + '</span>' +
-      '<span class="ck-field ck-field--date">开始时间 ~ 结束时间</span></div>' +
-      field('结算单/产值单', '') +
-      '<button class="ck-link" data-mb-more>' + (MS.more ? '收起' : '展开') + '</button>' +
-      actions() + '</div>' +
-      '<div class="ck-filter__more"' + (MS.more ? '' : ' hidden') + '>' +
-      field('二级单位', '') + field('三级单位', '') + field('统计月份', '') + field('降本类型', '') +
-      '</div></div>' +
-      '<div class="dsc-card u-mb-lg"><div class="dsc-card__header">' +
-      '<div class="dsc-card__title">降本明细清单</div>' +
-      '<div class="dsc-card__extra">共 ' + MB_RANK.length + ' 个二级单位 · 60 条明细　<button class="dsc-btn dsc-btn--sm" data-mb-columns>列设置</button></div>' +
       '</div>' +
-      D.table({ cols: MB_DETAIL_COLS, rows: rows, maxHeight: 420,
-        foot: D.pager({ page: MS.detailPage, size: MS.size, total: 60 }) }) + '</div>');
+      '<div class="ck-filter__more" hidden>' +
+      field('项目类型', '') + field('二级单位', '') + field('三级单位', '') +
+      field('统计月份', '') + field('单据号', '') +
+      '</div>' +
+      advActions() + '</div>' +
+
+      subHead(s.name + ' · 降本金额与占项目确权产值趋势') +
+      '<div class="dsc-chart" id="mbSave" style="height:280px"></div>' +
+      '<div class="ck-legend">' +
+      '<span><i style="background:#D0021B"></i>降本金额（万元，左轴）</span>' +
+      '<span><i class="ck-legend__line"></i>占项目确权产值（%，右轴）</span></div>' +
+
+      subHead('降本明细清单', '共 ' + total + ' 条（每页 ' + size + ' 条）' +
+        (MS.save === 'total' ? '　·　合计口径：6 大项 ' + MB_SAVE_SUBS.length + ' 小项全量展开' : '')) +
+      mbDrillPath() +
+      '<div class="ck-savehead">' +
+      '<span class="ck-savehead__hint">' + (MS.save === 'total'
+        ? '默认展示：6 大项金额 + 降本额合计 + 项目确权产值金额 + 降低额占比；其余 ' + MB_SAVE_SUBS.length + ' 个小项与项目属性在「设置列」里'
+        : '点击 二级单位 / 三级单位 / 项目名称 可在本页内逐级下钻（不影响数据报表）') + '</span>' +
+      D.colGear('data-mb-columns', '设置列：' + s.name + '的明细字段（基本信息 + 指标信息）') +
+      '</div>' +
+      D.table({
+        cols: D.colsOf('mb-save-' + MS.save, cols, def),
+        rows: paged.map(function (r, i) {
+          return Object.assign({ idx: (MS.detailPage - 1) * size + i + 1 }, r);
+        }),
+        maxHeight: 420
+      }) +
+      '<div data-mb-pager="detailPage">' + D.pager({ page: MS.detailPage, size: size, total: total }) + '</div>');
   }
 
   D.pages['material-board'] = function () {
@@ -924,8 +1300,8 @@
       field('本级库', '') +
       '<div class="ck-filter__item"><span class="ck-filter__label">日期选择</span>' +
       '<span class="ck-field ck-field--date">2025-06-01 ~ 2026-05-31</span></div>' +
-      (extra || '') + field('物料分类', '') + actions() +
-      '</div></div>';
+      (extra || '') + field('物料分类', '') +
+      '</div>' + actions() + '</div>';
   }
 
   function supplierBoardView() {
@@ -953,8 +1329,9 @@
       /* 合作年限分析 */
       section('合作年限分析',
         '<div class="ck-filter"><div class="ck-filter__row">' + field('合作年限', '') +
+        '</div>' +
+        '<div class="ck-filter__more" hidden>' + field('本级库', '') + field('物料分类', '') + '</div>' +
         actions() + '</div>' +
-        '<div class="ck-filter__more" hidden>' + field('本级库', '') + field('物料分类', '') + '</div></div>' +
         sbChart('sbYears', 280)) +
 
       /* 分供商履约情况分析（双轴：金额 / 数量） */
@@ -991,8 +1368,8 @@
       /* 评价均分 */
       section('评价均分',
         '<div class="ck-filter"><div class="ck-filter__row">' +
-        '<span class="ck-filter__hint">沿用顶部筛选条件（本级库 / 日期 / 物料分类）</span>' +
-        actions() + '</div></div>' +
+        '<span class="ck-filter__note">沿用顶部筛选条件（本级库 / 日期 / 物料分类）</span>' +
+        '</div>' + actions() + '</div>' +
         subHead('单位反向评价均分', '满分 10 分') + sbChart('sbScore', 280)) +
 
       /* 相关报表：纯图表页需要一个下钻出口 */
@@ -1043,6 +1420,15 @@
   /* 截图实测：折线在 88%~100% 区间，标注 95.79% / 95.12% / 93.45% */
   const AB_TREND = [95.79, 96.35, 96.28, 96.10, 95.86, 95.12, 94.72, 94.35, 94.02, 93.78, 93.60, 93.45];
 
+  /* 每个指标的趋势都由「该指标卡片值」反推：形状取源图曲线，末点收敛到卡片值。
+     此前是「源曲线 + 指标序号×0.6」的偏移，导致资产闲置率（卡片 5.85%）的趋势却画在 96% 量级，
+     与资产周转率卡片（73.53%）和它自己的趋势（95.79→93.45）也对不上 */
+  function abMetricTrend(m) {
+    const last = AB_TREND[AB_TREND.length - 1] || 1;
+    const k = (m && m.value != null ? m.value : last) / last;
+    return AB_TREND.map(function (v) { return D.round(v * k, 2); });
+  }
+
   /* 二级单位资产周转率（截图实测 10 行 + 合计） */
   /* 二级单位资产周转率：与物资看板的表分开编数（原先两表前 8 行金额完全相同），
      21 个二级单位 × 分页 = 真实数据 */
@@ -1072,13 +1458,15 @@
   /* 合计取全部 21 行之和；比率类指标不可累加 */
   const AB_RANK_TOTAL = ['296,947.26', '329,611.44'];
   const AB_RANK_N = AB_RANK.length;
+  /* 二级单位资产周转率明细的动态列（Axure 局驾驶舱核心数据 · 资产「设置列」口径） */
   const AB_COLS = [
-    { key: 'idx', name: '排名', width: 80 },
     { key: 'org2', name: '二级单位', width: 160 },
-    { key: 'outAmt', name: '项目调出资产总金额（万元）', width: 220 },
-    { key: 'totalAmt', name: '项目资产总金额（万元）', width: 200 },
-    { key: 'rate', name: '资产周转率（%）', width: 150 }
+    { key: 'outAmt', name: '项目调出资产总金额（万元）', width: 220, num: true },
+    { key: 'totalAmt', name: '项目资产总金额（万元）', width: 200, num: true },
+    { key: 'rate', name: '资产周转率（%）', width: 150, num: true, danger: true },
+    { key: 'share', name: '调出占资产额比（%）', width: 170, num: true, pct: true }
   ];
+  const AB_COLS_DEF = ['idx', 'org2', 'outAmt', 'totalAmt', 'rate'];
   /* 资产类别构成：源图未标数值，按扇区比例估算（见 原型设计说明 §5.2e） */
   const AB_PIE = [
     { key: 'lift', name: '电梯', value: 42 }, { key: 'box', name: '临建设施-箱式房', value: 20 },
@@ -1095,6 +1483,11 @@
     rate: [0, 7.5, 0.5, 0.3, 0.5, 0.2, 0.4, 10.5]
   };
 
+  /* 资产看板 5 个指标 → 指标字段模型（周转率 / 闲置率 / 折旧率三套口径） */
+  const AB_METRIC_MAP = {
+    turnover: 'assetTurnover', doneTurnover: 'assetTurnover',
+    idle: 'assetIdle', doneIdle: 'assetIdle', depRate: 'assetDepRate'
+  };
   function abRankTable() {
     /* R2：受限视角只返回本单位行 */
     const scope = D.scope.name;
@@ -1104,20 +1497,19 @@
     const pages = Math.max(1, Math.ceil(all.length / ASB.size));
     if (ASB.page > pages) ASB.page = pages;
     const rows = all.slice((ASB.page - 1) * ASB.size, (ASB.page - 1) * ASB.size + ASB.size);
-    return '<table class="ck-table ck-table--metrics"><thead><tr>' +
-      '<th style="width:80px">排名</th><th>二级单位</th>' +
-      '<th class="is-num">项目调出资产总金额（万元）</th><th class="is-num">项目资产总金额（万元）</th>' +
-      '<th class="is-num ck-table__danger">资产周转率（%）</th></tr></thead><tbody>' +
-      rows.map(function (r, i) {
-        return '<tr><td class="is-center">' + ((ASB.page - 1) * ASB.size + i + 1) + '</td><td class="is-center">' + esc(r[0]) + '</td>' +
-          '<td class="is-num">' + D.fmtNum(r[1], 2) + '</td>' +
-          '<td class="is-num">' + D.fmtNum(r[2], 2) + '</td>' +
-          '<td class="is-num ck-table__danger">' + D.fmtNum(r[3], 2) + '</td></tr>';
-      }).join('') +
-      '<tr class="ck-table__total"><td class="is-center">合计</td><td class="is-center">全部 ' + AB_RANK_N + ' 个单位</td>' +
-      '<td class="is-num">' + AB_RANK_TOTAL[0] + '</td><td class="is-num">' + AB_RANK_TOTAL[1] + '</td>' +
-      '<td class="is-num ck-table__danger" title="比率类指标不可累加">—</td></tr>' +
-      '</tbody></table>';
+    const metric = AB_METRIC_MAP[ASB.metric] || 'assetTurnover';
+    const factor = ASB.metric === 'idle' || ASB.metric === 'doneIdle' ? 1
+      : ASB.metric === 'depRate' ? 2 : 0;
+    const data = rows.map(function (r) {
+      const base = D.reportUnitMetrics(r[0]) || {};
+      const total = D.round((base.sum || 1e9) / 1e4 * 1.4, 2);
+      const rate = r[3];
+      if (metric === 'assetIdle') return { name: r[0], idleAmt: D.round(total * rate / 100, 2), totalAmt: total, rate: rate };
+      if (metric === 'assetDepRate') return { name: r[0], depAmt: D.round(total * rate / 100, 2), origAmt: D.round(total * 1.15, 2), rate: rate };
+      return { name: r[0], outAmt: r[1], totalAmt: r[2], rate: rate };
+    });
+    return metricListTable({ metric: metric, rows: data, ds: 'asset',
+      page: ASB.page, size: ASB.size, totalName: '全部 ' + AB_RANK_N + ' 个单位' });
   }
 
   function assetBoardView() {
@@ -1141,7 +1533,7 @@
       '<span class="ck-grain" data-ck-grain="日期选择">' + esc(CS.settleGrain) + CARET + '</span>' +
       '<span class="ck-field ck-field--date">2025-06-01 ~ 2026-05-31</span></div>' +
       field('地区', '') + field('组织', '') + field('物料分类', '') +
-      actions() + '</div></div>' +
+      '</div>' + actions() + '</div>' +
 
       /* 指标页签 + 红色趋势 */
       '<div class="ck-tabsrow">' + AB_IND.map(function (x) {
@@ -1161,11 +1553,11 @@
         field('实施单位', '') + field('物料小类', '') +
         '</div><div class="ck-filter__row">' +
         field('项目类型', '') + field('项目状态', '') + field('项目业态', '') + field('承包模式', '') +
-        actions() + '</div></div>' +
+        '</div>' + actions() + '</div>' +
         '<div class="dsc-card u-mb-lg"><div class="dsc-card__header">' +
         '<div class="dsc-card__title">二级单位资产周转率明细</div>' +
         '<div class="dsc-card__extra">共 ' + AB_RANK_N + ' 个二级单位　' +
-        '<button class="dsc-btn dsc-btn--sm" data-ab-columns>列设置</button></div></div>' +
+        D.colGear('data-ab-columns', '设置列：本指标的明细列表字段（基本信息 + 指标信息）') + '</div></div>' +
         abRankTable() +
         '<div data-ab-pager>' + D.pager({ page: ASB.page, size: ASB.size, total: AB_RANK_N }) + '</div>' +
         '</div>') +
@@ -1200,6 +1592,13 @@
   D.pages['purchase-board'].after = function (root) {
     metricsAfter(root);
     commonAfter(root);
+    /* 二级单位明细：设置列（齿轮）——真正改变表格字段，不只是弹提示 */
+    D.delegate(root, [
+      { sel: '[data-pb-cols]', fn: function () {
+        metricColPicker(CS.metric, METRICS.filter(function (x) { return x.key === CS.metric; })[0].name +
+          ' · 指标明细列表');
+      } }
+    ]);
   };
   D.pages['material-board'].after = function (root) {
     materialBoardAfter(root);
@@ -1221,11 +1620,9 @@
     const trend = root.querySelector('#abTrend');
     if (trend) {
       const m = abMetric(ASB.metric);
-      /* 趋势图数据只有一套（源图仅给资产周转率），其余指标按同口径做小幅偏移便于演示 */
-      const shift = (AB_IND.indexOf(m)) * 0.6;
       D.lineChart(trend, {
         categories: AB_MONTHS,
-        series: [{ name: m.name, data: AB_TREND.map(function (v) { return D.round(v + shift, 2); }), color: '#D0021B' }]
+        series: [{ name: m.name, data: abMetricTrend(m), color: '#D0021B' }]
       }, { height: 280, area: false, lineWidth: 1.8, dotR: 3.5, unit: m.unit, tipDigits: 2,
         dataLabels: true, labelDigits: 2, padL: 64 });
     }
@@ -1249,18 +1646,8 @@
       { sel: '[data-ab-metric]', fn: function (el) { ASB.metric = el.getAttribute('data-ab-metric'); D.render(); } },
       { sel: '[data-ab-tab]', fn: function (el) { ASB.metric = el.getAttribute('data-ab-tab'); D.render(); } },
       { sel: '[data-ab-columns]', fn: function () {
-        const all = AB_COLS.filter(function (c) { return c.key !== 'idx'; })
-          .map(function (c) { return { key: c.key, name: c.name }; });
-        D.modal({
-          title: '列设置 · 二级单位资产周转率明细', width: 900,
-          body: D.columnDialog(all, ['org2', 'outAmt', 'totalAmt', 'rate']),
-          buttons: [{ text: '取消', cls: '', act: 'cancel' }, { text: '应用', cls: 'dsc-btn--primary', act: 'ok' }],
-          onAction: function (act, ov) {
-            const keys = D.readColumnDialog(ov.querySelector('.dsc-column-dialog'));
-            if (!keys.length) { D.toast('请至少选择一个字段', 'warn'); return false; }
-            D.toast('列设置已应用（' + keys.length + ' 个字段）');
-          }
-        });
+        const k = AB_METRIC_MAP[ASB.metric] || 'assetTurnover';
+        metricColPicker(k, abMetric(ASB.metric).name + ' · 指标明细列表');
       } }
     ]);
 
@@ -1367,6 +1754,7 @@
   /* ---------- 物资管理看板 ---------- */
   function materialBoardAfter(root) {
     bindMetricTips(root, MB_METRICS, 'data-mb-metric');
+    bindMetricTips(root, MB_SAVE, 'data-mb-save');      // 六项降本卡片的金额/占比口径气泡
     const m = mbMetric(MS.metric);
     const trend = root.querySelector('#mbTrend');
     if (trend) {
@@ -1379,11 +1767,17 @@
 
     const save = root.querySelector('#mbSave');
     if (save) {
-      D.lineChart(save, {
+      /* 金额（柱，左轴）+ 占项目确权产值（线，右轴）：一张图同时读金额与占比两条趋势 */
+      D.comboChart(save, {
         categories: MB_SAVE_MONTHS,
-        series: [{ name: mbSave(MS.save).name, data: mbSaveTrend(MS.save), color: '#D0021B' }]
-      }, { height: 260, area: false, lineWidth: 1.8, dotR: 3.5, unit: '万元', tipDigits: 2,
-        dataLabels: true, labelDigits: 0, padL: 64 });
+        series: [
+          { name: mbSave(MS.save).name, data: mbSaveTrend(MS.save), type: 'bar',
+            color: '#D0021B', color2: '#F58A8C', unit: '万元' },
+          { name: '占项目确权产值', data: mbSaveRateTrend(MS.save), type: 'line', axis: 'right',
+            color: '#2468F2' }
+        ]
+      }, { height: 280, dataLabels: true, yDigits: 0, yUnit: '万元', y2Unit: '%', padL: 64,
+        rotateX: 0, rDigits: 2, lineLabelUnit: '%', barLabelRaw: true });
     }
 
     const rec = root.querySelector('#mbRecycle');
@@ -1403,28 +1797,39 @@
       { sel: '[data-mb-tab]', fn: function (el) { MS.metric = el.getAttribute('data-mb-tab'); D.render(); } },
       /* 六项降本：切卡换曲线 */
       { sel: '[data-mb-save]', fn: function (el) { MS.save = el.getAttribute('data-mb-save'); D.render(); } },
-      /* 降本明细：展开更多筛选 */
-      { sel: '[data-mb-more]', fn: function () {
-        MS.more = !MS.more;
-        const more = root.querySelector('.ck-filter__more');
-        if (more) more.hidden = !MS.more;
-        D.toast(MS.more ? '已展开更多筛选条件' : '已收起筛选条件');
-      } },
-      /* 降本明细：列设置 */
+      /* 降本明细：设置列（齿轮）——真正改变表格字段 */
       { sel: '[data-mb-columns]', fn: function () {
-        const all = MB_DETAIL_COLS.filter(function (c) { return c.key !== 'idx'; })
-          .map(function (c) { return { key: c.key, name: c.name }; });
-        const shown = ['org2', 'org3', 'project', 'unit', 'month', 'code', 'saveAmt'];
-        D.modal({
-          title: '列设置 · 降本明细清单', width: 900,
-          body: D.columnDialog(all, shown),
-          buttons: [{ text: '取消', cls: '', act: 'cancel' }, { text: '应用', cls: 'dsc-btn--primary', act: 'ok' }],
-          onAction: function (act, ov) {
-            const keys = D.readColumnDialog(ov.querySelector('.dsc-column-dialog'));
-            if (!keys.length) { D.toast('请至少选择一个字段', 'warn'); return false; }
-            D.toast('列设置已应用（' + keys.length + ' 个字段）');
-          }
+        const key = MS.save;
+        D.openColPicker({
+          key: 'mb-save-' + key, title: mbSave(key).name + ' · 降本明细清单',
+          /* 组织链（排名 / 二级单位 / 三级单位 / 项目名称）作为固定列，不进可选清单 */
+          all: mbSaveCols(key).filter(function (c) { return MB_FIXED_COLS.indexOf(c.key) < 0; }),
+          def: mbSaveDef(key), after: D.render
         });
+      } },
+      /* 降本明细：本页内下钻（点单位 / 项目名就地过滤，不跳报表） */
+      { sel: '[data-mb-drill]', fn: function (el) {
+        const pr = el.getAttribute('data-mb-drill').split('|');
+        const lv = pr[0], v = pr[1] || '';
+        if (lv === 'all') MS.drill = { org2: '', org3: '', project: '' };
+        else if (lv === 'org2') MS.drill = { org2: v, org3: '', project: '' };
+        else if (lv === 'org3') MS.drill = { org2: MS.drill.org2, org3: v, project: '' };
+        else MS.drill = { org2: MS.drill.org2, org3: MS.drill.org3, project: v };
+        MS.detailPage = 1;
+        D.render();
+        D.toast(lv === 'all' ? '已回到全部单位' : '已下钻到「' + v + '」');
+      } },
+      { sel: '[data-mb-drill-back]', fn: function () {
+        if (MS.drill.project) MS.drill.project = '';
+        else if (MS.drill.org3) MS.drill.org3 = '';
+        else MS.drill = { org2: '', org3: '', project: '' };
+        MS.detailPage = 1;
+        D.render();
+        D.toast('已返回上一级');
+      } },
+      { sel: '[data-mb-rank-cols]', fn: function () {
+        metricColPicker(MS.metric, MB_METRICS.filter(function (x) { return x.key === MS.metric; })[0].name +
+          ' · 指标明细列表');
       } }
     ]);
 
@@ -1464,6 +1869,15 @@
     });
     /* 通用：查询 / 清空 / 重置 / 高级筛选 / 日期粒度 */
     D.delegate(root, [
+      /* C1：看板 → 报表的入口。带 org 跳转即切到该单位的组织视角，
+         报表随 R2 只显示本单位数据（与「组织视角」是同一套权限开关，符合系统语义） */
+      { sel: '[data-goto-report]', fn: function (el) {
+        const ds = el.getAttribute('data-goto-report');
+        const org = el.getAttribute('data-goto-org');
+        D.toast('打开' + ({ purchase: '采购', material: '物资', asset: '资产' }[ds] || '') +
+          '数据报表，组织视角切换至 ' + org);
+        D.nav('report', { ds: ds, org: org });
+      } },
       { sel: '[data-ck-query]', fn: function (el) {
         const box = el.closest('.ck-filter');
         if (!box) return;
@@ -1472,7 +1886,7 @@
         /* 提示里的日期取当前筛选条实际展示的范围，而不是全局默认值 */
         const dt = box.querySelector('.ck-field--date');
         D.toast('查询完成' + (dt ? '：' + dt.textContent.trim() : '') +
-          '，生效条件 ' + conds.length + ' 项');
+          '，已记录条件 ' + conds.length + ' 项');
       } },
       { sel: '[data-ck-clear]', fn: function (el) {
         const box = el.closest('.ck-filter');
@@ -1484,10 +1898,17 @@
       } },
       { sel: '[data-ck-reset]', fn: function () { D.toast('已重置查询条件'); D.render(); } },
       { sel: '[data-ck-adv]', fn: function (el) {
-        CS.advanced = !CS.advanced;
+        /* 展开状态按「本筛选条」自己的 DOM 判定，不再用全局 CS.advanced：
+           一页里有多条筛选（F3 项目驾驶舱最多 8 条）时，全局标志会让第二条的首次点击变成收起 */
         const more = el.closest('.ck-filter').querySelector('.ck-filter__more');
-        if (more) more.hidden = !CS.advanced;
-        el.classList.toggle('ck-link--on', CS.advanced);
+        const open = more ? more.hidden : false;
+        if (more) more.hidden = !open;
+        /* 只在本筛选条内生效：不再回写全局 CS.advanced（多条筛选 / 跨页重绘会串状态） */
+        el.classList.toggle('ck-link--on', open);
+        /* 文案跟着状态走：展开 ↔ 收起（与数据报表页筛选条一致） */
+        if (el.firstChild && el.firstChild.nodeType === 3) {
+          el.firstChild.nodeValue = open ? '收起' : '展开';
+        }
       } },
       { sel: '[data-ck-grain]', fn: function (el) {
         const label = el.getAttribute('data-ck-grain');
@@ -1498,7 +1919,10 @@
         D.toast(label + ' 粒度切换为「' + nv + '」');
       } }
     ]);
+
   }
+
+  D.ckCommonAfter = commonAfter;   // 合规看板等页面复用同一套筛选条交互
 
   /* ---------- 局级驾驶舱 ---------- */
   function overviewAfter(root) {

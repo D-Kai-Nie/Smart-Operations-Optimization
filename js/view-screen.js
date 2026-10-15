@@ -2,7 +2,7 @@
    F1 数据大屏（PRD F1.1–F1.4）
    版式对齐 Axure 导出稿：
    标题带（左副题 / 中主标 / 右时钟）
-   + 左「采购榜单」+ 中「多维概览（核心数字 + 项目分布）」
+   + 左「采购榜单」+ 中「采购规模（核心数字 + 项目分布）」
    + 右「多维概览 / 主材采购 / 采购动态 / 本月概览 / 平均招采时效」
    + 下「分供商规模」
    ============================================================ */
@@ -126,9 +126,10 @@
       '      <div class="screen-panel__body scr-scroll">' + rankTable() + '</div>' +
       '    </section>' +
 
-      /* 中：多维概览 */
+      /* 中：采购规模（源图这一栏被「智慧运营数据大屏」横幅占位、无面板标题；
+         这里补的标题不能与右栏（源图确为「多维概览」）重名） */
       '    <section class="screen-panel screen-page__overview-panel">' +
-      '      <div class="screen-panel__head"><span class="screen-panel__title">多维概览</span>' +
+      '      <div class="screen-panel__head"><span class="screen-panel__title">采购规模</span>' +
       '        <span class="screen-panel__extra"><span class="scr-seg" data-screen-period>' +
       [['quarter', '本季度'], ['month', '本月度'], ['year', '本年度']].map(function (k) {
         return '<i class="scr-seg__item' + (k[0] === SS.period ? ' scr-seg__item--active' : '') +

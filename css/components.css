@@ -105,9 +105,15 @@ select.dsc-field {
   background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23999' stroke-width='1.5'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
   background-repeat: no-repeat; background-position: right 8px center; background-size: 14px;
 }
-.dsc-daterange { display: flex; align-items: center; gap: 6px; }
-.dsc-daterange .dsc-field { flex: 1 1 0; min-width: 0; }
-.dsc-daterange__sep { color: var(--color-text-tertiary); flex: 0 0 auto; }
+.dsc-daterange { display: flex; align-items: center; gap: 4px; }
+.dsc-daterange .dsc-field { flex: 1 1 0; min-width: 0; font-size: 12px; padding-left: 4px; padding-right: 2px; }
+/* 原生日期控件的文本（2026/06/01 + 日历图标）装不下就被截成「2026/0」——
+   这里给一个不可再压缩的最小宽度，宁可让筛选条换行也不截断日期 */
+.dsc-daterange input[type="date"] { min-width: 128px; }
+.dsc-daterange__grain { flex: 0 0 46px !important; width: 46px; padding-right: 14px !important; }
+/* 窄屏（筛选条收为 3 列）时让日期区间独占控件宽度，避免日期被截断 */
+@media (max-width: 1500px) { .dsc-daterange__grain { display: none; } }
+.dsc-daterange__sep { color: var(--color-text-tertiary); flex: 0 0 auto; margin: 0 1px; }
 
 /* ============================================================
    筛选条
@@ -134,6 +140,17 @@ select.dsc-field {
   border-top: 1px dashed var(--color-divider);
 }
 .dsc-filter-bar__foot-right { margin-left: auto; display: flex; gap: var(--sp-sm); }
+/* 固定口径页签：明示列不可增删，替代此前的假「列设置」入口 */
+.report-page__fixed-hint {
+  align-self: center; font-size: var(--fs-sm); color: var(--color-text-tertiary);
+  padding: 0 var(--sp-sm); cursor: help;
+}
+/* 就地条件反馈（与看板 .ck-filter__hint 同语义）：常驻在展开按钮右侧 */
+.dsc-filter-bar__hint {
+  font-size: var(--fs-base); color: var(--color-text-secondary);
+  max-width: 46%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.dsc-filter-bar__toggle + .dsc-filter-bar__hint:not([hidden]) { margin-left: var(--sp-md); }
 .dsc-filter-bar__toggle {
   font-size: var(--fs-base); color: var(--color-primary); cursor: pointer;
   display: inline-flex; align-items: center; gap: 4px; user-select: none;
@@ -354,8 +371,9 @@ select.dsc-field {
 .dsc-table thead .dsc-sticky-col-2 { z-index: 6; background: var(--color-bg-table-header); }
 .dsc-table tbody tr:hover .dsc-sticky-col-2 { background: var(--color-primary-bg); }
 .dsc-table__link { color: var(--color-primary); cursor: pointer; }
-.dsc-table__link:hover { text-decoration: underline; }
-
+/* 两级表头（采购报表总览：总采购金额 / 采购成本降低率 分组） */
+.dsc-table thead tr:nth-child(2) th { top: 40px; border-left: 1px solid var(--color-divider); }
+.dsc-table th.dsc-table__group { text-align: center; border-left: 1px solid var(--color-border); }
 .dsc-table-foot {
   display: flex; align-items: center; gap: var(--sp-md);
   padding: var(--sp-sm) var(--sp-lg); border-top: 1px solid var(--color-divider);
@@ -637,7 +655,7 @@ select.dsc-field {
 }
 .compliance-page__metric-card .dsc-kpi__name { min-height: 40px; }
 .compliance-page__metric-card .dsc-kpi__foot {
-  display: flex; align-items: center; justify-content: space-between;
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;
   font-size: 12px; color: var(--color-text-tertiary); margin-top: var(--sp-md);
 }
 .compliance-page__abnormal-strip .dsc-strip { border-top: none; }
@@ -862,7 +880,14 @@ select.dsc-field {
 .pj-metric:hover .pj-metric__name { color: var(--color-primary); }
 
 /* 页签条与页签内容容器（截图：等宽页签 + 竖分隔线 + 底部通栏细线） */
-.project-cockpit-page__tab-bar { gap: 0; margin-bottom: 0; }
+/* P1-3：F3 页头（定位地图 + 信息栅格 + 7 指标带）约 700px 高，页签条正好落在首屏底部 ——
+   点完页签还得往下滚一屏才看得到内容。页签条吸顶在面包屑之下，
+   配合切换后自动定位到内容区（view-project.js），切页签不再需要手动滚动 */
+.project-cockpit-page__tab-bar {
+  gap: 0; margin-bottom: 0;
+  position: sticky; top: calc(var(--header-height) + var(--breadcrumb-height));
+  z-index: 800; background: var(--color-bg-card);
+}
 .project-cockpit-page__tab-bar .dsc-tabs__item { padding: 10px 26px; text-align: center; }
 .project-cockpit-page__tab-bar .dsc-tabs__item + .dsc-tabs__item { border-left: 1px solid var(--color-divider); }
 .pj-tabbody { padding-top: var(--sp-lg); }
@@ -881,4 +906,46 @@ select.dsc-field {
 }
 @media (max-width: 1480px) {
   .pj-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+/* 表格右上角的「设置列」齿轮（Axure：所有明细表右上角同一位置） */
+.dsc-colgear {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; padding: 0; margin-left: 6px;
+  border: 1px solid var(--color-border); border-radius: var(--radius-sm, 4px);
+  background: var(--color-white); color: var(--color-text-secondary);
+  cursor: pointer; vertical-align: middle;
+}
+.dsc-colgear:hover { color: var(--color-primary); border-color: var(--color-primary); }
+.dsc-colgear svg { display: block; }
+.ck-table__foot .dsc-colgear { margin-left: var(--sp-sm); }
+
+/* 分组版「设置列」（指标明细列表：基本信息 / 指标信息） */
+.dsc-column-dialog--grouped { padding: 4px 2px; }
+.cd-group + .cd-group { margin-top: var(--sp-lg); }
+.cd-group__title {
+  font-size: var(--fs-base); font-weight: var(--fw-bold); color: var(--color-text-primary);
+  padding: 6px 2px; border-bottom: 1px solid var(--color-divider); margin-bottom: var(--sp-md);
+}
+.cd-group__grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px var(--sp-lg); }
+.cd-cell { display: flex; align-items: center; gap: 6px; font-size: var(--fs-base); color: var(--color-text-table); cursor: pointer; }
+.cd-cell input { flex: 0 0 auto; margin: 0; }
+.cd-cell span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 1500px) { .cd-group__grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+
+/* ============================================================
+   P2-3 键盘焦点环：只有键盘 Tab 到时才显示（鼠标点击不出现），
+   与「可点区域补 tabindex/role + Enter/Space 激活」配套
+   ============================================================ */
+.dsc-tabs__item:focus-visible,
+.ck-tab:focus-visible,
+.ck-link--adv:focus-visible,
+.dsc-colgear:focus-visible,
+.scr-seg__item:focus-visible,
+.dsc-kpi--clickable:focus-visible,
+.ck-metriccard:focus-visible,
+.drill-path__crumb:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: 3px;
 }

@@ -174,8 +174,11 @@ window.APP = window.APP || {};
       (fields.length > visible ? '<div class="dsc-filter-bar__grid dsc-filter-bar__extra" style="margin-top:12px">' +
         fields.slice(visible).map(fieldHTML).join('') + '</div>' : '') +
       '<div class="dsc-filter-bar__foot">' +
+      /* 展开在最左（对齐 Axure 筛选条），随后是就地条件反馈，按钮固定贴右下角 */
       (fields.length > visible ? '<span class="dsc-filter-bar__toggle" data-f-toggle>展开' +
         '<svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 6l4 4 4-4"/></svg></span>' : '') +
+      '<span class="dsc-filter-bar__hint" data-f-hint' + (opt.conds ? '' : ' hidden') + '>' +
+      esc(opt.conds || '') + '</span>' +
       '<div class="dsc-filter-bar__foot-right">' +
       '<button class="dsc-btn dsc-btn--primary" data-f-query>查询</button>' +
       '<button class="dsc-btn" data-f-clear>清空</button>' +
@@ -197,6 +200,10 @@ window.APP = window.APP || {};
         }).join('') + '</select>';
     } else if (f.type === 'daterange') {
       ctrl = '<div class="dsc-daterange">' +
+        (f.grain ? '<select class="dsc-field dsc-daterange__grain" data-f-name="' + esc(f.name + 'Grain') + '" title="统计粒度">' +
+          f.grain.map(function (g) {
+            return '<option' + (f.grainValue === g ? ' selected' : '') + '>' + esc(g) + '</option>';
+          }).join('') + '</select>' : '') +
         '<input class="dsc-field" type="date" data-f-name="' + esc(f.name) + '" value="' + esc(f.value ? f.value[0] : '') + '"/>' +
         '<span class="dsc-daterange__sep">~</span>' +
         '<input class="dsc-field" type="date" data-f-name="' + esc(f.name) + '2" value="' + esc(f.value ? f.value[1] : '') + '"/></div>';
@@ -253,14 +260,31 @@ window.APP = window.APP || {};
     const rows = opt.rows || [];
     if (!cols.length) return '<div class="dsc-empty">未配置列</div>';
     const sortKey = opt.sortKey, sortDir = opt.sortDir;
-    let th = '<tr>' + cols.map(function (c, i) {
+    function thOf(c, extra) {
       const cls = [c.num ? 'dsc-num' : '', c.sticky ? 'dsc-sticky-col' : (c.sticky2 ? 'dsc-sticky-col-2' : ''),
         c.sortable ? 'dsc-sortable' : '', sortKey === c.key ? ('dsc-sort-' + sortDir) : ''].filter(Boolean).join(' ');
       const inner = c.sortable ? '<span class="dsc-sort">' + esc(c.name) + '</span>' : esc(c.name);
-      return '<th class="' + cls + '" style="min-width:' + (c.width || 120) + 'px"' +
+      return '<th class="' + cls + '" style="min-width:' + (c.width || 120) + 'px"' + (extra || '') +
         (c.tip ? ' title="' + esc(c.tip) + '"' : '') +
         (c.sortable ? ' data-sort="' + esc(c.key) + '"' : '') + '>' + inner + '</th>';
-    }).join('') + '</tr>';
+    }
+    /* 两级表头：带 group 的列合并出一行父表头，其余列 rowspan=2 占满两行 */
+    let th;
+    if (cols.some(function (c) { return c.group; })) {
+      const top = [], sub = [];
+      for (let i = 0; i < cols.length; i++) {
+        const c = cols[i];
+        if (!c.group) { top.push(thOf(c, ' rowspan="2"')); continue; }
+        let j = i;
+        while (j < cols.length && cols[j].group === c.group) j++;
+        top.push('<th class="dsc-table__group" colspan="' + (j - i) + '">' + esc(c.group) + '</th>');
+        for (let k = i; k < j; k++) sub.push(thOf(cols[k]));
+        i = j - 1;
+      }
+      th = '<tr>' + top.join('') + '</tr><tr>' + sub.join('') + '</tr>';
+    } else {
+      th = '<tr>' + cols.map(function (c) { return thOf(c); }).join('') + '</tr>';
+    }
 
     let body;
     if (!rows.length) {
@@ -268,7 +292,7 @@ window.APP = window.APP || {};
         '<div class="dsc-empty__hint">可调整筛选条件后重新查询</div></div></td></tr>';
     } else {
       body = rows.map(function (r, ri) {
-        return '<tr data-row="' + ri + '">' + cols.map(function (c, i) {
+        return '<tr class="' + (opt.rowClass ? opt.rowClass(r, ri) : '') + '" data-row="' + ri + '">' + cols.map(function (c, i) {
           const cls = [c.num ? 'dsc-num' : '', c.sticky ? 'dsc-sticky-col' : (c.sticky2 ? 'dsc-sticky-col-2' : '')].filter(Boolean).join(' ');
           let v = r[c.key], html;
           if (c.key === 'idx') html = ri + 1;
@@ -277,7 +301,7 @@ window.APP = window.APP || {};
           else if (c.pct) {
             const bad = c.range && (v < c.range[0] || v > c.range[1]);
             html = '<span' + (bad ? ' style="color:#F5222D;font-weight:700" title="超出阈值 ' + c.range.join('~') + '"' : '') + '>' + D.fmtNum(v, 2) + '%</span>';
-          } else if (c.num) html = D.fmtNum(v, typeof v === 'number' && v % 1 !== 0 ? 2 : 0);
+          } else if (c.num) html = c.fmt ? c.fmt(v) : D.fmtNum(v, typeof v === 'number' && v % 1 !== 0 ? 2 : 0);
           else html = esc(v);
           if (c.link && v && v !== '—') html = '<span class="dsc-table__link" data-link="' + esc(v) + '">' + esc(v) + '</span>';
           return '<td class="' + cls + '">' + html + '</td>';
@@ -290,7 +314,8 @@ window.APP = window.APP || {};
           let v = t[c.key];
           if (c.key === 'idx') v = '合计';
           else if (v == null) v = '';
-          else if (c.num) v = D.fmtNum(v, typeof v === 'number' && v % 1 !== 0 ? 2 : 0);
+          else if (c.pct) v = D.fmtNum(v, 2) + '%';
+          else if (c.num) v = c.fmt ? c.fmt(v) : D.fmtNum(v, typeof v === 'number' && v % 1 !== 0 ? 2 : 0);
           return '<td class="' + cls + '">' + esc(v) + '</td>';
         }).join('') + '</tr>';
       }
@@ -312,6 +337,78 @@ window.APP = window.APP || {};
   };
 
   /* ============================================================
+     动态列（表格右上角的齿轮「设置列」）
+     store: key → 当前显示字段数组（会话内保持，与 Axure 各表独立的「列表字段选择」面板对应）
+     ============================================================ */
+  D.colStore = {};
+  D.colsOf = function (key, all, def) {
+    if (!D.colStore[key]) D.colStore[key] = (def || all.map(function (c) { return c.key; })).slice();
+    const map = {};
+    all.forEach(function (c) { map[c.key] = c; });
+    return D.colStore[key].map(function (k) { return map[k]; }).filter(Boolean);
+  };
+  D.resetCols = function (key) { delete D.colStore[key]; };
+  /* 齿轮按钮：所有明细表统一放在卡片右上角（Axure 各报表右上角同一位置） */
+  D.colGear = function (attr, tip) {
+    return '<button class="dsc-colgear"' + (attr ? ' ' + attr : '') +
+      ' title="' + esc(tip || '设置列：勾选需要显示的字段，并拖拽调整顺序') + '" aria-label="设置列">' +
+      '<svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round">' +
+      '<circle cx="8" cy="8" r="2.1"/><path d="M12.9 9.6a1.1 1.1 0 0 0 .22 1.21l.04.04a1.33 1.33 0 1 1-1.88 1.88l-.04-.04a1.1 1.1 0 0 0-1.21-.22 1.1 1.1 0 0 0-.67 1v.11a1.33 1.33 0 1 1-2.66 0v-.06a1.1 1.1 0 0 0-.72-1 1.1 1.1 0 0 0-1.21.22l-.04.04a1.33 1.33 0 1 1-1.88-1.88l.04-.04a1.1 1.1 0 0 0 .22-1.21 1.1 1.1 0 0 0-1-.67h-.11a1.33 1.33 0 1 1 0-2.66h.06a1.1 1.1 0 0 0 1-.72 1.1 1.1 0 0 0-.22-1.21l-.04-.04A1.33 1.33 0 1 1 5.55 2.3l.04.04a1.1 1.1 0 0 0 1.21.22h.05a1.1 1.1 0 0 0 .67-1v-.11a1.33 1.33 0 1 1 2.66 0v.06a1.1 1.1 0 0 0 .67 1 1.1 1.1 0 0 0 1.21-.22l.04-.04a1.33 1.33 0 1 1 1.88 1.88l-.04.04a1.1 1.1 0 0 0-.22 1.21v.05a1.1 1.1 0 0 0 1 .67h.11a1.33 1.33 0 1 1 0 2.66h-.06a1.1 1.1 0 0 0-1 .67z"/></svg></button>';
+  };
+  /* 打开「设置列」弹窗：勾选 + 拖拽排序 → 立即作用到当前表（o.after 里重绘） */
+  /* 分组版「设置列」（对齐 Axure 指标明细列表的设置列：基本信息 / 指标信息 两组 + 勾选网格） */
+  D.groupedColumnDialog = function (groups, shown) {
+    return '<div class="dsc-column-dialog dsc-column-dialog--grouped">' +
+      groups.map(function (g) {
+        return '<div class="cd-group"><div class="cd-group__title">' + esc(g.title) + '</div>' +
+          '<div class="cd-group__grid">' + g.items.map(function (c) {
+            return '<label class="cd-cell"><input type="checkbox" data-key="' + esc(c.key) + '"' +
+              (shown.indexOf(c.key) >= 0 ? ' checked' : '') + '/><span>' + esc(c.name) + '</span></label>';
+          }).join('') + '</div></div>';
+      }).join('') + '</div>';
+  };
+  D.readGroupedDialog = function (box) {
+    return Array.prototype.slice.call(box.querySelectorAll('.cd-cell input[type="checkbox"]'))
+      .filter(function (b) { return b.checked; })
+      .map(function (b) { return b.getAttribute('data-key'); });
+  };
+
+  D.openColPicker = function (o) {
+    /* 固定列（序号 / 排名）：不在可选清单里，任何时候都保留在最前 */
+    const fixed = (o.def || []).filter(function (k) {
+      return !o.all.some(function (c) { return c.key === k; });
+    });
+    const shownKeys = (D.colStore[o.key] || o.def).filter(function (k) {
+      return o.all.some(function (c) { return c.key === k; });
+    });
+    D.modal({
+      title: '设置列 · ' + o.title, width: o.width || (o.groups ? 1080 : 900),
+      body: o.groups
+        ? D.groupedColumnDialog(o.groups, shownKeys)
+        : D.columnDialog(o.all.map(function (c) { return { key: c.key, name: c.name }; }), shownKeys),
+      buttons: [{ text: '恢复默认', cls: '', act: 'default' },
+        { text: '取消', cls: '', act: 'cancel' },
+        { text: '确定', cls: 'dsc-btn--primary', act: 'ok' }],
+      onAction: function (act, root) {
+        if (act === 'default') {
+          D.resetCols(o.key);
+          D.closeModal();
+          if (o.after) o.after();
+          D.toast('已恢复默认字段');
+          return false;
+        }
+        const box = root.querySelector('.dsc-column-dialog');
+        const keys = o.groups ? D.readGroupedDialog(box) : D.readColumnDialog(box);
+        if (!keys.length) { D.toast('请至少选择一个字段', 'warn'); return false; }
+        D.colStore[o.key] = fixed.concat(keys);
+        if (o.after) o.after();
+        D.toast('已应用 ' + keys.length + ' 个显示字段（会话内保持）');
+      }
+    });
+    if (!o.groups) D.bindColumnDialog(document.getElementById('modalBody'));
+  };
+
+  /* ============================================================
      分页
      ============================================================ */
   D.pager = function (opt) {
@@ -323,7 +420,7 @@ window.APP = window.APP || {};
     return '<div class="dsc-table-foot"><span>共 ' + total + ' 条</span>' +
       '<div class="dsc-table-foot__right">' +
       '<select class="dsc-field" style="width:auto;height:28px" data-pg-size>' +
-      [10, 20, 50, 100].map(function (s) { return '<option value="' + s + '"' + (s === size ? ' selected' : '') + '>' + s + ' 条/页</option>'; }).join('') +
+      [10, 15, 20, 50, 100].map(function (s) { return '<option value="' + s + '"' + (s === size ? ' selected' : '') + '>' + s + ' 条/页</option>'; }).join('') +
       '</select><div class="dsc-pager">' +
       '<button class="dsc-pager__btn" data-pg="1" ' + (page <= 1 ? 'disabled' : '') + '>«</button>' +
       '<button class="dsc-pager__btn" data-pg="' + (page - 1) + '" ' + (page <= 1 ? 'disabled' : '') + '>‹</button>' +

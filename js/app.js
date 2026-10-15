@@ -242,6 +242,9 @@
   D.crumb = function (parts) {
     const el = document.getElementById('breadcrumb');
     const all = ['首页', '智慧运营'].concat(parts || []);
+    /* P2-4：面包屑沿用原系统（不可点击），但页面里同时有可点的「组织下钻/返回上一级」，
+       这里补一句提示，避免用户以为是点击无响应 */
+    el.title = '面包屑为原系统样式（不可点击）；下钻请用页面内的「组织下钻」路径或「返回上一级」';
     el.innerHTML = all.map(function (p, i) {
       return i === all.length - 1 ? '<span>' + esc(p) + '</span>' : esc(p) + ' &gt; ';
     }).join('');
@@ -268,8 +271,40 @@
     D.bindPager(container, function (o) { if (D.__pagerCb) D.__pagerCb(o); });
     D.bindSort(container, function (k) { if (D.__sortCb) D.__sortCb(k); });
     if (fn.after) fn.after(container, q);
+    markKeyFocus(container);          // P2-3：给可点区域补键盘可达性
     window.scrollTo(0, 0);
   };
+
+  /* ============================================================
+     P2-3 键盘可达性
+     页签 / 指标卡 / 齿轮 / 展开 / 分段控件 都是 div/span，键盘用户此前完全操作不了。
+     这里统一补 tabindex + role（不改变任何视觉与交互逻辑），Enter / Space 触发点击。
+     ============================================================ */
+  const KEY_SEL = [
+    '.dsc-tabs__item', '.ck-tab', '.ck-link--adv', '.dsc-colgear', '.scr-seg__item',
+    '[data-ck-metric]', '[data-mb-metric]', '[data-ab-metric]', '[data-pb-metric]',
+    '[data-mb-save]', '[data-sb-go]', '[data-pj-metric]', '[data-cstat]',
+    '[data-goto-report]', '.dsc-kpi--clickable', '.drill-path__crumb'
+  ].join(', ');
+
+  function markKeyFocus(container) {
+    container.querySelectorAll(KEY_SEL).forEach(function (el) {
+      if (el.hasAttribute('tabindex')) return;
+      el.setAttribute('tabindex', '0');
+      const isTab = el.classList.contains('dsc-tabs__item') || el.classList.contains('ck-tab');
+      el.setAttribute('role', isTab ? 'tab' : 'button');
+    });
+  }
+
+  /* Enter / Space 激活聚焦元素（div/span 默认不响应键盘） */
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') return;
+    const el = e.target;
+    if (!el || !el.getAttribute || el.getAttribute('tabindex') !== '0') return;
+    if (/^(INPUT|SELECT|TEXTAREA|BUTTON|A)$/.test(el.tagName)) return;
+    e.preventDefault();
+    el.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  });
 
   /* ============================================================
      启动
