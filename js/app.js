@@ -255,7 +255,12 @@
      ============================================================ */
   D.pages = D.pages || {};
 
-  D.render = function () {
+  D.render = function (opt) {
+    /* 就地重绘（点卡片 / 换指标 / 换降本类型 / 翻页 / 下钻）保持滚动位置：
+       此前每次重绘都 window.scrollTo(0, 0)，在页面中下部的区块上点一下就被弹回顶部。
+       真正的换页走 D.nav → location.search 整页刷新，本来就从顶部开始；
+       模拟换页（测试里 monkey-patch 的 nav）显式传 { scroll: 'top' }。 */
+    const keepY = window.scrollY || window.pageYOffset || 0;
     /* 视图入参 = 查询参数 + 当前页（视图内直接读 q.ds / q.project / q.view） */
     const q = Object.assign({}, D.route.params, { page: D.route.page });
     const fn = D.pages[q.page] || D.pages.cockpit;
@@ -272,7 +277,9 @@
     D.bindSort(container, function (k) { if (D.__sortCb) D.__sortCb(k); });
     if (fn.after) fn.after(container, q);
     markKeyFocus(container);          // P2-3：给可点区域补键盘可达性
-    window.scrollTo(0, 0);
+    /* 内容被清空重填的那一瞬间文档高度会塌陷，滚动位置会被浏览器夹取 —— 这里显式还原 */
+    if (opt && opt.scroll === 'top') window.scrollTo(0, 0);
+    else if (keepY) window.scrollTo(0, keepY);
   };
 
   /* ============================================================

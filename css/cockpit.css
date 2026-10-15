@@ -608,19 +608,25 @@ input.ck-field { display: inline-block; min-width: 190px; }
 .ck-table--metrics th, .ck-table--metrics td { white-space: nowrap; }
 
 /* ============================================================
-   六项降本：卡片上的「占项目确权产值」占比行与占比条
-   （金额是降本金额，百分比是降本金额占项目确权产值 —— 两者口径不同，比例尺也不同，
-     卡片上必须写明百分比的口径，并用条长表达六项之间的相对高低）
+   六项降本：卡片上的「占项目确权产值」占比行
+   （金额是降本金额，百分比是降本金额占项目确权产值 —— 两者口径不同、比例尺也不同，
+     卡片上必须写明百分比的口径；此前底部那条渐变进度条没有可读基准，已去掉）
    ============================================================ */
 .ck-savecard__rate {
   display: flex; align-items: baseline; gap: 6px; margin-top: 6px;
   font-size: 12px; color: var(--color-text-tertiary);
 }
 .ck-savecard__rate b { font-size: 14px; color: var(--data-blue); font-variant-numeric: tabular-nums; }
-.ck-savecard__bar { height: 4px; margin-top: 6px; border-radius: 2px; background: #EEF3FA; overflow: hidden; }
-.ck-savecard__bar i { display: block; height: 100%; border-radius: 2px; background: linear-gradient(90deg, #7FC4F5, #2468F2); }
-.ck-metriccard--stat.ck-metriccard--active .ck-savecard__bar i { background: linear-gradient(90deg, #FF9C6E, #D0021B); }
 
 /* 六项降本 · 明细清单表头行：左侧口径提示 + 右侧设置列齿轮 */
 .ck-savehead { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-lg); margin: var(--sp-md) 0 var(--sp-sm); }
 .ck-savehead__hint { font-size: 12px; color: var(--color-text-tertiary); }
+
+/* ============================================================
+   图例可点亮 / 熄灭（六项降本趋势图、局驾驶舱多坐标柱状图）
+   点图例项切换该系列的显示；熄灭态整条变淡并置灰色块
+   ============================================================ */
+.ck-legend span { cursor: pointer; user-select: none; transition: opacity .15s; }
+.ck-legend span:hover { opacity: .78; }
+.ck-legend span.is-off { opacity: .38; }
+.ck-legend span.is-off i { filter: grayscale(1); }

@@ -13,6 +13,8 @@
   /* ============================================================
      视图状态
      ============================================================ */
+  /* 局驾驶舱「物资进场数据」图例的熄灭状态 */
+  const CS_IN_HIDE = {};
   const CS = {
     view: 'overview',          // overview | metrics
     metric: 'costDown',        // 指标总览当前页签
@@ -309,9 +311,12 @@
       '</div>' +
       '<div class="dsc-chart" id="ckInData" style="height:340px"></div>' +
       '<div class="ck-legend">' +
-      '<span><i style="background:#2F80ED"></i>金额</span>' +
-      '<span><i style="background:#34A853"></i>数量</span>' +
-      '<span><i class="ck-legend__line"></i>均价</span>' +
+      '<span data-ck-legend="0"' + (CS_IN_HIDE[0] ? ' class="is-off"' : '') +
+      ' title="点击点亮 / 熄灭该系列"><i style="background:#2F80ED"></i>金额</span>' +
+      '<span data-ck-legend="1"' + (CS_IN_HIDE[1] ? ' class="is-off"' : '') +
+      ' title="点击点亮 / 熄灭该系列"><i style="background:#34A853"></i>数量</span>' +
+      '<span data-ck-legend="2"' + (CS_IN_HIDE[2] ? ' class="is-off"' : '') +
+      ' title="点击点亮 / 熄灭该系列"><i class="ck-legend__line ck-legend__line--red"></i>均价</span>' +
       '</div>' +
 
       subHead('物资小类分析') +
@@ -706,6 +711,7 @@
     metric: 'bargain',   // 顶部指标带 / 页签当前项
     save: 'total',       // 六项降本当前项
     rankPage: 1, detailPage: 1, size: 10,
+    hide: {},              // 六项降本趋势图例的熄灭状态（下标 → true 表示已熄灭）
     more: false
   };
 
@@ -1121,7 +1127,6 @@
   /* 六项降本：卡片（降本金额 + 占项目确权产值）→ 统一查询条 → 趋势图（金额柱 + 占比线）→ 降本明细清单 */
   function saveSection() {
     const s = mbSave(MS.save);
-    const maxRate = Math.max.apply(null, MB_SAVE.map(function (x) { return x.rate; }));
     const allRows = mbDrillRows(mbDetailRows(MS.save));
     const rows = allRows;
     const size = MS.size;
@@ -1131,14 +1136,15 @@
     const cols = mbSaveCols(MS.save);
     const def = mbSaveDef(MS.save);
     return section('六项降本',
+      /* 卡片：金额（降本金额）+ 占比（占项目确权产值）。
+         此前卡片底部还有一条渐变进度条，编码的是「该口径占比 ÷ 六项中最高占比」——
+         满格没有标注基准、又与上一行的百分比重复，读者无法解读（容易被当成完成度），已去掉 */
       '<div class="ck-metrics ck-metrics--7">' + MB_SAVE.map(function (x) {
-        const pct = Math.round(x.rate / maxRate * 100);
         return '<div class="ck-metriccard ck-metriccard--stat' +
           (MS.save === x.key ? ' ck-metriccard--active' : '') + '" data-mb-save="' + x.key + '">' +
           '<div class="ck-metriccard__label">' + esc(x.name) + '</div>' +
           '<div class="ck-metriccard__value">' + esc(x.value) + '<span>万元</span></div>' +
           '<div class="ck-savecard__rate"><span>占项目确权产值</span><b>' + D.fmtNum(x.rate, 2) + '%</b></div>' +
-          '<div class="ck-savecard__bar"><i style="width:' + Math.max(3, pct) + '%"></i></div>' +
           '</div>';
       }).join('') + '</div>' +
 
@@ -1158,8 +1164,10 @@
       subHead(s.name + ' · 降本金额与占项目确权产值趋势') +
       '<div class="dsc-chart" id="mbSave" style="height:280px"></div>' +
       '<div class="ck-legend">' +
-      '<span><i style="background:#D0021B"></i>降本金额（万元，左轴）</span>' +
-      '<span><i class="ck-legend__line"></i>占项目确权产值（%，右轴）</span></div>' +
+      '<span data-mb-legend="0"' + (MS.hide[0] ? ' class="is-off"' : '') +
+      ' title="点击点亮 / 熄灭该系列"><i style="background:#2468F2"></i>降本金额（万元，左轴）</span>' +
+      '<span data-mb-legend="1"' + (MS.hide[1] ? ' class="is-off"' : '') +
+      ' title="点击点亮 / 熄灭该系列"><i class="ck-legend__line ck-legend__line--red"></i>占项目确权产值（%，右轴）</span></div>' +
 
       subHead('降本明细清单', '共 ' + total + ' 条（每页 ' + size + ' 条）' +
         (MS.save === 'total' ? '　·　合计口径：6 大项 ' + MB_SAVE_SUBS.length + ' 小项全量展开' : '')) +
@@ -1768,14 +1776,16 @@
     const save = root.querySelector('#mbSave');
     if (save) {
       /* 金额（柱，左轴）+ 占项目确权产值（线，右轴）：一张图同时读金额与占比两条趋势 */
+      /* 与上方「核心指标随时间变化的趋势」同一套语言：金额用蓝柱，占比用红线；
+         横轴月份带年度（2025.04 …），与上方图表一致 */
       D.comboChart(save, {
-        categories: MB_SAVE_MONTHS,
+        categories: MB_MONTHS,
         series: [
           { name: mbSave(MS.save).name, data: mbSaveTrend(MS.save), type: 'bar',
-            color: '#D0021B', color2: '#F58A8C', unit: '万元' },
+            color: '#2468F2', color2: '#7FC4F5', unit: '万元' },
           { name: '占项目确权产值', data: mbSaveRateTrend(MS.save), type: 'line', axis: 'right',
-            color: '#2468F2' }
-        ]
+            color: '#D0021B' }
+        ].filter(function (se, i) { return !MS.hide[i]; })
       }, { height: 280, dataLabels: true, yDigits: 0, yUnit: '万元', y2Unit: '%', padL: 64,
         rotateX: 0, rDigits: 2, lineLabelUnit: '%', barLabelRaw: true });
     }
@@ -1797,6 +1807,12 @@
       { sel: '[data-mb-tab]', fn: function (el) { MS.metric = el.getAttribute('data-mb-tab'); D.render(); } },
       /* 六项降本：切卡换曲线 */
       { sel: '[data-mb-save]', fn: function (el) { MS.save = el.getAttribute('data-mb-save'); D.render(); } },
+      /* 六项降本趋势图：点图例点亮 / 熄灭对应系列 */
+      { sel: '[data-mb-legend]', fn: function (el) {
+        const i = +el.getAttribute('data-mb-legend');
+        MS.hide[i] = !MS.hide[i];
+        D.render();
+      } },
       /* 降本明细：设置列（齿轮）——真正改变表格字段 */
       { sel: '[data-mb-columns]', fn: function () {
         const key = MS.save;
@@ -1944,7 +1960,7 @@
           { name: '数量', data: qty.map(function (v) { return v / 20; }), type: 'bar', axis: 'right',
             color: '#34A853', color2: '#7FC8F1', unit: '万个' },
           { name: '均价', data: price, type: 'line', color: '#D0021B' }
-        ]
+        ].filter(function (se, i) { return !CS_IN_HIDE[i]; })
       }, { height: 340, rotateX: 45, yDigits: 0, yUnit: '亿元', y2Unit: '万个', padB: 96 });
     }
 
@@ -1953,7 +1969,14 @@
       const el = root.querySelector('#ckRing' + i);
       if (el) D.ringChart(el, c.pct, { size: 100 });
     });
-    D.delegate(root, [{ sel: '[data-ck-matcard]', fn: function (el) {
+    D.delegate(root, [
+      /* 物资进场数据（多坐标柱状图）：点图例点亮 / 熄灭对应系列 */
+      { sel: '[data-ck-legend]', fn: function (el) {
+        const i = +el.getAttribute('data-ck-legend');
+        CS_IN_HIDE[i] = !CS_IN_HIDE[i];
+        D.render();
+      } },
+      { sel: '[data-ck-matcard]', fn: function (el) {
       CS.matSmall = el.getAttribute('data-ck-matcard');
       D.render();
       D.toast('物料小类切换为「' + CS.matSmall + '」');
