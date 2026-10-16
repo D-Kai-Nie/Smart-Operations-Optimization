@@ -949,3 +949,7 @@ select.dsc-field {
   outline-offset: 2px;
   border-radius: 3px;
 }
+
+/* 多选下拉：分组标题本身是可勾选项（两层枚举，如「6 大项 + 18 小项」） */
+.dsc-multiselect__opt--group { font-weight: 600; margin-top: 4px; }
+.dsc-multiselect__opt--group:first-of-type { margin-top: 0; }

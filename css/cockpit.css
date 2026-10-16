@@ -635,3 +635,12 @@ input.ck-field { display: inline-block; min-width: 190px; }
 .ck-legend span:hover { opacity: .78; }
 .ck-legend span.is-off { opacity: .38; }
 .ck-legend span.is-off i { filter: grayscale(1); }
+
+/* 六项降本 · 卡片区右上角的「金额 / 占比」放大口径切换 */
+.ck-kpihead { display: flex; justify-content: flex-end; margin: 0 0 var(--sp-sm); }
+.ck-kpihead .dsc-tabs { margin-bottom: 0; }
+
+/* 卡片副行：占比放大模式下副行是「降本金额 xxx 万元」，7 列窄卡里允许整体换行，
+   但文字块自身不拆（否则会出现「降本 金 额」这种断字） */
+.ck-savecard__rate { flex-wrap: wrap; row-gap: 2px; }
+.ck-savecard__rate > span, .ck-savecard__rate > b { white-space: nowrap; }

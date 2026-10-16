@@ -724,6 +724,9 @@
     rankPage: 1, detailPage: 1, size: 10,
     hide: {},              // 六项降本趋势图例的熄灭状态（下标 → true 表示已熄灭）
     sign: '全部',           // 降本金额正负：全部 / 正数 / 负数
+    items: null,           // 降本明细项查询：勾选的小项集合（null = 全选）
+    msOpen: false,         // 复选下拉面板是否展开（重绘后保持展开）
+    kpiMode: 'amt',         // 卡片放大口径：amt = 放大降本金额；rate = 放大产值占比
     more: false
   };
   D.materialBoardState = MS;   // 与 projectState / reportState / complianceState 一致：导出供测试与联动使用
@@ -896,15 +899,84 @@
       .concat([['finSave', '供应链金融溢价降本金额', 'turnover']]),
     idle: MB_SAVE_SUBS.filter(function (x) { return x[2] === 'idle'; })
   };
-  const MB_FIXED_COLS = ['idx', 'org2', 'org3', 'project'];
+  /* 组织链四列都可渲染；其中「排名 / 二级单位」固定，「三级单位 / 项目名称」默认隐藏（在设置列里勾选） */
+  const MB_ORG_COLS = ['idx', 'org2', 'org3', 'project'];
+  const MB_FIXED_COLS = ['idx', 'org2'];
+
+  /* 「降本明细项查询」：6 大项 + 18 小项两级（下拉按大项分组，分组的首项就是该大项本身） */
+  const MB_ITEM_PARENT = {};                       // 小项 key → 所属大项 key
+  MB_SAVE_SUBS.forEach(function (x) { MB_ITEM_PARENT[x[0]] = x[2]; });
+  function mbItemOpts() {
+    /* 复选枚举取 18 小项的并集（「供应链金融溢价降本金额」在议价与周转的列口径里各出现一次，去重后归议价）；
+       分组标题自身也是一个可勾选项（勾上 = 整组勾选） */
+    return MB_SAVE_TYPES.map(function (k) {
+      return { value: k, label: mbSave(k).name,
+        children: MB_SAVE_SUBS.filter(function (x) { return x[2] === k; })
+          .map(function (x) { return { value: x[0], label: x[1] }; }) };
+    });
+  }
+  function mbItemName(key) {
+    if (!key) return '全部明细项';
+    const sub = MB_SAVE_SUBS.filter(function (x) { return x[0] === key; })[0];
+    return sub ? sub[1] : mbSave(key).name;
+  }
+  const MB_ALL_SUBS = MB_SAVE_SUBS.map(function (x) { return x[0]; });
+  /* 18 小项在各自大项中的标准份额（与大项卡同一套拆分权重），供「降本明细项」勾选范围取数 */
+  const MB_ITEM_SHARE = {};
+  (function () {
+    MB_SAVE_TYPES.forEach(function (k) {
+      const list = MB_SAVE_SUBS.filter(function (x) { return x[2] === k; });
+      const amt = +String(mbSave(k).value).replace(/,/g, '');
+      const part = splitSubs(amt, list, 11 + k.length);
+      list.forEach(function (x) { MB_ITEM_SHARE[x[0]] = amt ? part[x[0]] / amt : 0; });
+    });
+  })();
+  /* 勾选集合（默认全选） */
+  function mbItemSel() { return MS.items || MB_ALL_SUBS; }
+  function mbShareOf(key) { return mbItemSel().indexOf(key) >= 0 ? (MB_ITEM_SHARE[key] || 0) : 0; }
+  /* 卡片上的「全量」金额：大项取卡片值，合计取六项之和 */
+  function mbCardAmt(key) {
+    if (key === 'total') {
+      return D.round(MB_SAVE_TYPES.reduce(function (a, k) { return a + mbCardAmt(k); }, 0), 2);
+    }
+    return +String(mbSave(key).value).replace(/,/g, '');
+  }
+  /* 勾选范围下的金额 / 占比（未勾选的小项不计入） */
+  function mbScopeAmt(key) {
+    if (key === 'total') {
+      return D.round(MB_SAVE_TYPES.reduce(function (a, k) { return a + mbScopeAmt(k); }, 0), 2);
+    }
+    const share = MB_SAVE_SUBS.filter(function (x) { return x[2] === key; })
+      .reduce(function (a, x) { return a + mbShareOf(x[0]); }, 0);
+    return D.round(mbCardAmt(key) * share, 2);
+  }
+  function mbScopeRate(key) {
+    const base = key === 'total' ? mbSave('total').rate : mbSave(key).rate;
+    const all = mbCardAmt(key);
+    return D.round(base * mbScopeAmt(key) / (all || 1), 2);
+  }
+  /* 只勾一个小项时，视图口径就是这个明细项（卡片收窄、趋势与主指标列跟随） */
+  function mbScopeKey() {
+    const sel = mbItemSel();
+    return sel.length === 1 ? sel[0] : '';
+  }
+  /* 二级单位取简称；三级单位 = 二级单位简称 + 本级简称 */
+  function mbOrg2Label(v) { return D.reportShortOf(String(v || '')); }
+  function mbOrg3Label(v, r) {
+    const p = mbOrg2Label(r && r.org2);
+    if (!v) return p || '—';
+    if (!p || String(v).indexOf(p) === 0) return String(v);
+    const own = String((r && r.org3Short) || v);
+    return own.indexOf(p) === 0 ? own : p + own;
+  }
 
   /* 列模型：合计降本 = 组织链（固定）+ 9 列默认 + 18 小项等隐藏项；单口径 = 组织链 + 该口径小项 + 降本额 / 占比 */
   function mbSaveCols(key) {
     const isTotal = key === 'total';
     const ident = [
       { key: 'idx', name: '排名', width: 70, num: true },
-      { key: 'org2', name: '二级单位', width: 130, render: function (v) { return mbDrillLink('org2', v); } },
-      { key: 'org3', name: '三级单位', width: 150, render: function (v) { return mbDrillLink('org3', v); } },
+      { key: 'org2', name: '二级单位', width: 130, render: function (v) { return mbDrillLink('org2', v, mbOrg2Label(v)); } },
+      { key: 'org3', name: '三级单位', width: 150, render: function (v, r) { return mbDrillLink('org3', v, mbOrg3Label(v, r)); } },
       { key: 'project', name: '项目名称', width: 200, render: function (v) { return mbDrillLink('project', v); } }
     ];
     if (isTotal) {
@@ -914,7 +986,12 @@
       metric.push({ key: 'saveAmt', name: '降本额合计(万元)', width: 150, num: true });
       metric.push({ key: 'entAmt', name: '项目确权产值金额(万元)', width: 180, num: true });
       metric.push({ key: 'saveRate', name: '降低额占比', width: 120, pct: true });
-      const rest = MB_SAVE_BASIC.filter(function (b) { return MB_FIXED_COLS.indexOf(b[0]) < 0; })
+      /* 本轮新增：过程降本小计（验收 + 消耗 + 闲废）、过程议价降本占比、产值 / 降本项目数 */
+      metric.push({ key: 'procAmt', name: '过程降本小计(万元)', width: 170, num: true });
+      metric.push({ key: 'procRate', name: '过程议价降本占比', width: 160, pct: true });
+      metric.push({ key: 'entCnt', name: '产值项目数', width: 110, num: true });
+      metric.push({ key: 'saveCnt', name: '降本项目数', width: 110, num: true });
+      const rest = MB_SAVE_BASIC.filter(function (b) { return MB_ORG_COLS.indexOf(b[0]) < 0; })
         .map(function (b) { return { key: b[0], name: b[1], width: b[2] }; })
         .filter(function (c) { return ['code', 'docStatus'].indexOf(c.key) < 0; });
       const subs = MB_SAVE_SUBS.map(function (x) {
@@ -923,20 +1000,25 @@
       return ident.concat(metric).concat(rest).concat(subs);
     }
     const k = MB_SAVE_METRICS[key] ? key : 'bargain';
-    const metric = MB_SAVE_METRICS[k].map(function (m2) {
-      return { key: m2[0], name: m2[1] + '（万元）', width: 240, num: true };
-    });
-    metric.push({ key: 'saveAmt', name: mbSave(k).name + '（万元）', width: 150, num: true });
+    /* 选中某个明细项时，主指标列就是该明细项，因此该小项不再重复出现在小项列里 */
+    const itemKey = mbScopeKey() && MB_ITEM_PARENT[mbScopeKey()] === k ? mbScopeKey() : '';
+    const metric = MB_SAVE_METRICS[k].filter(function (m2) { return m2[0] !== itemKey; })
+      .map(function (m2) {
+        return { key: m2[0], name: m2[1] + '（万元）', width: 240, num: true };
+      });
+    metric.push({ key: 'saveAmt', name: (itemKey ? mbItemName(itemKey) : mbSave(k).name) + '（万元）',
+      width: 150, num: true });
     metric.push({ key: 'saveRate', name: '降本占比率', width: 110, pct: true });
-    const rest = MB_SAVE_BASIC.filter(function (b) { return MB_FIXED_COLS.indexOf(b[0]) < 0; })
+    const rest = MB_SAVE_BASIC.filter(function (b) { return MB_ORG_COLS.indexOf(b[0]) < 0; })
       .map(function (b) { return { key: b[0], name: b[1], width: b[2] }; });
     return ident.concat(metric).concat(rest);
   }
-  /* 默认显示列：合计降本 = 6 大项 + 合计 + 产值 + 占比（9 列）；单口径 = 该口径小项 + 降本额 + 占比 */
+  /* 默认显示列：合计降本 = 二级单位 + 6 大项 + 合计 + 产值 + 占比 + 过程小计/占比 + 项目数；
+     单口径 = 二级单位 + 该口径小项 + 降本额 + 占比。三级单位 / 项目名称默认不显示（勾选后行粒度下沉） */
   function mbSaveDef(key) {
     if (key === 'total') {
       return MB_FIXED_COLS.concat(MB_SAVE_SUM_COLS.map(function (c) { return c[0]; }))
-        .concat(['saveAmt', 'entAmt', 'saveRate']);
+        .concat(['saveAmt', 'entAmt', 'saveRate', 'procAmt', 'procRate', 'entCnt', 'saveCnt']);
     }
     const k = MB_SAVE_METRICS[key] ? key : 'bargain';
     return MB_FIXED_COLS.concat(MB_SAVE_METRICS[k].map(function (m2) { return m2[0]; }))
@@ -965,28 +1047,42 @@
       const mine = pjs.length ? pjs : D.projects.slice(oi * 2, oi * 2 + 3);
       mine.slice(0, 3).forEach(function (p, pi) {
         const seed = oi * 7 + pi * 3;
-        const neg = (oi + pi) % 5 === 2;                 // 约 1/5 的项目降本为负
+        const neg = (oi + pi) % 5 === 2;                    // 约 1/5 的项目降本为负
+        const noEnt = (oi * 5 + pi) % 11 === 3;             // 少量项目尚未确权产值 → 产值项目数 0、占比不可算
+        const noSave = !noEnt && (oi * 3 + pi) % 13 === 5;   // 少量项目当期无降本记录 → 降本项目数 0
         const tAmt = {};
         let sum = 0;
         MB_SAVE_TYPES.forEach(function (t, ti) {
           const base = { bargain: 1, consume: 1.9, asset: 2.6, accept: 3.1, turnover: 1.8, idle: 3.9 }[t];
-          const v = D.round((180 + base * 320 + ((seed * 37 + ti * 53) % 97) * 6.4) * (neg ? -1 : 1), 2);
+          const v = noSave ? 0 :
+            D.round((180 + base * 320 + ((seed * 37 + ti * 53) % 97) * 6.4) * (neg ? -1 : 1), 2);
           tAmt[t] = v;
           sum = D.round(sum + v, 2);
         });
-        const rate = D.round((neg ? -1 : 1) * (4.6 + (seed % 11) * 0.58), 2);
-        /* 产值按占比反推：降低额占比 = 合计 ÷ 产值，保证行内自洽 */
-        const ent = D.round(Math.abs(sum) / Math.abs(rate) * 100, 2);
+        const rate = noSave ? 0 : D.round((neg ? -1 : 1) * (4.6 + (seed % 11) * 0.58), 2);
+        /* 产值按占比反推：降低额占比 = 合计 ÷ 产值，保证行内自洽；未确权产值的行占比留空 */
+        const ent = noEnt ? 0 : D.round(Math.abs(sum) / Math.abs(rate || 1) * 100, 2);
+        const sub = subs.length ? subs[pi % subs.length] : null;
         const row = {
-          org2: o.name, org3: subs.length ? subs[pi % subs.length].name : (p.subOrg || p.org),
+          org2: o.name, org3: sub ? sub.name : (p.subOrg || p.org),
+          org3Short: sub ? sub.shortName : String(p.subOrg || p.org || ''),
           project: p.name, pType: p.type, unit: (p.subOrg || p.org) + '',
           pStatus: p.status, pFormat: p.format || '房建', pMode: p.mode,
           month: '2026-' + String(1 + (oi + pi) % 9).padStart(2, '0'),
-          entAmt: ent, saveTotal: sum, saveRateTotal: rate
+          entAmt: ent, saveTotal: sum,
+          saveRateTotal: noEnt ? null : (noSave ? 0 : rate),
+          /* 过程降本小计 = 验收 + 消耗 + 闲废；占比 = 过程降本 ÷ 全部降本（口径见需求） */
+          procAmt: D.round((tAmt.accept || 0) + (tAmt.consume || 0) + (tAmt.idle || 0), 2),
+          entCnt: noEnt ? 0 : 1,
+          saveCnt: noSave ? 0 : 1
         };
+        row.procRate = sum ? D.round(row.procAmt / sum * 100, 2) : null;
         MB_SAVE_SUM_COLS.forEach(function (c) { row[c[0]] = tAmt[c[2]]; });
         MB_SAVE_TYPES.forEach(function (t, ti) {
-          const part = splitSubs(tAmt[t], MB_SAVE_METRICS[t], seed + ti);
+          /* 拆分集 = 「归属该大项」的小项（18 小项各归一个大项）：周转口径里的
+             「供应链金融溢价降本金额」归在议价，不参与周转的拆分 ——
+             否则同一字段会被两套拆分先后覆盖，小项之和与所属大项对不上 */
+          const part = splitSubs(tAmt[t], MB_SAVE_SUBS.filter(function (x) { return x[2] === t; }), seed + ti);
           Object.keys(part).forEach(function (kk) { row[kk] = part[kk]; });
         });
         /* 单口径视图的两列（降本额 / 降本占比率）按该口径取值 */
@@ -999,31 +1095,111 @@
   /* 按当前口径把「降本额 / 降本占比率」两列投影成通用键（列表列定义固定用 saveAmt / saveRate） */
   function mbRowsFor(key) {
     const k = key === 'total' || !MB_SAVE_METRICS[key] ? 'total' : key;
+    const sel = mbItemSel();
+    /* 一个大项里「被勾选的小项」之和（勾选范围决定取数；小项全勾即该大项全量） */
+    const sumSel = function (r, k2) {
+      return D.round(MB_SAVE_SUBS.filter(function (x) { return x[2] === k2; })
+        .reduce(function (a, x) { return a + (sel.indexOf(x[0]) >= 0 ? (r[x[0]] || 0) : 0); }, 0), 2);
+    };
     return mbDetailRows().map(function (r) {
-      const amt = k === 'total' ? r.saveTotal : r['amt_' + k];
-      return Object.assign({}, r, {
+      const amt = k === 'total'
+        ? D.round(MB_SAVE_TYPES.reduce(function (a, k2) { return a + sumSel(r, k2); }, 0), 2)
+        : sumSel(r, k);
+      const ent = r.entAmt || 0;
+      const proc = D.round(sumSel(r, 'accept') + sumSel(r, 'consume') + sumSel(r, 'idle'), 2);
+      const out = Object.assign({}, r, {
         saveAmt: amt,
-        saveRate: k === 'total' ? r.saveRateTotal : D.round(amt / (r.entAmt || 1) * 100, 2)
+        saveRate: ent ? D.round(amt / ent * 100, 2) : null,
+        procAmt: proc,
+        /* 降本项目数：勾选范围内还有降本记录才算 1（项目行 0/1，单位行是计数） */
+        saveCnt: amt ? 1 : 0
+      });
+      MB_SAVE_SUM_COLS.forEach(function (c) { out[c[0]] = sumSel(r, c[2]); });
+      MB_SAVE_TYPES.forEach(function (k2) { out['amt_' + k2] = sumSel(r, k2); });
+      out.procRate = out.saveAmt ? D.round(proc / out.saveAmt * 100, 2) : null;
+      return out;
+    });
+  }
+  /* 行粒度：默认按二级单位汇总；设置列里放开三级单位 / 项目名称即逐级下沉；下钻时至少展开下一级 */
+  function mbRowLevel(shown) {
+    const keys = shown.map(function (c) { return c.key; });
+    let lv = keys.indexOf('project') >= 0 ? 'project' : keys.indexOf('org3') >= 0 ? 'org3' : 'org2';
+    if (MS.drill.org2 && lv === 'org2') lv = 'org3';
+    if ((MS.drill.org3 || MS.drill.project) && lv !== 'project') lv = 'project';
+    return lv;
+  }
+  const MB_NUM_KEYS = MB_SAVE_SUBS.map(function (x) { return x[0]; })
+    .concat(MB_SAVE_SUM_COLS.map(function (c) { return c[0]; }))
+    .concat(['saveAmt', 'saveTotal', 'entAmt', 'procAmt', 'entCnt', 'saveCnt']);
+  /* 按行粒度汇总：金额与小项金额相加、项目数相加；率值列在汇总后再算「分子 ÷ 分母」 */
+  function mbAggRows(rows, lv) {
+    if (lv === 'project') return rows;
+    const map = {};
+    const out = [];
+    rows.forEach(function (r) {
+      const key = lv === 'org2' ? r.org2 : (r.org2 + '|' + r.org3);
+      let g = map[key];
+      if (!g) {
+        g = Object.assign({}, r);
+        /* 组织链按层级保留，不适用的一律留空（表格显示「—」）；项目属性在单位行不适用 */
+        g.org3 = lv === 'org3' ? r.org3 : '';
+        g.org3Short = lv === 'org3' ? r.org3Short : '';
+        g.project = '';
+        ['pType', 'unit', 'month', 'pStatus', 'pFormat', 'pMode'].forEach(function (k2) { g[k2] = ''; });
+        MB_NUM_KEYS.forEach(function (k2) { g[k2] = 0; });
+        map[key] = g;
+        out.push(g);
+      }
+      MB_NUM_KEYS.forEach(function (k2) {
+        g[k2] = D.round((g[k2] || 0) + (typeof r[k2] === 'number' ? r[k2] : 0), 2);
       });
     });
+    out.forEach(function (g) {
+      g.saveRate = g.entAmt ? D.round(g.saveAmt / g.entAmt * 100, 2) : null;
+      g.procRate = g.saveAmt ? D.round(g.procAmt / g.saveAmt * 100, 2) : null;
+    });
+    return out;
+  }
+  /* 明细清单的合计行：金额 / 项目数列加总；率值列按「分子 ÷ 分母」聚合，
+     不是各行的平均（降低额占比 = 合计降本 ÷ 合计产值；过程议价降本占比 = 过程降本 ÷ 合计降本） */
+  function mbTotalRow(cols, rows) {
+    if (!cols.some(function (c) { return c.num; })) return null;
+    const t = D.totalOf(cols, rows);
+    const sumOf = function (k) {
+      return D.round(rows.reduce(function (a, r) { return a + (typeof r[k] === 'number' ? r[k] : 0); }, 0), 2);
+    };
+    if (cols.some(function (c) { return c.key === 'saveRate'; })) {
+      const ent = sumOf('entAmt');
+      t.saveRate = ent ? D.round(sumOf('saveAmt') / ent * 100, 2) : null;
+    }
+    if (cols.some(function (c) { return c.key === 'procRate'; })) {
+      const all = sumOf('saveAmt');
+      t.procAmt = sumOf('procAmt');
+      t.procRate = all ? D.round(t.procAmt / all * 100, 2) : null;
+    }
+    return t;
   }
 
   /* 本页内下钻：点单位名 / 项目名就地过滤本表（不跳数据报表） */
-  function mbDrillLink(level, v) {
+  function mbDrillLink(level, v, label) {
     if (!v) return '—';
-    return '<span class="dsc-table__link" data-mb-drill="' + level + '|' + esc(v) + '">' + esc(v) + '</span>';
+    return '<span class="dsc-table__link" data-mb-drill="' + level + '|' + esc(v) + '">' +
+      esc(label == null ? v : label) + '</span>';
   }
   function mbDrillRows(rows) {
     const d = MS.drill;
     return rows.filter(function (r) {
-      /* 降本金额正负：默认全部，可只看正数 / 负数 */
-      if (MS.sign === '正数' && !(r.saveAmt > 0)) return false;
-      if (MS.sign === '负数' && !(r.saveAmt < 0)) return false;
       if (d.org2 && r.org2 !== d.org2) return false;
       if (d.org3 && r.org3 !== d.org3) return false;
       if (d.project && r.project !== d.project) return false;
       return true;
     });
+  }
+  /* 降本金额正负：按「最终展示的那一行」判断（二级单位行看单位合计，项目行看项目） */
+  function mbSignRows(rows) {
+    if (MS.sign === '正数') return rows.filter(function (r) { return r.saveAmt > 0; });
+    if (MS.sign === '负数') return rows.filter(function (r) { return r.saveAmt < 0; });
+    return rows;
   }
   function mbDrillPath() {
     const d = MS.drill;
@@ -1136,28 +1312,72 @@
   }
 
   /* 六项降本：卡片（降本金额 + 占项目确权产值）→ 统一查询条 → 趋势图（金额柱 + 占比线）→ 降本明细清单 */
+  /* 卡片区：默认 7 张（合计降本 + 六项）；「降本明细项查询」选中某小项时收窄为该明细项 1 张。
+     「金额 / 占比」切换：放大金额时副行给产值占比，放大占比时副行给降本金额、标题加「占比」 */
+  function mbCards() {
+    const rateMode = MS.kpiMode === 'rate';
+    /* 卡片带始终是 7 张（合计 + 六项）：既是导航也是概览，数值按「降本明细项」勾选范围收窄 */
+    const list = MB_SAVE.map(function (x) {
+      return { key: x.key, name: x.name, value: D.fmtNum(mbScopeAmt(x.key), 2),
+        rate: mbScopeRate(x.key), active: MS.save === x.key };
+    });
+    function card(o) {
+      const name = (rateMode ? o.name.replace(/金额$/, '') + '占比' : o.name);
+      const main = rateMode
+        ? D.fmtNum(o.rate, 2) + '<span>%</span>'
+        : esc(o.value) + '<span>万元</span>';
+      const sub = rateMode
+        ? '<span>降本金额</span><b>' + esc(o.value) + ' 万元</b>'
+        : '<span>产值占比</span><b>' + D.fmtNum(o.rate, 2) + '%</b>';
+      return '<div class="ck-metriccard ck-metriccard--stat' + (o.active ? ' ck-metriccard--active' : '') +
+        '" data-mb-save="' + o.key + '">' +
+        '<div class="ck-metriccard__label">' + esc(name) + '</div>' +
+        '<div class="ck-metriccard__value">' + main + '</div>' +
+        '<div class="ck-savecard__rate">' + sub + '</div></div>';
+    }
+    return '<div class="ck-kpihead"><div class="dsc-tabs dsc-tabs--pill" data-mb-kpimode>' +
+      [['amt', '金额'], ['rate', '占比']].map(function (m) {
+        return '<div class="dsc-tabs__item' + (MS.kpiMode === m[0] ? ' dsc-tabs__item--active' : '') +
+          '" data-km="' + m[0] + '">' + m[1] + '</div>';
+      }).join('') + '</div></div>' +
+      '<div class="ck-metrics ck-metrics--7">' +
+      list.map(card).join('') + '</div>';
+  }
+  /* 「降本明细项查询」：6 大项 + 18 小项两级复选下拉，默认全选 */
+  function mbItemField() {
+    const sel = mbItemSel();
+    const value = MB_ALL_SUBS.filter(function (k) { return sel.indexOf(k) >= 0; });
+    MB_SAVE_TYPES.forEach(function (k) {
+      const subs = MB_SAVE_SUBS.filter(function (x) { return x[2] === k; });
+      if (subs.length && subs.every(function (x) { return sel.indexOf(x[0]) >= 0; })) value.push(k);
+    });
+    const html = D.multiselect({
+      name: '降本明细项查询', tree: true, options: mbItemOpts(), value: value,
+      ph: MB_ALL_SUBS.length + ' 项全选', allText: '全部明细项',
+      total: MB_ALL_SUBS.length
+    });
+    return '<div class="ck-filter__item"><span class="ck-filter__label">降本明细项查询</span>' +
+      (MS.msOpen ? html.replace('class="dsc-multiselect"', 'class="dsc-multiselect dsc-multiselect--open"') : html) +
+      '</div>';
+  }
   function saveSection() {
     const s = mbSave(MS.save);
-    const allRows = mbDrillRows(mbRowsFor(MS.save));
-    const rows = allRows;
+    const cols = mbSaveCols(MS.save);
+    const def = mbSaveDef(MS.save);
+    /* 行粒度由「设置列」决定（三级单位 / 项目名称默认隐藏），正负筛选按最终展示的行判断 */
+    const shown0 = D.colsOf('mb-save-' + MS.save, cols, def);
+    const rowLevel = mbRowLevel(shown0);
+    const rows = mbSignRows(mbAggRows(mbDrillRows(mbRowsFor(MS.save)), rowLevel));
     const size = MS.size;
     const total = rows.length;
     if ((MS.detailPage - 1) * size >= total) MS.detailPage = 1;
     const paged = rows.slice((MS.detailPage - 1) * size, (MS.detailPage - 1) * size + size);
-    const cols = mbSaveCols(MS.save);
-    const def = mbSaveDef(MS.save);
+    const lvText = rowLevel === 'project' ? '按项目' : rowLevel === 'org3' ? '按三级单位' : '按二级单位';
     return section('六项降本',
       /* 卡片：金额（降本金额）+ 占比（占项目确权产值）。
          此前卡片底部还有一条渐变进度条，编码的是「该口径占比 ÷ 六项中最高占比」——
          满格没有标注基准、又与上一行的百分比重复，读者无法解读（容易被当成完成度），已去掉 */
-      '<div class="ck-metrics ck-metrics--7">' + MB_SAVE.map(function (x) {
-        return '<div class="ck-metriccard ck-metriccard--stat' +
-          (MS.save === x.key ? ' ck-metriccard--active' : '') + '" data-mb-save="' + x.key + '">' +
-          '<div class="ck-metriccard__label">' + esc(x.name) + '</div>' +
-          '<div class="ck-metriccard__value">' + esc(x.value) + '<span>万元</span></div>' +
-          '<div class="ck-savecard__rate"><span>占项目确权产值</span><b>' + D.fmtNum(x.rate, 2) + '%</b></div>' +
-          '</div>';
-      }).join('') + '</div>' +
+      mbCards() +
 
       /* 统一查询条：本模块的卡片 / 趋势 / 明细清单共用（原「降本明细」那条重复的已并入此条） */
       '<div class="ck-filter"><div class="ck-filter__row">' +
@@ -1165,7 +1385,7 @@
       '<span class="ck-grain" data-ck-grain="日期选择">' + esc(CS.settleGrain) + CARET + '</span>' +
       '<span class="ck-field ck-field--date">2025-06-01 ~ 2026-05-31</span></div>' +
       field('实施单位', '中国建筑第八工程局有限公司') + field('项目名称', '') + field('项目业态', '') +
-      field('降本金额正负', MS.sign) +
+      field('降本金额正负', MS.sign) + mbItemField() +
       '</div>' +
       '<div class="ck-filter__more" hidden>' +
       field('项目类型', '') + field('二级单位', '') + field('三级单位', '') +
@@ -1173,7 +1393,7 @@
       '</div>' +
       advActions() + '</div>' +
 
-      subHead(s.name + ' · 降本金额与占项目确权产值趋势') +
+      subHead((mbScopeKey() ? mbItemName(mbScopeKey()) : s.name) + ' · 降本金额与占项目确权产值趋势') +
       '<div class="dsc-chart" id="mbSave" style="height:280px"></div>' +
       '<div class="ck-legend">' +
       '<span data-mb-legend="0"' + (MS.hide[0] ? ' class="is-off"' : '') +
@@ -1181,22 +1401,33 @@
       '<span data-mb-legend="1"' + (MS.hide[1] ? ' class="is-off"' : '') +
       ' title="点击点亮 / 熄灭该系列"><i class="ck-legend__line ck-legend__line--red"></i>占项目确权产值（%，右轴）</span></div>' +
 
-      subHead('降本明细清单', '共 ' + total + ' 条（每页 ' + size + ' 条）' +
-        (MS.save === 'total' ? '　·　合计口径：6 大项 ' + MB_SAVE_SUBS.length + ' 小项全量展开' : '')) +
+      subHead('降本明细清单', '共 ' + total + ' 条（每页 ' + size + ' 条）　·　' + lvText + '汇总' +
+        (mbScopeKey() ? '　·　明细项：' + mbItemName(mbScopeKey())
+          : mbItemSel().length < MB_ALL_SUBS.length
+            ? '　·　明细项 ' + mbItemSel().length + '/' + MB_ALL_SUBS.length + '（已按勾选范围取数）' : '')) +
       mbDrillPath() +
       '<div class="ck-savehead">' +
       '<span class="ck-savehead__hint">' + (MS.save === 'total'
-        ? '默认展示：6 大项金额 + 降本额合计 + 项目确权产值金额 + 降低额占比；其余 ' + MB_SAVE_SUBS.length + ' 个小项与项目属性在「设置列」里'
-        : '点击 二级单位 / 三级单位 / 项目名称 可在本页内逐级下钻（不影响数据报表）') + '</span>' +
+        ? '默认展示：6 大项金额 + 降本额合计 + 项目确权产值金额 + 降低额占比 + 过程降本小计 / 占比 + 产值 · 降本项目数；' +
+          '三级单位 / 项目名称与其余 ' + MB_SAVE_SUBS.length + ' 个小项在「设置列」里 —— 行粒度随显示字段下沉，' +
+          '项目数在单位行是计数、到项目行才是 0 / 1'
+        : (mbScopeKey() ? '明细项：' + mbItemName(mbScopeKey()) + '　·　' : '') +
+          '点击 二级单位 / 三级单位 / 项目名称 可在本页内逐级下钻（不影响数据报表）') + '</span>' +
       D.colGear('data-mb-columns', '设置列：' + s.name + '的明细字段（基本信息 + 指标信息）') +
       '</div>' +
-      D.table({
-        cols: D.colsOf('mb-save-' + MS.save, cols, def),
-        rows: paged.map(function (r, i) {
-          return Object.assign({ idx: (MS.detailPage - 1) * size + i + 1 }, r);
-        }),
-        maxHeight: 420
-      }) +
+      (function () {
+        const shown = shown0;
+        return D.table({
+          cols: shown,
+          rows: paged.map(function (r, i) {
+            return Object.assign({ idx: (MS.detailPage - 1) * size + i + 1 }, r);
+          }),
+          /* 合计行按「全量结果集」算（与排行表一致），不是当前页；放在数据行之前便于第一眼看到 */
+          totalRow: mbTotalRow(shown, rows),
+          totalRowTop: true,
+          maxHeight: 420
+        });
+      })() +
       '<div data-mb-pager="detailPage">' + D.pager({ page: MS.detailPage, size: size, total: total }) + '</div>');
   }
 
@@ -1785,6 +2016,74 @@
         dataLabels: true, labelDigits: 2, padL: 56 });
     }
 
+    /* 降本明细项查询（复选项，默认全选）：勾选即生效，卡片 / 趋势 / 清单都按勾选范围取数 */
+    const itemMs = root.querySelector('[data-ms][data-name="降本明细项查询"]');
+    if (itemMs) {
+      const q2 = function (v) { return itemMs.querySelector('input[value="' + v + '"]'); };
+      /* 大项勾选 → 整组联动；小项 → 回写大项「整组勾上才亮」 */
+      const syncMs = function (cb) {
+        if (MB_SAVE_TYPES.indexOf(cb.value) >= 0) {
+          MB_SAVE_SUBS.forEach(function (x) {
+            if (x[2] !== cb.value) return;
+            const c = q2(x[0]);
+            if (c) c.checked = cb.checked;
+          });
+        } else if (MB_ITEM_PARENT[cb.value]) {
+          const p = MB_ITEM_PARENT[cb.value];
+          const all = MB_SAVE_SUBS.filter(function (x) { return x[2] === p; })
+            .every(function (x) { const c = q2(x[0]); return c && c.checked; });
+          const pc = q2(p);
+          if (pc) pc.checked = all;
+        }
+      };
+      const applyMs = function () {
+        const box = root.querySelector('[data-ms][data-name="降本明细项查询"]');
+        if (!box) return;
+        const items = [];
+        MB_ALL_SUBS.forEach(function (k) {
+          const c = box.querySelector('input[value="' + k + '"]');
+          if (c && c.checked) items.push(k);
+        });
+        MS.msOpen = box.classList.contains('dsc-multiselect--open');
+        if (items.join(',') === mbItemSel().join(',')) return;
+        MS.items = items;
+        MS.detailPage = 1;
+        D.render();
+      };
+      itemMs.addEventListener('change', function (e) {
+        if (e.target.type !== 'checkbox') return;
+        syncMs(e.target);
+        applyMs();
+      });
+      itemMs.addEventListener('click', function (e) {
+        const all = e.target.closest('[data-ms-all]');
+        const none = e.target.closest('[data-ms-none]');
+        if (all || none) {
+          /* 全选 / 清空：D.bindMultiselect 的委托处理挂在容器上、晚于本监听器，这里自己先落勾选态 */
+          itemMs.querySelectorAll('input[type=checkbox]').forEach(function (c) { c.checked = !!all; });
+          MS.msOpen = true;
+          MS.items = all ? MB_ALL_SUBS.slice() : [];
+          MS.detailPage = 1;
+          D.render();
+          return;
+        }
+        /* 点 chip 上的 ✕ 删除：委托处理随后才取消勾选，延后一拍再取状态 */
+        if (e.target.closest('[data-ms-del]')) setTimeout(function () {
+          const box = root.querySelector('[data-ms][data-name="降本明细项查询"]');
+          if (!box) return;
+          const items = [];
+          MB_ALL_SUBS.forEach(function (k) {
+            const c = box.querySelector('input[value="' + k + '"]');
+            if (c && c.checked) items.push(k);
+          });
+          MS.msOpen = true;
+          MS.items = items;
+          MS.detailPage = 1;
+          D.render();
+        }, 0);
+      });
+    }
+
     /* 降本金额正负：选完立即生效（列表就地过滤） */
     const signSel = root.querySelector('[data-ck-field="降本金额正负"]');
     if (signSel) {
@@ -1799,16 +2098,20 @@
 
     const save = root.querySelector('#mbSave');
     if (save) {
+      /* 趋势跟随「降本明细项」勾选范围收窄：月度金额与大项同形，按「勾选范围 ÷ 全量」缩放；
+         占比同理（同一产值分母，缩放系数相同）。只勾一个小项时就是该明细项的口径 */
+      const f = mbCardAmt(MS.save) ? mbScopeAmt(MS.save) / mbCardAmt(MS.save) : 1;
+      const barName = mbScopeKey() ? mbItemName(mbScopeKey()) : mbSave(MS.save).name;
       /* 金额（柱，左轴）+ 占项目确权产值（线，右轴）：一张图同时读金额与占比两条趋势 */
       /* 与上方「核心指标随时间变化的趋势」同一套语言：金额用蓝柱，占比用红线；
          横轴月份带年度（2025.04 …），与上方图表一致 */
       D.comboChart(save, {
         categories: MB_MONTHS,
         series: [
-          { name: mbSave(MS.save).name, data: mbSaveTrend(MS.save), type: 'bar',
-            color: '#2468F2', color2: '#7FC4F5', unit: '万元' },
-          { name: '占项目确权产值', data: mbSaveRateTrend(MS.save), type: 'line', axis: 'right',
-            color: '#D0021B' }
+          { name: barName, data: mbSaveTrend(MS.save).map(function (v) { return D.round(v * f, 2); }),
+            type: 'bar', color: '#2468F2', color2: '#7FC4F5', unit: '万元' },
+          { name: '占项目确权产值', data: mbSaveRateTrend(MS.save).map(function (v) { return D.round(v * f, 2); }),
+            type: 'line', axis: 'right', color: '#D0021B' }
         ].filter(function (se, i) { return !MS.hide[i]; })
       }, { height: 280, dataLabels: true, yDigits: 0, yUnit: '万元', y2Unit: '%', padL: 64,
         rotateX: 0, rDigits: 2, lineLabelUnit: '%', barLabelRaw: true });
@@ -1830,7 +2133,19 @@
       { sel: '[data-mb-metric]', fn: function (el) { MS.metric = el.getAttribute('data-mb-metric'); D.render(); } },
       { sel: '[data-mb-tab]', fn: function (el) { MS.metric = el.getAttribute('data-mb-tab'); D.render(); } },
       /* 六项降本：切卡换曲线 */
-      { sel: '[data-mb-save]', fn: function (el) { MS.save = el.getAttribute('data-mb-save'); D.render(); } },
+      { sel: '[data-mb-save]', fn: function (el) {
+        /* 点卡片 = 切换看哪个口径（合计 / 某大项）；「降本明细项」的勾选范围保持不变 */
+        MS.save = el.getAttribute('data-mb-save');
+        MS.detailPage = 1;
+        D.render();
+      } },
+      /* 卡片区右上角：放大「降本金额」/「产值占比」 */
+      { sel: '[data-mb-kpimode] .dsc-tabs__item', fn: function (el) {
+        const m = el.getAttribute('data-km');
+        if (MS.kpiMode === m) return;
+        MS.kpiMode = m;
+        D.render();
+      } },
       /* 六项降本趋势图：点图例点亮 / 熄灭对应系列 */
       { sel: '[data-mb-legend]', fn: function (el) {
         const i = +el.getAttribute('data-mb-legend');

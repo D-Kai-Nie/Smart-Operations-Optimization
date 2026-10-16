@@ -45,7 +45,9 @@ window.APP = window.APP || {};
     let list = '';
     if (opt.tree) {
       opts.forEach(function (g) {
-        list += '<div class="dsc-multiselect__group">' + esc(g.label) + '</div>';
+        /* 分组标题自身也可以是一个可勾选项（g.value 有值时）——用于「6 大项 + 18 小项」这类两层枚举 */
+        if (g.value) list += msOpt(g.value, g.label, value.indexOf(g.value) >= 0, false, 'dsc-multiselect__opt--group');
+        else list += '<div class="dsc-multiselect__group">' + esc(g.label) + '</div>';
         (g.children || []).forEach(function (c) { list += msOpt(c.value, c.label, value.indexOf(c.value) >= 0, true); });
       });
     } else {
@@ -55,17 +57,32 @@ window.APP = window.APP || {};
         list += msOpt(v, l, value.indexOf(v) >= 0, false);
       });
     }
-    return '<div class="dsc-multiselect" data-ms="' + id + '" data-name="' + esc(opt.name || '') + '">' +
-      '<div class="dsc-multiselect__box">' + msChips(value, opts, opt.ph || '请选择') + '</div>' +
+    return '<div class="dsc-multiselect" data-ms="' + id + '" data-name="' + esc(opt.name || '') +
+      '" data-ms-total="' + (opt.total || '') + '" data-ms-alltext="' + esc(opt.allText || '') + '">' +
+      '<div class="dsc-multiselect__box">' + msChips(value, opts, opt.ph || '请选择', opt.total, opt.allText) + '</div>' +
       '<div class="dsc-multiselect__panel dsc-scroll">' +
       '<div class="dsc-multiselect__tools"><span data-ms-all>全选</span><span data-ms-none>清空</span>' +
       '<span data-ms-close style="margin-left:auto;color:#999">收起</span></div>' + list + '</div></div>';
   };
-  function msOpt(v, l, checked, child) {
-    return '<label class="dsc-multiselect__opt' + (child ? ' dsc-multiselect__opt--child' : '') + '">' +
+  function msOpt(v, l, checked, child, extraCls) {
+    return '<label class="dsc-multiselect__opt' + (child ? ' dsc-multiselect__opt--child' : '') +
+      (extraCls ? ' ' + extraCls : '') + '">' +
       '<input type="checkbox" value="' + esc(v) + '"' + (checked ? ' checked' : '') + '/><span>' + esc(l) + '</span></label>';
   }
-  function msChips(value, opts, ph) {
+  function msChips(value, opts, ph, total, allText) {
+    if (!value.length) return '<span class="dsc-multiselect__ph">' + esc(ph) + '</span>';
+    /* 只对「叶子项」计数与展示 chip：分组标题（父子两级枚举的一级）不占位 */
+    let leaves = value;
+    if (opts && opts.some(function (o) { return o.children; })) {
+      const leafOpts = [];
+      opts.forEach(function (o) { if (o.children) leafOpts.push.apply(leafOpts, o.children); });
+      leaves = value.filter(function (v) {
+        return leafOpts.some(function (o) { return (o.value || o) === v; });
+      });
+    }
+    /* 全部勾选时用一句话代替一长串 chip（长枚举的默认态） */
+    if (allText && total && leaves.length >= total) return '<span class="dsc-multiselect__ph">' + esc(allText) + '</span>';
+    value = leaves;
     if (!value.length) return '<span class="dsc-multiselect__ph">' + esc(ph) + '</span>';
     const flat = [];
     (opts || []).forEach(function (o) { if (o.children) flat.push.apply(flat, o.children); else flat.push(o); });
@@ -110,7 +127,8 @@ window.APP = window.APP || {};
     const vals = [];
     ms.querySelectorAll('input[type=checkbox]').forEach(function (x) { if (x.checked) vals.push(x.value); });
     ms.dataset.value = vals.join(',');
-    ms.querySelector('.dsc-multiselect__box').innerHTML = msChips(vals, null, '请选择');
+    ms.querySelector('.dsc-multiselect__box').innerHTML =
+      msChips(vals, null, '请选择', +ms.dataset.msTotal || 0, ms.dataset.msAlltext || '');
   }
   D.readMultiselect = function (root) {
     const out = {};
@@ -309,7 +327,7 @@ window.APP = window.APP || {};
       }).join('');
       if (opt.totalRow) {
         const t = opt.totalRow;
-        body += '<tr class="dsc-total-row">' + cols.map(function (c, i) {
+        const totalHtml = '<tr class="dsc-total-row">' + cols.map(function (c, i) {
           const cls = [c.num ? 'dsc-num' : '', c.sticky ? 'dsc-sticky-col' : (c.sticky2 ? 'dsc-sticky-col-2' : '')].filter(Boolean).join(' ');
           let v = t[c.key];
           if (c.key === 'idx') v = '合计';
@@ -318,6 +336,8 @@ window.APP = window.APP || {};
           else if (c.num) v = c.fmt ? c.fmt(v) : D.fmtNum(v, typeof v === 'number' && v % 1 !== 0 ? 2 : 0);
           return '<td class="' + cls + '">' + esc(v) + '</td>';
         }).join('') + '</tr>';
+        /* totalRowTop：合计行放在数据行之前（长清单滚动区里不至于"看不见合计"，与排行表一致） */
+        body = opt.totalRowTop ? totalHtml + body : body + totalHtml;
       }
     }
     return '<div class="dsc-table-wrap"><div class="dsc-table-wrap__scroll dsc-scroll" style="max-height:' +
