@@ -255,17 +255,22 @@
   /* 局级总览的行是「单位」，条件里的二级单位要落到 name 上 */
   const OVERVIEW_ALIAS = { org2: 'name' };
 
-  /* 条件命中数：让「查询」的结果可被核对（反馈里直接写出筛掉后剩多少条） */
+  /* 条件命中数：让「查询」的结果可被核对（反馈里直接写出筛掉后剩多少条）
+     必须与表格用同一套口径：表格还要过 D.scope.canSeeRow 的组织权限（R2），
+     否则会出现「提示命中 36 条、表里一行都没有」的自相矛盾 */
   function condHits(dsKey, view) {
+    const visible = function (rows) {
+      return rows.filter(function (r) { return D.scope.canSeeRow(r); });
+    };
     if ((dsKey === 'contract' || dsKey === 'settlement') && view !== 'detail') {
       return applyConds(D.scopeOrgs(D.scope.dataOrgs()).map(function (o) { return { name: o.name }; }),
         RS.conds, OVERVIEW_ALIAS).length;
     }
     if (dsKey === 'supplier') {
-      if (RS.supTab === 'resource') return applyConds(D.genResourceRows(80), RS.conds).length;
+      if (RS.supTab === 'resource') return visible(applyConds(D.genResourceRows(80), RS.conds)).length;
       if (RS.supTab !== 'cooperation') return 0;
     }
-    return applyConds(rowsOf(dsKey), RS.conds).length;
+    return visible(applyConds(rowsOf(dsKey), RS.conds)).length;
   }
 
   /* A2：把已提交的条件回填进字段默认值，重绘（查询 / 翻页 / 切页签）后不再被清空 */

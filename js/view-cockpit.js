@@ -163,6 +163,7 @@
       case '使用部位': return ['主体结构', '基础工程', '装饰装修', '机电安装', '室外工程'];
       case '计划使用部位': return ['房建施工板块', '基础设施板块', '安装板块', '装饰装修板块'];
       case '达处置条件': return ['已达到', '未达到'];
+      case '降本金额正负': return ['全部', '正数', '负数'];
       case '处理日期': case '调拨申请时间': case '调拨完成时间': case '处置日期':
         return ['2026-01 ~ 2026-09', '2026-01 ~ 2026-03', '2026-04 ~ 2026-06', '2026-07 ~ 2026-09'];
       case '降本类型': return ['议价降本', '消耗降本', '资产降本', '验收降本', '周转降本', '闲废降本'];
@@ -722,8 +723,10 @@
     save: 'total',       // 六项降本当前项
     rankPage: 1, detailPage: 1, size: 10,
     hide: {},              // 六项降本趋势图例的熄灭状态（下标 → true 表示已熄灭）
+    sign: '全部',           // 降本金额正负：全部 / 正数 / 负数
     more: false
   };
+  D.materialBoardState = MS;   // 与 projectState / reportState / complianceState 一致：导出供测试与联动使用
 
   const MB_METRICS = [
     { key: 'bargain', name: '二次议价采购成本降低率', value: 5.85, unit: '%', dec: 2,
@@ -877,11 +880,11 @@
     ['assetAmt', '资产降本金额', 'asset'], ['acceptAmt', '验收降本金额', 'accept'],
     ['turnoverAmt', '周转降本金额', 'turnover'], ['idleAmt', '闲废降本金额', 'idle']
   ];
+  /* 最低维度就是项目：不再有「单号 / 单据状态」这类单据级字段 */
   const MB_SAVE_BASIC = [
     ['org2', '二级单位', 130], ['org3', '三级单位', 150], ['project', '项目名称', 200],
     ['pType', '项目类型', 120], ['unit', '实施单位', 200], ['month', '统计月份', 110],
-    ['code', '单号', 180], ['docStatus', '单据状态', 110], ['pStatus', '项目状态', 100],
-    ['pFormat', '项目业态', 110], ['pMode', '承包模式', 130]
+    ['pStatus', '项目状态', 100], ['pFormat', '项目业态', 110], ['pMode', '承包模式', 130]
   ];
   /* 各口径的专有指标信息（Axure 面板逐状态抄录） */
   const MB_SAVE_METRICS = {
@@ -939,7 +942,6 @@
     return MB_FIXED_COLS.concat(MB_SAVE_METRICS[k].map(function (m2) { return m2[0]; }))
       .concat(['saveAmt', 'saveRate']);
   }
-  const MB_DOC_STATUS = ['已生效', '审批中', '已提交'];
   /* 把一个大项金额按确定性权重拆到它的小项上（各小项之和恒等于该大项） */
   function splitSubs(amt, subs, seed) {
     const w = subs.map(function (x, j) { return 22 + ((seed + j * 7) % 9) * 3; });
@@ -953,63 +955,59 @@
     });
     return out;
   }
-  function mbDetailRows(key) {
+  /* 降本明细：最低维度就是项目 —— 一行 = 一个项目。
+     金额有正有负（部分项目当期超支，降本为负），供「降本金额正负」筛选 */
+  function mbDetailRows() {
     const rows = [];
     D.orgs.forEach(function (o, oi) {
       const subs = D.subOrgsByParent[o.name] || [];
       const pjs = (D.projectsByOrg && D.projectsByOrg[o.name]) || [];
       const mine = pjs.length ? pjs : D.projects.slice(oi * 2, oi * 2 + 3);
-      if (key === 'total') {
-        /* 合计降本：一行 = 一个项目，六个大项 + 18 小项 + 合计 + 产值 + 占比 */
-        mine.slice(0, 3).forEach(function (p, pi) {
-          const seed = oi * 7 + pi * 3;
-          const tAmt = {};
-          let sum = 0;
-          MB_SAVE_TYPES.forEach(function (t, ti) {
-            const base = { bargain: 1, consume: 1.9, asset: 2.6, accept: 3.1, turnover: 1.8, idle: 3.9 }[t];
-            const v = D.round(180 + base * 320 + ((seed * 37 + ti * 53) % 97) * 6.4, 2);
-            tAmt[t] = v;
-            sum = D.round(sum + v, 2);
-          });
-          const rate = D.round(4.6 + (seed % 11) * 0.58, 2);
-          /* 产值按占比反推：降低额占比 = 合计 ÷ 产值，保证行内自洽 */
-          const ent = D.round(sum / rate * 100, 2);
-          const row = {
-            org2: o.name, org3: subs.length ? subs[pi % subs.length].name : (p.subOrg || p.org),
-            project: p.name, pType: p.type, unit: (p.subOrg || p.org) + '',
-            pStatus: p.status, pFormat: p.format || '房建', pMode: p.mode,
-            month: '2026-' + String(1 + (oi + pi) % 9).padStart(2, '0'),
-            saveAmt: sum, entAmt: ent, saveRate: rate
-          };
-          MB_SAVE_SUM_COLS.forEach(function (c) { row[c[0]] = tAmt[c[2]]; });
-          MB_SAVE_TYPES.forEach(function (t, ti) {
-            const part = splitSubs(tAmt[t], MB_SAVE_METRICS[t], seed + ti);
-            Object.keys(part).forEach(function (kk) { row[kk] = part[kk]; });
-          });
-          rows.push(row);
-        });
-        return;
-      }
-      /* 单口径：一行 = 一条降本单据 */
       mine.slice(0, 3).forEach(function (p, pi) {
-        const seed = oi * 5 + pi;
-        const amt = D.round(2874.19 - (oi % 21) * 92.4 + pi * 137.6, 2);
+        const seed = oi * 7 + pi * 3;
+        const neg = (oi + pi) % 5 === 2;                 // 约 1/5 的项目降本为负
+        const tAmt = {};
+        let sum = 0;
+        MB_SAVE_TYPES.forEach(function (t, ti) {
+          const base = { bargain: 1, consume: 1.9, asset: 2.6, accept: 3.1, turnover: 1.8, idle: 3.9 }[t];
+          const v = D.round((180 + base * 320 + ((seed * 37 + ti * 53) % 97) * 6.4) * (neg ? -1 : 1), 2);
+          tAmt[t] = v;
+          sum = D.round(sum + v, 2);
+        });
+        const rate = D.round((neg ? -1 : 1) * (4.6 + (seed % 11) * 0.58), 2);
+        /* 产值按占比反推：降低额占比 = 合计 ÷ 产值，保证行内自洽 */
+        const ent = D.round(Math.abs(sum) / Math.abs(rate) * 100, 2);
         const row = {
           org2: o.name, org3: subs.length ? subs[pi % subs.length].name : (p.subOrg || p.org),
           project: p.name, pType: p.type, unit: (p.subOrg || p.org) + '',
+          pStatus: p.status, pFormat: p.format || '房建', pMode: p.mode,
           month: '2026-' + String(1 + (oi + pi) % 9).padStart(2, '0'),
-          code: 'LXJB-20260310-' + String(oi * 3 + pi + 1).padStart(6, '0'),
-          docStatus: MB_DOC_STATUS[(oi + pi) % 3], pStatus: p.status,
-          pFormat: p.format || '房建', pMode: p.mode,
-          saveAmt: amt, saveRate: D.round(4.2 + (seed % 13) * 0.68, 2)
+          entAmt: ent, saveTotal: sum, saveRateTotal: rate
         };
-        const part = splitSubs(amt, MB_SAVE_METRICS[MB_SAVE_METRICS[key] ? key : 'bargain'], seed);
-        Object.keys(part).forEach(function (kk) { row[kk] = part[kk]; });
+        MB_SAVE_SUM_COLS.forEach(function (c) { row[c[0]] = tAmt[c[2]]; });
+        MB_SAVE_TYPES.forEach(function (t, ti) {
+          const part = splitSubs(tAmt[t], MB_SAVE_METRICS[t], seed + ti);
+          Object.keys(part).forEach(function (kk) { row[kk] = part[kk]; });
+        });
+        /* 单口径视图的两列（降本额 / 降本占比率）按该口径取值 */
+        Object.keys(MB_SAVE_METRICS).forEach(function (k) { row['amt_' + k] = tAmt[k]; });
         rows.push(row);
       });
     });
     return rows;
   }
+  /* 按当前口径把「降本额 / 降本占比率」两列投影成通用键（列表列定义固定用 saveAmt / saveRate） */
+  function mbRowsFor(key) {
+    const k = key === 'total' || !MB_SAVE_METRICS[key] ? 'total' : key;
+    return mbDetailRows().map(function (r) {
+      const amt = k === 'total' ? r.saveTotal : r['amt_' + k];
+      return Object.assign({}, r, {
+        saveAmt: amt,
+        saveRate: k === 'total' ? r.saveRateTotal : D.round(amt / (r.entAmt || 1) * 100, 2)
+      });
+    });
+  }
+
   /* 本页内下钻：点单位名 / 项目名就地过滤本表（不跳数据报表） */
   function mbDrillLink(level, v) {
     if (!v) return '—';
@@ -1018,6 +1016,9 @@
   function mbDrillRows(rows) {
     const d = MS.drill;
     return rows.filter(function (r) {
+      /* 降本金额正负：默认全部，可只看正数 / 负数 */
+      if (MS.sign === '正数' && !(r.saveAmt > 0)) return false;
+      if (MS.sign === '负数' && !(r.saveAmt < 0)) return false;
       if (d.org2 && r.org2 !== d.org2) return false;
       if (d.org3 && r.org3 !== d.org3) return false;
       if (d.project && r.project !== d.project) return false;
@@ -1137,7 +1138,7 @@
   /* 六项降本：卡片（降本金额 + 占项目确权产值）→ 统一查询条 → 趋势图（金额柱 + 占比线）→ 降本明细清单 */
   function saveSection() {
     const s = mbSave(MS.save);
-    const allRows = mbDrillRows(mbDetailRows(MS.save));
+    const allRows = mbDrillRows(mbRowsFor(MS.save));
     const rows = allRows;
     const size = MS.size;
     const total = rows.length;
@@ -1164,10 +1165,11 @@
       '<span class="ck-grain" data-ck-grain="日期选择">' + esc(CS.settleGrain) + CARET + '</span>' +
       '<span class="ck-field ck-field--date">2025-06-01 ~ 2026-05-31</span></div>' +
       field('实施单位', '中国建筑第八工程局有限公司') + field('项目名称', '') + field('项目业态', '') +
+      field('降本金额正负', MS.sign) +
       '</div>' +
       '<div class="ck-filter__more" hidden>' +
       field('项目类型', '') + field('二级单位', '') + field('三级单位', '') +
-      field('统计月份', '') + field('单据号', '') +
+      field('统计月份', '') +
       '</div>' +
       advActions() + '</div>' +
 
@@ -1781,6 +1783,18 @@
         series: [{ name: m.name, data: mbMetricTrend(m), color: '#D0021B' }]
       }, { height: 280, area: false, lineWidth: 1.8, dotR: 3.5, unit: m.unit, tipDigits: 2,
         dataLabels: true, labelDigits: 2, padL: 56 });
+    }
+
+    /* 降本金额正负：选完立即生效（列表就地过滤） */
+    const signSel = root.querySelector('[data-ck-field="降本金额正负"]');
+    if (signSel) {
+      signSel.value = MS.sign;
+      signSel.addEventListener('change', function () {
+        MS.sign = signSel.value || '全部';
+        MS.detailPage = 1;
+        D.render();
+        D.toast('降本金额筛选：' + MS.sign);
+      });
     }
 
     const save = root.querySelector('#mbSave');
