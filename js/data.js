@@ -346,7 +346,7 @@ window.APP = window.APP || {};
 
   /* 六项降本（F2.4） */
   D.sixSave = [
-    { key: 'bargain', name: '议价降本', formula: '（集采单价 - 采购单价）× 结算数量', src: '系统自动抓取', amount: 8620.42, rate: 2.14 },
+    { key: 'bargain', name: '结算降本', formula: '（集采单价 - 采购单价）× 结算数量', src: '系统自动抓取', amount: 8620.42, rate: 2.14 },
     { key: 'consume', name: '消耗降本', formula: '（图纸用量 - 实际用量）× 结算单价', src: '图纸用量数字商务填报', amount: 5842.36, rate: 1.45 },
     { key: 'asset', name: '资产降本', formula: '（购买单价 - 调拨单价）× 调拨数量', src: '手动填写', amount: 1746.28, rate: 0.43 },
     { key: 'verify', name: '验收降本', formula: '（到货数量 - 实收数量）× 结算单价', src: '系统自动抓取', amount: 3264.18, rate: 0.81 },

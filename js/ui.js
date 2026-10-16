@@ -281,7 +281,10 @@ window.APP = window.APP || {};
     function thOf(c, extra) {
       const cls = [c.num ? 'dsc-num' : '', c.sticky ? 'dsc-sticky-col' : (c.sticky2 ? 'dsc-sticky-col-2' : ''),
         c.sortable ? 'dsc-sortable' : '', sortKey === c.key ? ('dsc-sort-' + sortDir) : ''].filter(Boolean).join(' ');
-      const inner = c.sortable ? '<span class="dsc-sort">' + esc(c.name) + '</span>' : esc(c.name);
+      const inner = (c.sortable ? '<span class="dsc-sort">' + esc(c.name) + '</span>' : esc(c.name)) +
+        /* c.info：列头 ⓘ，悬停/点击弹口径气泡（定义 / 口径 / 来源），由页面在 after 里用 D.metricTip 绑定；
+           字形用 CSS 画（::after），不进 th 的文本，避免影响表头文字检索 */
+        (c.info ? '<i class="ck-info dsc-thinfo" data-col-info="' + esc(c.key) + '" title="悬停查看口径说明"></i>' : '');
       return '<th class="' + cls + '" style="min-width:' + (c.width || 120) + 'px"' + (extra || '') +
         (c.tip ? ' title="' + esc(c.tip) + '"' : '') +
         (c.sortable ? ' data-sort="' + esc(c.key) + '"' : '') + '>' + inner + '</th>';

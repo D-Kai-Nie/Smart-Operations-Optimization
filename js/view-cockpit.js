@@ -166,7 +166,7 @@
       case '降本金额正负': return ['全部', '正数', '负数'];
       case '处理日期': case '调拨申请时间': case '调拨完成时间': case '处置日期':
         return ['2026-01 ~ 2026-09', '2026-01 ~ 2026-03', '2026-04 ~ 2026-06', '2026-07 ~ 2026-09'];
-      case '降本类型': return ['议价降本', '消耗降本', '资产降本', '验收降本', '周转降本', '闲废降本'];
+      case '降本类型': return ['结算降本', '消耗降本', '资产降本', '验收降本', '周转降本', '闲废降本'];
       default: return null;
     }
   }
@@ -810,9 +810,9 @@
   const SAVE_SRC = '物资系统 / 财务系统';
   const MB_SAVE = [
     { key: 'total', name: '合计降本', value: '19,131.73', rate: 8.31,
-      desc: '六项降本金额合计（= 议价 + 消耗 + 资产 + 验收 + 周转 + 闲废）；占比为合计降本 ÷ 项目确权产值', src: SAVE_SRC },
-    { key: 'bargain', name: '议价降本', value: '1,317', rate: 6.88,
-      desc: '二次议价压降的采购金额（含集采引用议价、过程履约议价、结算议价）；占比为该降本额 ÷ 项目确权产值', src: SAVE_SRC },
+      desc: '六项降本金额合计（= 结算 + 消耗 + 资产 + 验收 + 周转 + 闲废）；占比为合计降本 ÷ 项目确权产值', src: SAVE_SRC },
+    { key: 'bargain', name: '结算降本', value: '1,317', rate: 6.88,
+      desc: '结算环节形成的降本额（集采引用议价 + 过程履约议价 + 供应链金融溢价 + 结算议价）；占比为该降本额 ÷ 项目确权产值', src: SAVE_SRC },
     { key: 'consume', name: '消耗降本', value: '2,586', rate: 10.50,
       desc: '材料结余降耗 + 过程控耗形成的降本额；占比为该降本额 ÷ 项目确权产值', src: SAVE_SRC },
     { key: 'asset', name: '资产降本', value: '3,528.17', rate: 6.68,
@@ -826,7 +826,7 @@
   ];
   const MB_SAVE_MONTHS = ['一月', '二月', '三月', '四月', '五月', '六月',
     '七月', '八月', '九月', '十月', '十一月', '十二月'];
-  /* 截图实测：议价降本一—十二月（万元） */
+  /* 截图实测：原「议价降本」（现「结算降本」）一—十二月（万元） */
   const MB_SAVE_BASE = [4497.32, 3821.47, 6314.69, 5814.27, 5624.10, 4618.29,
     4019.28, 2997.14, 3001.38, 3004.29, 3049.57, 4815.28];
   const MB_SAVE_FACTOR = { total: 3.97, bargain: 1, consume: 1.96, asset: 2.68, accept: 3.14, turnover: 1.81, idle: 3.94 };
@@ -853,7 +853,7 @@
      六项降本 › 降本明细清单
      · 单据口径：字段逐项抄自 Axure《列表字段选择-物资六项降本》（7 状态）
      · 合计降本：扩展为全量 6 大项 18 小项 + 项目确权产值金额
-       （18 小项 = 六个状态指标信息的并集；「供应链金融溢价降本金额」在议价与周转中各出现一次，去重后 18 项）
+       （18 小项 = 六个状态指标信息的并集；「供应链金融溢价降本金额」在结算与周转中各出现一次，去重后 18 项）
      ============================================================ */
   const MB_SAVE_TYPES = ['bargain', 'consume', 'asset', 'accept', 'turnover', 'idle'];
   /* 18 小项：[key, 名称, 所属大项] */
@@ -879,7 +879,7 @@
   ];
   /* 6 大项的合计列（合计降本视图的默认展示项） */
   const MB_SAVE_SUM_COLS = [
-    ['bargainAmt', '议价降本金额', 'bargain'], ['consumeAmt', '消耗降本金额', 'consume'],
+    ['bargainAmt', '结算降本金额', 'bargain'], ['consumeAmt', '消耗降本金额', 'consume'],
     ['assetAmt', '资产降本金额', 'asset'], ['acceptAmt', '验收降本金额', 'accept'],
     ['turnoverAmt', '周转降本金额', 'turnover'], ['idleAmt', '闲废降本金额', 'idle']
   ];
@@ -907,7 +907,7 @@
   const MB_ITEM_PARENT = {};                       // 小项 key → 所属大项 key
   MB_SAVE_SUBS.forEach(function (x) { MB_ITEM_PARENT[x[0]] = x[2]; });
   function mbItemOpts() {
-    /* 复选枚举取 18 小项的并集（「供应链金融溢价降本金额」在议价与周转的列口径里各出现一次，去重后归议价）；
+    /* 复选枚举取 18 小项的并集（「供应链金融溢价降本金额」在结算与周转的列口径里各出现一次，去重后归结算）；
        分组标题自身也是一个可勾选项（勾上 = 整组勾选） */
     return MB_SAVE_TYPES.map(function (k) {
       return { value: k, label: mbSave(k).name,
@@ -960,6 +960,17 @@
     const sel = mbItemSel();
     return sel.length === 1 ? sel[0] : '';
   }
+  /* 列头 ⓘ 的口径气泡（定义 / 口径 / 来源）：只给「口径不自明」的列挂，
+     普通字段（金额、占比）不加图标，避免表头变噪 */
+  const MB_COL_TIPS = {
+    procAmt: { key: 'procAmt', name: '过程降本小计',
+      desc: '验收降本 + 消耗降本 + 闲废降本 三项之和（过程履约阶段形成的降本额）',
+      unit: '万元', src: SAVE_SRC },
+    procRate: { key: 'procRate', name: '过程降本占比',
+      desc: '过程降本小计 ÷ 降本额合计 —— 分母是「降本额合计」（当前行范围内六项降本金额之和，不是产值），' +
+        '即过程降本金额在全部降本金额中的占比',
+      unit: '%', src: SAVE_SRC }
+  };
   /* 二级单位取简称；三级单位 = 二级单位简称 + 本级简称 */
   function mbOrg2Label(v) { return D.reportShortOf(String(v || '')); }
   function mbOrg3Label(v, r) {
@@ -980,17 +991,20 @@
       { key: 'project', name: '项目名称', width: 200, render: function (v) { return mbDrillLink('project', v); } }
     ];
     if (isTotal) {
-      const metric = MB_SAVE_SUM_COLS.map(function (c) {
-        return { key: c[0], name: c[1] + '(万元)', width: 140, num: true };
+      /* 两个项目数统计字段前置到指标列最前（紧跟组织链）：先看「这一行统计了几个项目」，再看金额 */
+      const metric = [
+        { key: 'entCnt', name: '产值项目数', width: 110, num: true },
+        { key: 'saveCnt', name: '降本项目数', width: 110, num: true }
+      ];
+      MB_SAVE_SUM_COLS.forEach(function (c) {
+        metric.push({ key: c[0], name: c[1] + '(万元)', width: 140, num: true });
       });
       metric.push({ key: 'saveAmt', name: '降本额合计(万元)', width: 150, num: true });
       metric.push({ key: 'entAmt', name: '项目确权产值金额(万元)', width: 180, num: true });
       metric.push({ key: 'saveRate', name: '降低额占比', width: 120, pct: true });
-      /* 本轮新增：过程降本小计（验收 + 消耗 + 闲废）、过程议价降本占比、产值 / 降本项目数 */
-      metric.push({ key: 'procAmt', name: '过程降本小计(万元)', width: 170, num: true });
-      metric.push({ key: 'procRate', name: '过程议价降本占比', width: 160, pct: true });
-      metric.push({ key: 'entCnt', name: '产值项目数', width: 110, num: true });
-      metric.push({ key: 'saveCnt', name: '降本项目数', width: 110, num: true });
+      /* 过程降本小计（验收 + 消耗 + 闲废）与占比：列头 ⓘ 说明构成 / 来源 / 分母 */
+      metric.push({ key: 'procAmt', name: '过程降本小计(万元)', width: 170, num: true, info: true });
+      metric.push({ key: 'procRate', name: '过程降本占比', width: 150, pct: true, info: true });
       const rest = MB_SAVE_BASIC.filter(function (b) { return MB_ORG_COLS.indexOf(b[0]) < 0; })
         .map(function (b) { return { key: b[0], name: b[1], width: b[2] }; })
         .filter(function (c) { return ['code', 'docStatus'].indexOf(c.key) < 0; });
@@ -1017,8 +1031,9 @@
      单口径 = 二级单位 + 该口径小项 + 降本额 + 占比。三级单位 / 项目名称默认不显示（勾选后行粒度下沉） */
   function mbSaveDef(key) {
     if (key === 'total') {
-      return MB_FIXED_COLS.concat(MB_SAVE_SUM_COLS.map(function (c) { return c[0]; }))
-        .concat(['saveAmt', 'entAmt', 'saveRate', 'procAmt', 'procRate', 'entCnt', 'saveCnt']);
+      return MB_FIXED_COLS.concat(['entCnt', 'saveCnt'])
+        .concat(MB_SAVE_SUM_COLS.map(function (c) { return c[0]; }))
+        .concat(['saveAmt', 'entAmt', 'saveRate', 'procAmt', 'procRate']);
     }
     const k = MB_SAVE_METRICS[key] ? key : 'bargain';
     return MB_FIXED_COLS.concat(MB_SAVE_METRICS[k].map(function (m2) { return m2[0]; }))
@@ -1080,7 +1095,7 @@
         MB_SAVE_SUM_COLS.forEach(function (c) { row[c[0]] = tAmt[c[2]]; });
         MB_SAVE_TYPES.forEach(function (t, ti) {
           /* 拆分集 = 「归属该大项」的小项（18 小项各归一个大项）：周转口径里的
-             「供应链金融溢价降本金额」归在议价，不参与周转的拆分 ——
+             「供应链金融溢价降本金额」归在结算降本，不参与周转的拆分 ——
              否则同一字段会被两套拆分先后覆盖，小项之和与所属大项对不上 */
           const part = splitSubs(tAmt[t], MB_SAVE_SUBS.filter(function (x) { return x[2] === t; }), seed + ti);
           Object.keys(part).forEach(function (kk) { row[kk] = part[kk]; });
@@ -1408,7 +1423,7 @@
       mbDrillPath() +
       '<div class="ck-savehead">' +
       '<span class="ck-savehead__hint">' + (MS.save === 'total'
-        ? '默认展示：6 大项金额 + 降本额合计 + 项目确权产值金额 + 降低额占比 + 过程降本小计 / 占比 + 产值 · 降本项目数；' +
+        ? '默认展示：产值 · 降本项目数 + 6 大项金额 + 降本额合计 + 项目确权产值金额 + 降低额占比 + 过程降本小计 / 占比；' +
           '三级单位 / 项目名称与其余 ' + MB_SAVE_SUBS.length + ' 个小项在「设置列」里 —— 行粒度随显示字段下沉，' +
           '项目数在单位行是计数、到项目行才是 0 / 1'
         : (mbScopeKey() ? '明细项：' + mbItemName(mbScopeKey()) + '　·　' : '') +
@@ -2116,6 +2131,12 @@
       }, { height: 280, dataLabels: true, yDigits: 0, yUnit: '万元', y2Unit: '%', padL: 64,
         rotateX: 0, rDigits: 2, lineLabelUnit: '%', barLabelRaw: true });
     }
+
+    /* 列头 ⓘ：悬停 / 点击弹口径气泡（与指标卡同一套气泡） */
+    Object.keys(MB_COL_TIPS).forEach(function (k) {
+      const el = root.querySelector('[data-col-info="' + k + '"]');
+      if (el) D.metricTip(el, MB_COL_TIPS[k]);
+    });
 
     const rec = root.querySelector('#mbRecycle');
     if (rec) {

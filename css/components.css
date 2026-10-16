@@ -953,3 +953,6 @@ select.dsc-field {
 /* 多选下拉：分组标题本身是可勾选项（两层枚举，如「6 大项 + 18 小项」） */
 .dsc-multiselect__opt--group { font-weight: 600; margin-top: 4px; }
 .dsc-multiselect__opt--group:first-of-type { margin-top: 0; }
+
+/* 表头口径图标：字形由 CSS 画（内容不进 th 文本），悬停 / 点击弹口径气泡 */
+.dsc-thinfo::after { content: 'i'; }
