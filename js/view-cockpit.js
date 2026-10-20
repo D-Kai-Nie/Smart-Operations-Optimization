@@ -1465,82 +1465,54 @@
       desc: '统计期内分供商承接合同的结算金额合计', src: '物资系统 + 采购管理系统' },
     { name: '履约分供商数量', value: '20,645', unit: '家', trend: 12.0, good: true, last: '18,436', go: 4,
       desc: '统计期内有实际履约记录的分供商数量', src: '物资系统' },
-    { name: '不良行为分供商数量', value: '658', unit: '家', trend: -19.0, good: true, last: '812', extra: '占比 4.9%', go: 5,
-      desc: '统计期内被记录不良行为的分供商数量；不良行为的判定标准待确认（Q-09）', src: '采购管理系统分供商模块' },
+    { name: '不良行为分供商数量', value: '658', unit: '家', trend: -19.0, good: true, last: '812', extra: '占比 1.06%', go: 0,
+      desc: '存在不良行为记录的分供商数量；占比 = 不良行为分供商数量 ÷ 在库分供商数量（658 ÷ 61,854）；不良行为的判定标准待确认（Q-09）', src: '采购管理系统分供商模块' },
     { name: '活跃分供商', value: '31,855', unit: '家', trend: -16.6, good: false, last: '38,912', go: 0,
       desc: '近 12 个月内有投标、报价或履约记录的分供商数量', src: '招采系统' },
-    { name: '优质分供商履约额', value: '354.57', unit: '亿元', trend: 18.6, good: true, last: '265.32', extra: '占比 72.50%', go: 4,
+    { name: '优质分供商履约额', value: '354.57', unit: '亿元', trend: 18.6, good: true, last: '265.32', extra: '占比 72.48%', go: 4,
       desc: '评价为优质的分供商所承接合同的结算金额，占比 = 优质履约额 ÷ 分供商履约额', src: '物资系统 + 采购管理系统' },
-    { name: '优质分供商数量', value: '25,793', unit: '家', trend: -18.1, good: false, last: '31,493', extra: '占比 41.7%', go: 0,
+    { name: '优质分供商数量', value: '25,793', unit: '家', trend: -18.1, good: false, last: '31,493', extra: '占比 41.70%', go: 0,
       desc: '评价等级为优质的分供商数量，占比 = 优质数量 ÷ 在库分供商数量', src: '采购管理系统分供商模块' },
-    { name: '清退分供商数量', value: '7,391', unit: '家', trend: 17.0, good: false, last: '6,315', extra: '占比 10.4%', go: 2,
-      desc: '统计期内被清退出库的分供商数量', src: '采购管理系统分供商模块' }
+    { name: '清退分供商数量', value: '7,391', unit: '家', trend: 17.0, good: false, last: '6,315', extra: '占比 10.67%', go: 2,
+      desc: '当前自然年内出库的分供商数量；占比 = 清退分供商数量 ÷（在库 + 清退）＝ 7,391 ÷ 69,245', src: '采购管理系统分供商模块' }
   ];
 
   const SB_BAR = { height: 240, dataLabels: true, labelColor: '#4A5568', xColor: '#666' };
   const SB_BLUE = '#2468F2';
 
-  const SB_RATE = {                                        // 分供商使用率分析
-    cats: ['在库分供商', '活跃分供商', '履约分供商', '优质分供商', '清退分供商'],
-    data: [9851, 8119, 7822, 7240, 5839], rate: '30.7'
+  /* 分供商使用率分析（CSV：新增入库→活跃→中标→签约→履约，各级给「数量及转化率」；
+     转化率 = 本级 ÷ 上一级。使用率 = 履约分供商数量 ÷ 在库分供商数量 = 20,645 ÷ 61,854） */
+  const SB_RATE = {
+    cats: ['新增入库', '活跃', '中标', '签约', '履约'],
+    data: [9851, 8119, 7822, 7240, 5839],
+    rates: [null, 82.42, 96.34, 92.56, 80.65], rate: '33.38'
   };
-  const SB_EVAL = {                                        // 分供商评价分析
-    cats: ['优质分供商', '良好分供商', '合格分供商', '待改进分供商'],
-    data: [25793, 15464, 12866, 7732], pct: [41.7, 25.0, 20.8, 12.5]
+  const SB_EVAL = {                                        // 分供商评价分析（Axure：分供商评级）
+    cats: ['优秀', '良好', '合格', '不合格'],
+    data: [25793, 15464, 12866, 7731], pct: [41.70, 25.00, 20.80, 12.50]   // 四档之和 = 在库 61,854
   };
-  const SB_CONVERT = [                                     // 引进分供商转化与留存分析
-    { name: '中标分供商', label: '中标分供商 1,822 家（26.6%）', value: 1822, color: '#2468F2' },
-    { name: '活跃未中标分供商', label: '活跃未中标分供商 4,642 家（67.9%）', value: 4642, color: '#F2B04A' },
-    { name: '淘汰分供商', label: '淘汰分供商 387 家（5.65%）', value: 387, color: '#EE7B8B' }
+  /* 引进分供商转化与留存（CSV：新引进 = 新增入库；分片 = 中标 / 未中标且未出库 / 出库，三者之和 = 新引进） */
+  const SB_CONVERT = [
+    { name: '中标分供商', label: '中标 7,822 家（79.40%）', value: 7822, color: '#2468F2' },
+    { name: '未中标且未出库', label: '未中标且未出库 1,642 家（16.67%）', value: 1642, color: '#F2B04A' },
+    { name: '出库分供商', label: '出库 387 家（3.93%）', value: 387, color: '#EE7B8B' }
   ];
-  const SB_LOSS = [                                        // 分供商流失情况分析
-    { name: '出库且合作超5年', label: '出库且合作超 5 年 280 家（27.05%）', value: 280, color: '#17B98A' },
-    { name: '出库且合作未满5年', label: '出库且合作未满 5 年 755 家（72.95%）', value: 755, color: '#2468F2' }
+  /* 分供商流失情况分析（CSV：出库分供商中「合作满五年 / 未满五年」，两者之和 = 出库 7,391） */
+  const SB_LOSS = [
+    { name: '合作满五年', label: '合作满 5 年 1,999 家（27.05%）', value: 1999, color: '#17B98A' },
+    { name: '合作未满五年', label: '合作未满 5 年 5,392 家（72.95%）', value: 5392, color: '#2468F2' }
   ];
   const SB_YEARS = {                                       // 合作年限分析
     cats: ['华中公司', '总承包公司', '发展建设分公司', '东北公司', '华北公司', '投资公司', '华南公司'],
     data: [1984, 1500, 1783, 631, 984, 798, 783]
   };
-  const SB_PERF = {                                        // 分供商履约情况分析（双轴）
+  /* 分供商履约情况分析（双轴）：各二级单位当前自然年内结算金额（万元）与存在履约的分供商数量。
+     金额与数量的单位均值都对齐全局 236.97 万元/家（489.22 亿元 ÷ 20,645 家），
+     7 个单位合计占全局 46.83%，与「二级单位数量之和 ≤ 履约分供商总数」自洽 */
+  const SB_PERF = {
     cats: ['华中公司', '上海公司', '总承包公司', '华南公司', '北京公司', '东北公司', '土木公司'],
-    amt: [984.88, 798.55, 783.54, 631.60, 622.77, 513.78, 488.14],
-    cnt: [5063, 3984, 3529, 3117, 3084, 2215, 2136]
-  };
-  const SB_DONE = { v: [929, 1589], pct: [36.97, 63.03] };   // 诉未完结占比分析
-  const SB_DUE = { v: [1454, 1064], pct: [57.74, 42.26] };   // 逾期占比情况分析
-  const SB_SAT = {                                          // 反向评价现阶段满意度
-    cats: ['非常满意', '较满意', '基本满意', '不满意'],
-    v: [929, 650, 534, 400], pct: [36.97, 25.87, 21.25, 15.91]
-  };
-  const SB_CNT = {                                         // 投诉数量及未完结占比
-    cats: ['一公司', '二公司', '三公司', '四公司'],
-    v: [984, 798, 783, 631], pct: [17.2, 9.89, 9.77, 8.98]
-  };
-  const SB_MIX = {                                         // 投诉金额及金额分布占比情况
-    cats: ['一公司', '二公司', '三公司', '四公司'],
-    total: [984.88, 798.55, 783.54, 631.60],
-    segs: [
-      { name: '5万元以下', color: '#2468F2', pct: [4.9, 3.2, 2.4, 7.2] },
-      { name: '5万元-30万元', color: '#F2B04A', pct: [10.8, 6.9, 5.7, 6.9] },
-      { name: '30万元-100万元', color: '#8CC63F', pct: [24.6, 15.0, 8.1, 4.0] },
-      { name: '100万元-500万元', color: '#C08FE8', pct: [38.8, 30.5, 30.8, 21.0] },
-      { name: '500万元及以上', color: '#EE7B8B', pct: [20.9, 44.4, 53.0, 60.9] }
-    ]
-  };
-  const SB_UNFIN = [                                       // 未完结处理进展情况
-    { name: '已撤回', label: '已撤回 1,418 条（56.03%）', value: 1418, color: '#2468F2' },
-    { name: '待受理', label: '待受理 165 条（15.12%）', value: 165, color: '#17B98A' },
-    { name: '处理中', label: '处理中 165 条（15.12%）', value: 165, color: '#F2B04A' },
-    { name: '待供应商确认', label: '待供应商确认 165 条（15.12%）', value: 165, color: '#B6E07A' }
-  ];
-  const SB_CATS4 = ['华中公司', '总承包公司', '发展建设分公司', '东北公司'];
-  const SB_AGE = [237, 192, 189, 156];                     // 处理时耗分布
-  const SB_NEW = [237, 192, 189, 156];                     // 各单位新增投诉
-  const SB_OVER = { v: [237, 192, 189, 156], pct: [8.6, 6.7, 6.6, 5.9] };
-  const SB_SCORE = {                                       // 单位反向评价均分
-    cats: ['华中公司', '总承包公司', '发展建设分公司', '东北公司', '一公司',
-      '上海公司', '华北公司', '华东公司', '西北公司'],
-    data: [9.8, 9.6, 9.3, 8.8, 7.5, 6.9, 5.8, 5.6, 5.4]
+    amt: [467818, 379311, 372182, 300010, 295816, 244046, 231866],
+    cnt: [1974, 1601, 1571, 1266, 1248, 1030, 978]
   };
 
   function sbChart(id, h) {
@@ -1578,72 +1550,48 @@
       /* 分供商使用情况分析（沿用顶部筛选条件，区块内不再重复同字段） */
       section('分供商使用情况分析',
         '<div class="dsc-split dsc-split--2">' +
-        '<div>' + '<div class="ck-statline">分供商使用率：<b>' + SB_RATE.rate + '%</b></div>' + sbChart('sbRate', 260) + '</div>' +
+        '<div>' + subHead('分供商使用率分析') +
+        '<div class="ck-statline">分供商使用率：<b>' + SB_RATE.rate + '%</b>' +
+        '<span class="u-tertiary" style="font-size:12px;margin-left:8px">履约分供商 ÷ 在库分供商</span></div>' +
+        sbChart('sbRate', 260) + '</div>' +
         '<div>' + subHead('分供商评价分析', '分供商评级') + sbChart('sbEval', 260) + '</div>' +
         '</div>') +
 
       /* 转化与流失 */
       '<div class="dsc-split dsc-split--2">' +
-      section('引进分供商转化与留存分析',
-        subHead('新引进后淘汰分供商数量占比', '新增 10,816 家，其中 6,851 家已评估') +
+      section('新引进分供商转化与留存分析',
+        subHead('新引进后淘汰分供商数量占比', '新增入库 9,851 家') +
         sbChart('sbConvert', 280) + sbLegend(SB_CONVERT)) +
       section('分供商流失情况分析',
-        subHead('出库分供商中合作 5 年分供商占比', '出库 7,391 家，其中 1,035 家已核实年限') +
+        subHead('出库分供商中合作满 5 年分供商占比', '出库 7,391 家') +
         sbChart('sbLoss', 280) + sbLegend(SB_LOSS)) +
       '</div>' +
 
-      /* 合作年限分析 */
-      section('合作年限分析',
+      /* 合作年限分析（7 个单位名较长，保持整行，避免半栏里横轴标签互相压字） */
+      section('分供商合作年限分析',
         '<div class="ck-filter"><div class="ck-filter__row">' + field('合作年限', '') +
         '</div>' +
         '<div class="ck-filter__more" hidden>' + field('本级库', '') + field('物料分类', '') + '</div>' +
-        actions() + '</div>' +
+        /* P0-4：更多条件必须能展开（此前是 hidden 且没有「展开」入口，两个字段永远不可达） */
+        actions({ attr: 'data-ck-adv', label: '展开' }) + '</div>' +
         sbChart('sbYears', 280)) +
-
-      /* 分供商履约情况分析（双轴：金额 / 数量） */
       section('分供商履约情况分析',
         '<div class="ck-sbsplit">' +
-        '<div class="ck-sbstat"><div class="ck-sbstat__label">履约额（万元）</div>' +
-        '<input class="ck-field ck-field--input" type="text" inputmode="numeric" placeholder="输入阈值" data-sb-field="履约额"/>' +
-        '<div class="ck-sbstat__big"><span>履约额超出占比数量</span><b>146</b> 家</div></div>' +
+        '<div class="ck-sbstat"><div class="ck-sbstat__label">履约额阈值（万元）</div>' +
+        /* P0-3：原输入框只聚焦不生效（死控件），改为明确的口径展示 + 说明 */
+        '<div class="ck-sbstat__fixed">≥ 500</div>' +
+        '<div class="ck-sbstat__big"><span>履约额超出占比数量</span><b>3,146</b> 家</div>' +
+        '<div class="ck-sbstat__note">统计期内履约额 ≥ 500 万元的分供商数量</div></div>' +
         '<div class="ck-sbmain">' + sbChart('sbPerf', 300) + sbLegend([
           { name: '分供商履约金额', color: '#2468F2' }, { name: '分供商履约数量', color: '#7FC4F5' }
         ]) + '</div></div>') +
 
-      /* 投诉三小图 */
-      section('投诉与满意度',
-        '<div class="dsc-split dsc-split--3">' +
-        '<div>' + subHead('诉未完结占比分析') + sbChart('sbDone', 230) + '</div>' +
-        '<div>' + subHead('逾期占比情况分析') + sbChart('sbDue', 230) + '</div>' +
-        '<div>' + subHead('分供商反向评价现阶段满意度分析') + sbChart('sbSat', 230) + '</div>' +
-        '</div>' +
-        '<div class="dsc-split dsc-split--2 u-mt-xl">' +
-        '<div>' + subHead('投诉数量及未完结占比') + sbChart('sbCnt', 250) + '</div>' +
-        '<div>' + subHead('投诉金额及金额分布占比情况') + sbChart('sbMix', 250) +
-        sbLegend(SB_MIX.segs) + '</div>' +
-        '</div>' +
-        '<div class="dsc-split dsc-split--2 u-mt-xl">' +
-        '<div>' + subHead('未完结处理进展情况', '共 1,589 条') + sbChart('sbUnfin', 260) + sbLegend(SB_UNFIN) + '</div>' +
-        '<div>' + subHead('处理时耗分布情况', '未结平均时耗') + sbChart('sbAge', 260) + '</div>' +
-        '</div>' +
-        '<div class="dsc-split dsc-split--2 u-mt-xl">' +
-        '<div>' + subHead('各单位新增投诉情况', '新增投诉数量') + sbChart('sbNew', 250) + '</div>' +
-        '<div>' + subHead('逾期分布情况', '逾期占比') + sbChart('sbOver', 250) + '</div>' +
-        '</div>') +
-
-      /* 评价均分 */
-      section('评价均分',
-        '<div class="ck-filter"><div class="ck-filter__row">' +
-        '<span class="ck-filter__note">沿用顶部筛选条件（本级库 / 日期 / 物料分类）</span>' +
-        '</div>' + actions() + '</div>' +
-        subHead('单位反向评价均分', '满分 10 分') + sbChart('sbScore', 280)) +
-
-      /* 相关报表：纯图表页需要一个下钻出口 */
+      /* 相关报表：纯图表页需要一个下钻出口（提诉 / 反向评价的明细在分供商数据报表里） */
       '<div class="dsc-card"><div class="dsc-card__body dsc-relbar">' +
       '<span class="dsc-relbar__label">相关报表</span>' +
       '<button class="dsc-btn" data-sb-go2="report" data-sb-ds="supplier">分供商数据报表</button>' +
       '<button class="dsc-btn" data-sb-go2="compliance">供应商合规分析</button>' +
-      '<span class="dsc-relbar__hint">本页为概览型看板，明细项目与合同级数据请前往数据报表</span>' +
+      '<span class="dsc-relbar__hint">本页为概览型看板；提诉与反向评价明细见「分供商数据报表」</span>' +
       '</div></div>' +
       '</div>';
   }
@@ -1655,7 +1603,7 @@
 
   D.pages['supplier-board'] = function () {
     return '<div class="dsc-page cockpit-page">' +
-      pageHead('分供商管理看板', '核心数据 · 资源：分供商规模 / 使用 / 履约 / 投诉与评价') +
+      pageHead('分供商管理看板', '核心数据 · 资源：分供商规模 / 使用 / 履约（提诉与反向评价见数据报表）') +
       scopeNote() + supplierBoardView() + '</div>';
   };
 
@@ -1952,54 +1900,25 @@
     }
     /* 分供商使用情况 */
     bar('sbRate', SB_RATE.cats, [{ name: '分供商数量', data: SB_RATE.data, color: SB_BLUE }],
-      { unit: '家', yDigits: 0, yUnit: '家' });
+      { unit: '家', yDigits: 0, yUnit: '家', dataLabels: false,
+        categoryTopLabels: SB_RATE.data.map(function (v, i) {
+          return D.fmtInt(v) + '家' + (SB_RATE.rates[i] ? '(' + SB_RATE.rates[i].toFixed(2) + '%)' : '');
+        }) });
     bar('sbEval', SB_EVAL.cats, [{ name: '分供商数量', data: SB_EVAL.data, color: SB_BLUE }],
       { unit: '家', yDigits: 0, yUnit: '家', dataLabels: false,
         categoryTopLabels: SB_EVAL.data.map(function (v, i) { return D.fmtInt(v) + '家(' + SB_EVAL.pct[i] + '%)'; }) });
     /* 转化与流失 */
-    donut('sbConvert', SB_CONVERT, '6,851 家');
-    donut('sbLoss', SB_LOSS, '1,035 家');
+    donut('sbConvert', SB_CONVERT, '9,851 家');
+    donut('sbLoss', SB_LOSS, '7,391 家');
     /* 合作年限 / 履约情况 */
     bar('sbYears', SB_YEARS.cats, [{ name: '超合作年份供应商数量', data: SB_YEARS.data, color: SB_BLUE }],
       { unit: '家', yDigits: 0, yUnit: '家' });
     bar('sbPerf', SB_PERF.cats, [
       { name: '分供商履约金额', data: SB_PERF.amt, color: SB_BLUE, unit: '万元' },
       { name: '分供商履约数量', data: SB_PERF.cnt, color: '#7FC4F5', unit: '家', axis: 'right' }
-    ], { height: 300, yDigits: 0, padR: 64, dataLabels: false });
-    /* 投诉三小图 */
-    bar('sbDone', ['完结', '未完结'], [{ name: '投诉数量', data: SB_DONE.v, color: SB_BLUE }],
-      { height: 230, yDigits: 0, dataLabels: false,
-        categoryTopLabels: SB_DONE.v.map(function (v, i) { return v + '(' + SB_DONE.pct[i] + '%)'; }) });
-    bar('sbDue', ['逾期', '未逾期'], [{ name: '投诉数量', data: SB_DUE.v, color: SB_BLUE }],
-      { height: 230, yDigits: 0, dataLabels: false,
-        categoryTopLabels: SB_DUE.v.map(function (v, i) { return v + '(' + SB_DUE.pct[i] + '%)'; }) });
-    bar('sbSat', SB_SAT.cats, [{ name: '投诉数量', data: SB_SAT.v, color: SB_BLUE }],
-      { height: 230, yDigits: 0, dataLabels: false,
-        categoryTopLabels: SB_SAT.v.map(function (v, i) { return D.fmtInt(v) + '家(' + SB_SAT.pct[i] + '%)'; }) });
-    bar('sbCnt', SB_CNT.cats, [{ name: '投诉总数', data: SB_CNT.v, color: SB_BLUE }],
-      { height: 250, yDigits: 0, yUnit: '个', dataLabels: false,
-        categoryTopLabels: SB_CNT.v.map(function (v, i) { return v + '个(' + SB_CNT.pct[i] + '%)'; }) });
-    /* 投诉金额分布：按金额段 100% 堆叠 */
-    bar('sbMix', SB_MIX.cats, SB_MIX.segs.map(function (g) {
-      return { name: g.name, data: g.pct, color: g.color, stack: true };
-    }), { height: 250, yDigits: 0, yUnit: '%', padT: 34, dataLabels: false,
-      categoryTopLabels: SB_MIX.total.map(function (v) { return v + '万元'; }) });
-    /* 未完结处理 / 处理时耗 */
-    donut('sbUnfin', SB_UNFIN, '1,589 条');
-    bar('sbAge', SB_CATS4, [{ name: '未结平均时耗', data: SB_AGE, color: SB_BLUE }],
-      { height: 260, yDigits: 0, dataLabels: false });
-    /* 新增投诉 / 逾期分布 */
-    bar('sbNew', SB_CATS4, [{ name: '新增投诉数量', data: SB_NEW, color: SB_BLUE }],
-      { height: 250, yDigits: 0, dataLabels: false });
-    bar('sbOver', SB_CATS4, [{ name: '逾期分布投诉占比', data: SB_OVER.v, color: SB_BLUE }],
-      { height: 250, yDigits: 0, dataLabels: false,
-        categoryTopLabels: SB_OVER.v.map(function (v, i) { return v + '(' + SB_OVER.pct[i] + '%)'; }) });
-    /* 评价均分 */
-    bar('sbScore', SB_SCORE.cats, [{ name: '单位反向评价均分', data: SB_SCORE.data, color: SB_BLUE }],
-      { height: 280, yDigits: 0, yUnit: '分', unit: '分' });
+    ], { height: 300, yDigits: 0, padR: 64, dataLabels: false, yUnit: '万元' });
 
     D.delegate(root, [
-      { sel: '[data-sb-field]', fn: function (el2) { el2.focus(); } },
       { sel: '[data-sb-go2]', fn: function (el2) {
         const p2 = el2.getAttribute('data-sb-go2');
         const ds = el2.getAttribute('data-sb-ds');

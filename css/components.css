@@ -956,3 +956,6 @@ select.dsc-field {
 
 /* 表头口径图标：字形由 CSS 画（内容不进 th 文本），悬停 / 点击弹口径气泡 */
 .dsc-thinfo::after { content: 'i'; }
+
+/* 两栏并排时，副标题的补充说明跟在标题后面（不贴到栏右端），避免与右栏标题连读成一串 */
+.dsc-split .ck-subhead__extra { margin-left: 0; }
