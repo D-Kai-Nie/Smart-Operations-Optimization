@@ -655,3 +655,13 @@ input.ck-field { display: inline-block; min-width: 190px; }
   font-variant-numeric: tabular-nums;
 }
 .ck-sbstat__note { margin-top: 8px; font-size: 12px; color: #8C93A0; line-height: 1.5; }
+
+/* 使用率数值：与子标题同一行、贴左栏右缘（标题已说明含义，只显示数值） */
+.dsc-split .ck-subhead__extra--rate {
+  margin-left: auto; line-height: 22px;
+  display: inline-flex; align-items: center; height: 22px;   /* 高度不超过标题行，避免把标题行撑高导致两图错位 */
+}
+.ck-subhead__extra--rate b {
+  font-size: 20px; font-weight: 700; color: var(--data-blue);
+  font-variant-numeric: tabular-nums;
+}

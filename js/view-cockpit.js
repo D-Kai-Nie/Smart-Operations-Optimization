@@ -1550,9 +1550,10 @@
       /* 分供商使用情况分析（沿用顶部筛选条件，区块内不再重复同字段） */
       section('分供商使用情况分析',
         '<div class="dsc-split dsc-split--2">' +
-        '<div>' + subHead('分供商使用率分析') +
-        '<div class="ck-statline">分供商使用率：<b>' + SB_RATE.rate + '%</b>' +
-        '<span class="u-tertiary" style="font-size:12px;margin-left:8px">履约分供商 ÷ 在库分供商</span></div>' +
+        /* 使用率数值属于左图：与子标题同一行、靠右对齐（标题已说明含义，不再重复「分供商使用率」） */
+        '<div>' +
+        '<div class="ck-subhead"><span class="ck-subhead__title">分供商使用率分析</span>' +
+        '<span class="ck-subhead__extra ck-subhead__extra--rate"><b>' + SB_RATE.rate + '%</b></span></div>' +
         sbChart('sbRate', 260) + '</div>' +
         '<div>' + subHead('分供商评价分析', '分供商评级') + sbChart('sbEval', 260) + '</div>' +
         '</div>') +
@@ -1906,7 +1907,7 @@
         }) });
     bar('sbEval', SB_EVAL.cats, [{ name: '分供商数量', data: SB_EVAL.data, color: SB_BLUE }],
       { unit: '家', yDigits: 0, yUnit: '家', dataLabels: false,
-        categoryTopLabels: SB_EVAL.data.map(function (v, i) { return D.fmtInt(v) + '家(' + SB_EVAL.pct[i] + '%)'; }) });
+        categoryTopLabels: SB_EVAL.data.map(function (v, i) { return D.fmtInt(v) + '家(' + SB_EVAL.pct[i].toFixed(2) + '%)'; }) });
     /* 转化与流失 */
     donut('sbConvert', SB_CONVERT, '9,851 家');
     donut('sbLoss', SB_LOSS, '7,391 家');
@@ -1916,7 +1917,7 @@
     bar('sbPerf', SB_PERF.cats, [
       { name: '分供商履约金额', data: SB_PERF.amt, color: SB_BLUE, unit: '万元' },
       { name: '分供商履约数量', data: SB_PERF.cnt, color: '#7FC4F5', unit: '家', axis: 'right' }
-    ], { height: 300, yDigits: 0, padR: 64, dataLabels: false, yUnit: '万元' });
+    ], { height: 300, yDigits: 0, rDigits: 0, padL: 78, padR: 64, dataLabels: false, yUnit: '万元' });
 
     D.delegate(root, [
       { sel: '[data-sb-go2]', fn: function (el2) {
