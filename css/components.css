@@ -826,18 +826,37 @@ select.dsc-field {
 
 /* 项目信息卡：左侧定位地图 + 右侧 2 列信息栅格 */
 .pj-info {
-  display: grid; grid-template-columns: 380px minmax(0, 1fr);
+  display: grid; grid-template-columns: 400px minmax(0, 1fr);
   gap: var(--sp-xxl); align-items: center;
   padding: var(--sp-lg) var(--sp-xl);
   background-color: var(--color-bg-card);
   border: 1px solid var(--color-divider); border-radius: var(--radius-md);
   margin-bottom: var(--sp-lg);
 }
-.pj-info__map {
-  height: 248px; border-right: 1px solid var(--color-divider); padding-right: var(--sp-xl);
-  overflow: hidden; /* 定位地图为放大视图，必须裁切，否则溢出整页 */
+/* 采购金额构成（替代原项目定位地图）：总额 + 五类金额 / 占比 */
+.pj-info__buy {
+  min-width: 0; padding-right: var(--sp-xl);
+  border-right: 1px solid var(--color-divider);
 }
-.pj-info__map .dsc-chart svg { overflow: hidden; }
+.pj-buy__head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-sm); }
+.pj-buy__title { font-size: 13px; color: var(--color-text-secondary); white-space: nowrap; }
+.pj-buy__total { font-size: 12px; color: var(--color-text-secondary); white-space: nowrap; cursor: help; }
+.pj-buy__total b {
+  margin: 0 2px; font-size: 20px; font-weight: 700; color: var(--color-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+.pj-buy__body { display: flex; align-items: center; gap: var(--sp-md); margin-top: 4px; }
+.pj-buy__ring { flex: 0 0 170px; width: 170px; }
+.pj-buy__legend { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.pj-buy__item {
+  display: grid; grid-template-columns: 8px minmax(0, 1fr) auto auto;
+  gap: 6px; align-items: center; font-size: 11px; line-height: 1.4;
+}
+.pj-buy__item i { width: 8px; height: 8px; border-radius: 2px; }
+.pj-buy__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #4A5568; }
+.pj-buy__amt { color: #334155; font-weight: 600; font-variant-numeric: tabular-nums; }
+.pj-buy__pct { min-width: 40px; text-align: right; color: #8C93A0; font-variant-numeric: tabular-nums; }
+.pj-buy__note { margin-top: 4px; font-size: 12px; line-height: 1.4; color: var(--color-accent); }
 .pj-info__grid {
   display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--sp-xl) var(--sp-xxl);
@@ -849,9 +868,9 @@ select.dsc-field {
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
-/* 项目核心指标带：7 项等宽 */
+/* 项目核心指标带：总采购金额上移后剩 6 项，桌面一行 6 列 */
 .pj-metrics {
-  display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));
+  display: grid; grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: var(--sp-lg); padding: var(--sp-xl) var(--sp-xl) var(--sp-xxl);
   background-color: var(--color-bg-card);
   border: 1px solid var(--color-divider); border-radius: var(--radius-md);
@@ -895,16 +914,14 @@ select.dsc-field {
 /* 招采分析筛选行：与 F2 筛选器同一套构件，仅补一次行距 */
 .pj-proc-filter { margin-bottom: 0; }
 
-/* 窄屏（1360px 起）：信息卡保持左右两栏只收窄地图列，指标带降到 4 列 / 3 列 */
-@media (max-width: 1700px) {
-  .pj-info { grid-template-columns: 300px minmax(0, 1fr); gap: var(--sp-xl); }
-  .pj-info__map { height: 210px; padding-right: var(--sp-lg); }
-  .pj-info__grid { gap: var(--sp-lg) var(--sp-xl); }
+/* 窄屏（1360px 起）：信息卡保持左右两栏，指标带 6 项在 1500 以下排 3×2 */
+@media (max-width: 1500px) {
+  .pj-info { grid-template-columns: 360px minmax(0, 1fr); gap: var(--sp-lg); }
+  .pj-info__buy { padding-right: var(--sp-lg); }
+  .pj-buy__ring { flex: 0 0 150px; width: 150px; }
+  .pj-info__grid { gap: var(--sp-lg); }
   .pj-info__item { font-size: 13px; }
-  .pj-info__value { padding-left: var(--sp-lg); }
-  .pj-metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-}
-@media (max-width: 1480px) {
+  .pj-info__value { padding-left: 12px; }
   .pj-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 

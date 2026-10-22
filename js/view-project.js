@@ -308,7 +308,27 @@
       '</div>';
   }
 
-  /* ---------- 项目信息：定位地图 + 信息栅格 ---------- */
+  /* ---------- 项目信息：采购金额构成 + 信息栅格 ----------
+     原定位地图占位改为「总采购金额 + 五类构成 + 占比」，五类口径与配色沿用局驾驶舱的采购金额构成；
+     金额按项目总采购额派生，五类之和严格等于总额 */
+  const PJ_BUY_MIX = [
+    { name: '专业分包结算', share: 43.02, color: '#4285F4' },
+    { name: '物资结算', share: 27.37, color: '#1F4E79' },
+    { name: '劳务分包结算', share: 25.17, color: '#34A853' },
+    { name: '设备结算', share: 3.12, color: '#FB923C' },
+    { name: '专业服务结算', share: 1.32, color: '#EA4335' }
+  ];
+  function pjBuyMix(p) {
+    const total = D.round(p.purchase, 2);
+    let used = 0;
+    return PJ_BUY_MIX.map(function (m, i) {
+      const v = i === PJ_BUY_MIX.length - 1
+        ? D.round(total - used, 2)
+        : D.round(total * m.share / 100, 2);
+      used = D.round(used + v, 2);
+      return { name: m.name, value: v, pct: m.share, color: m.color };
+    });
+  }
   function projectInfo(p) {
     const info = [
       ['项目类型', p.type], ['承包模式', p.mode],
@@ -317,7 +337,20 @@
       ['合同开竣工日期', '2026-03-01 ~ 2026-12-31'], ['项目状态', p.status]
     ];
     return '<div class="pj-info">' +
-      '<div class="pj-info__map"><div class="dsc-chart" id="pjMiniMap" style="height:100%"></div></div>' +
+      '<div class="pj-info__buy">' +
+      '  <div class="pj-buy__head"><span class="pj-buy__title">采购金额构成</span>' +
+      '    <span class="pj-buy__total">总采购金额 <b>' + D.fmtNum(p.purchase, 2) + '</b> 万元</span></div>' +
+      '  <div class="pj-buy__body">' +
+      '    <div class="pj-buy__ring"><div class="dsc-chart" id="pjBuyPie" style="height:170px"></div></div>' +
+      '    <div class="pj-buy__legend">' + pjBuyMix(p).map(function (m) {
+        return '<div class="pj-buy__item"><i style="background:' + m.color + '"></i>' +
+          '<span class="pj-buy__name">' + esc(m.name) + '</span>' +
+          '<b class="pj-buy__amt">' + D.fmtNum(m.value, 2) + '</b>' +
+          '<span class="pj-buy__pct">' + D.fmtNum(m.pct, 2) + '%</span></div>';
+      }).join('') + '</div>' +
+      '  </div>' +
+      '  <div class="pj-buy__note">总采购金额增加云筑产值单数据纳入计算</div>' +
+      '</div>' +
       '<div class="pj-info__grid">' + info.map(function (kv) {
         return '<div class="pj-info__item"><span class="pj-info__label">' + esc(kv[0]) + '：</span>' +
           '<span class="pj-info__value">' + esc(kv[1]) + '</span></div>';
@@ -333,11 +366,9 @@
     const i = Math.max(0, D.projects.indexOf(p));
     const rnd = D.seedRand(4200 + i * 17);
     const r = function (a, b) { return D.round(a + rnd() * (b - a), 2); };
-    /* desc/src 供口径气泡使用（AC9）；未明确的口径标注"待确认"，不臆造 */
+    /* desc/src 供口径气泡使用（AC9）；未明确的口径标注"待确认"，不臆造。
+       总采购金额已上移到页头「采购金额构成」面板，指标带剩 6 项 */
     return [
-      { name: '总采购金额', value: D.round(p.purchase, 2), unit: '万元',
-        note: '总采购金额增加云筑产值单数据纳入计算',
-        desc: '项目全周期采购金额合计（含云筑产值单纳入部分）', src: '物资系统 + 招采系统' },
       { name: '集中采购率', value: r(0, 12), unit: '%', company: r(60, 88), global: r(55, 80),
         desc: '项目集中采购金额 ÷ 项目采购总金额 × 100%', src: '物资系统' },
       { name: '履约支付率', value: r(0, 4), unit: '%', company: r(58, 80), global: r(50, 70),
@@ -870,10 +901,21 @@
       D.render();
     };
 
-    /* 项目定位小地图（浅色版中国地图，高亮项目所在省并标注项目名） */
-    const mini = root.querySelector('#pjMiniMap');
-    if (mini) {
-      D.mapMini(mini, { focus: D.provinceOf(p.city), marker: p.name });
+    /* 采购金额构成：五类占比环图（替代原项目定位地图） */
+    const buyPie = root.querySelector('#pjBuyPie');
+    if (buyPie) {
+      D.pieChart(buyPie, pjBuyMix(p), {
+        height: 170, hole: 0.55, labels: false, cx: 0.5, digits: 2, unit: '万元'
+      });
+    }
+    /* 总采购金额口径气泡：保留原指标卡上的定义 / 来源说明 */
+    const buyTotal = root.querySelector('.pj-buy__total');
+    if (buyTotal) {
+      D.metricTip(buyTotal, {
+        name: '总采购金额', unit: '万元',
+        desc: '项目全周期采购金额合计（含云筑产值单纳入部分）',
+        src: '物资系统 + 招采系统'
+      });
     }
 
     /* 指标卡口径气泡（AC9）：hover 或点击指标卡显示定义 / 口径 / 来源 */
