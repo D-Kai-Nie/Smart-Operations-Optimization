@@ -665,3 +665,39 @@ input.ck-field { display: inline-block; min-width: 190px; }
   font-size: 20px; font-weight: 700; color: var(--data-blue);
   font-variant-numeric: tabular-nums;
 }
+
+/* ---------- 资产看板：四项收尾优化（P1-3 / P1-6 / P1-7 / P1-8 / P2-9） ---------- */
+/* P1-7：静态日期文本 → 真日期区间控件（原生日历可选），与 ck-field 同高同边框 */
+.ck-daterange { display: inline-flex; align-items: center; gap: 6px; }
+.ck-daterange input.ck-field--date {
+  min-width: 136px; width: 136px; padding: 0 8px; font-size: 12px;
+  color: #333; font-variant-numeric: tabular-nums;
+}
+.ck-daterange input.ck-field--date:focus { outline: none; border-color: var(--action-blue); }
+.ck-daterange__sep { color: var(--color-text-tertiary); }
+/* P1-8：筛选条作用域徽标（看板筛选 / 明细筛选），避免两条筛选条各管哪块说不清 */
+.ck-filter__scope {
+  flex: 0 0 auto; padding: 0 9px; line-height: 20px; border-radius: 10px;
+  font-size: 12px; color: var(--action-blue); background: rgba(36, 104, 242, .08);
+}
+/* 明细筛出 0 行时的表内空态（不整页空态，保留筛选条以便调整条件） */
+.ck-table__empty { padding: 48px 0; text-align: center; font-size: 13px; color: #8C93A0; }
+
+/* P1-6：饼图去掉引线标注，改为「饼 + 右侧图例列表」两栏 */
+.ck-pie-split { display: grid; grid-template-columns: minmax(0, 1fr) 252px; gap: var(--sp-lg); align-items: center; }
+.ck-pielegend { display: flex; flex-direction: column; gap: 5px; font-size: 12px; color: #333; min-width: 0; }
+.ck-pielegend__item { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.ck-pielegend__item i { width: 10px; height: 10px; border-radius: 2px; flex: 0 0 auto; }
+.ck-pielegend__name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ck-pielegend__item b { flex: 0 0 auto; font-weight: 600; color: #334155; font-variant-numeric: tabular-nums; }
+@media (max-width: 1500px) {
+  /* 窄屏（最低 1360）下给饼图多留一点直径，图例列收窄 */
+  .ck-pie-split { grid-template-columns: minmax(0, 1fr) 196px; gap: var(--sp-md); }
+  .ck-pielegend { font-size: 11px; gap: 4px; }
+}
+/* P2-12：估算 / 示意数据角标——与取数结果区分开，避免被当作实际值引用 */
+.ck-demo-tag {
+  display: inline-block; margin-right: 6px; padding: 0 6px; line-height: 16px;
+  border-radius: 3px; font-size: 11px; font-weight: 600; color: #B26A00;
+  background: #FFF4E5; border: 1px solid #FFD8A8; vertical-align: 1px;
+}

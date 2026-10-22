@@ -129,7 +129,7 @@ window.APP = window.APP || {};
       ticks.forEach(function (t) {
         s += '<line x1="' + pad.l + '" y1="' + Y(t).toFixed(1) + '" x2="' + (w - pad.r) + '" y2="' + Y(t).toFixed(1) + '" stroke="#EEEEEE"/>';
         s += '<text x="' + (pad.l - 8) + '" y="' + (Y(t) + 4).toFixed(1) + '" text-anchor="end" font-size="11" fill="#999">' +
-          esc(fmt(t, opt.yDigits == null ? (vmax < 10 ? 1 : 0) : opt.yDigits)) + '</text>';
+          esc(fmt(t, opt.yDigits == null ? (vmax < 10 ? 1 : 0) : opt.yDigits)) + esc(opt.yUnit || '') + '</text>';
       });
       const step = Math.ceil(data.categories.length / (opt.maxX || 12));
       /* 首尾标签居中会被挤出画布 → 贴边时把锚点收到画布内（svg{overflow:visible} 会画到整页上） */
@@ -174,7 +174,8 @@ window.APP = window.APP || {};
     autoRedraw(el, function () {
       const w = Math.max(320, el.clientWidth || 600);
       const h = opt.height || 280;
-      const pad = { t: opt.padT || 22, r: opt.padR || 48, b: 38, l: opt.padL || 56 };
+      const rotate = opt.rotateX || 0;
+      const pad = { t: opt.padT || 22, r: opt.padR || 48, b: opt.padB || (rotate ? 92 : 38), l: opt.padL || 56 };
       const iw = w - pad.l - pad.r, ih = h - pad.t - pad.b;
       const bars = data.series.filter(function (s) { return s.type !== 'line'; });
       const lines = data.series.filter(function (s) { return s.type === 'line'; });
@@ -215,7 +216,7 @@ window.APP = window.APP || {};
       if (tR) {
         tR.forEach(function (t) {
           s += '<text x="' + (w - pad.r + 8) + '" y="' + (YR(t) + 4).toFixed(1) + '" font-size="11" fill="#F59A23">' +
-            esc(fmt(t, opt.rDigits == null ? 1 : opt.rDigits)) + '</text>';
+            esc(fmt(t, opt.rDigits == null ? 1 : opt.rDigits)) + esc(opt.y2Unit || '') + '</text>';
         });
       }
       data.categories.forEach(function (c, i) {
@@ -262,8 +263,15 @@ window.APP = window.APP || {};
             '" text-anchor="middle" font-size="11" fill="' + (opt.labelColor || '#7FE7FF') + '">' +
             esc(opt.categoryTopLabels[i]) + '</text>';
         }
-        s += '<text x="' + cx.toFixed(1) + '" y="' + (h - 12) + '" text-anchor="middle" font-size="11" fill="' +
-          (opt.xColor || '#666') + '">' + esc(String(c).slice(0, 7)) + '</text>';
+        if (rotate) {
+          /* 类目名长（如「土木公司总部」）时斜置，避免横向压成一串；rotateX 为正 → 逆时针倾斜 */
+          s += '<text x="' + cx.toFixed(1) + '" y="' + (pad.t + ih + 12).toFixed(1) + '" text-anchor="end" font-size="11" fill="' +
+            (opt.xColor || '#666') + '" transform="rotate(-' + rotate + ' ' + cx.toFixed(1) + ' ' +
+            (pad.t + ih + 12).toFixed(1) + ')">' + esc(String(c).slice(0, 14)) + '</text>';
+        } else {
+          s += '<text x="' + cx.toFixed(1) + '" y="' + (h - 12) + '" text-anchor="middle" font-size="11" fill="' +
+            (opt.xColor || '#666') + '">' + esc(String(c).slice(0, 7)) + '</text>';
+        }
       });
       lines.forEach(function (se) {
         const color = se.color || '#F59A23';
@@ -664,8 +672,9 @@ window.APP = window.APP || {};
       const h = opt.height || 300;
       const total = rows.reduce(function (a, r) { return a + (r.value || 0); }, 0) || 1;
       const cx = w * (opt.cx || 0.46), cy = h / 2;
-      /* 两侧各留 110px 放标签 */
-      const R = Math.max(50, Math.min(cx - 110, w - cx - 110, h / 2 - 14, opt.r || 999));
+      /* 默认两侧各留 110px 放引线标签；labels:false 时改由外部图例承担，只需留 20px */
+      const margin = opt.labels === false ? 20 : 110;
+      const R = Math.max(50, Math.min(cx - margin, w - cx - margin, h / 2 - 14, opt.r || 999));
       const inner = opt.hole ? R * opt.hole : 0;
       const P = function (a, rr) { return [cx + Math.cos(a) * rr, cy + Math.sin(a) * rr]; };
       let a0 = -Math.PI / 2;
@@ -699,8 +708,8 @@ window.APP = window.APP || {};
         });
         a0 = a1;
       });
-      /* 两侧标签各自按 y 排序后强制最小间距，再画引线与文字 */
-      ['left', 'right'].forEach(function (side) {
+      /* 两侧标签各自按 y 排序后强制最小间距，再画引线与文字（labels:false 时不画） */
+      if (opt.labels !== false) ['left', 'right'].forEach(function (side) {
         const list = labels[side].sort(function (a, b) { return a.ly - b.ly; });
         const gap = 30, top = 16, bottom = h - 16;
         let prev = -1e9;

@@ -228,7 +228,9 @@ window.APP = window.APP || {};
     } else {
       ctrl = '<input class="dsc-field" type="text" placeholder="' + esc(f.ph) + '" data-f-name="' + esc(f.name) + '" value="' + esc(f.value || '') + '"/>';
     }
-    return '<div class="dsc-filter-bar__item"><span class="dsc-filter-bar__label">' + esc(f.label) + '</span>' +
+    /* f.wide：日期区间跨两格，避免两个原生日期输入把下一列的标签盖住 */
+    return '<div class="dsc-filter-bar__item' + (f.wide ? ' dsc-filter-bar__item--wide' : '') + '">' +
+      '<span class="dsc-filter-bar__label">' + esc(f.label) + '</span>' +
       '<span class="dsc-filter-bar__ctrl">' + ctrl + '</span></div>';
   }
   D.bindFilter = function (root, id, handlers) {

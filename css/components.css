@@ -367,7 +367,7 @@ select.dsc-field {
 .dsc-table .dsc-sticky-col { position: sticky; left: 0; z-index: 4; background: var(--color-white); box-shadow: 2px 0 4px -2px rgba(0, 0, 0, 0.12); }
 .dsc-table thead .dsc-sticky-col { z-index: 6; background: var(--color-bg-table-header); }
 .dsc-table tbody tr:hover .dsc-sticky-col { background: var(--color-primary-bg); }
-.dsc-table .dsc-sticky-col-2 { position: sticky; left: 48px; z-index: 4; background: var(--color-white); }
+.dsc-table .dsc-sticky-col-2 { position: sticky; left: 56px; z-index: 4; background: var(--color-white); }
 .dsc-table thead .dsc-sticky-col-2 { z-index: 6; background: var(--color-bg-table-header); }
 .dsc-table tbody tr:hover .dsc-sticky-col-2 { background: var(--color-primary-bg); }
 .dsc-table__link { color: var(--color-primary); cursor: pointer; }
@@ -959,3 +959,19 @@ select.dsc-field {
 
 /* 两栏并排时，副标题的补充说明跟在标题后面（不贴到栏右端），避免与右栏标题连读成一串 */
 .dsc-split .ck-subhead__extra { margin-left: 0; }
+
+/* ---------- 资产数据报表：四项评审修复 ---------- */
+/* 日期区间跨两格：两个原生日期输入 + 粒度在 4 栏网格里放不进 1 格（会溢出盖住下一列标签） */
+.dsc-filter-bar__item--wide { grid-column: span 2; }
+@media (max-width: 1500px) {
+  .dsc-filter-bar__item--wide { grid-column: span 2; }
+}
+/* 合计行口径说明：合计为全量结果集，不等于当前页之和 */
+.dsc-table__footnote { padding: 8px 2px 0; font-size: 12px; color: #8C93A0; }
+/* 资产编码详情弹窗：两列键值对 */
+.dsc-asset-kv {
+  display: grid; grid-template-columns: 104px minmax(0, 1fr) 112px minmax(0, 1fr);
+  gap: 10px 18px; font-size: 13px;
+}
+.dsc-asset-kv__k { color: #8C93A0; }
+.dsc-asset-kv__v { color: #333; font-weight: 600; word-break: break-all; }

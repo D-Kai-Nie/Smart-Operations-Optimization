@@ -242,9 +242,8 @@
   D.crumb = function (parts) {
     const el = document.getElementById('breadcrumb');
     const all = ['首页', '智慧运营'].concat(parts || []);
-    /* P2-4：面包屑沿用原系统（不可点击），但页面里同时有可点的「组织下钻/返回上一级」，
-       这里补一句提示，避免用户以为是点击无响应 */
-    el.title = '面包屑为原系统样式（不可点击）；下钻请用页面内的「组织下钻」路径或「返回上一级」';
+    /* P2-4：面包屑沿用原系统（不可点击）。不再提示「组织下钻」——资产明细页没有下钻条 */
+    el.title = '面包屑为原系统样式（不可点击）；查数/下钻请使用页面内的筛选与明细表';
     el.innerHTML = all.map(function (p, i) {
       return i === all.length - 1 ? '<span>' + esc(p) + '</span>' : esc(p) + ' &gt; ';
     }).join('');
@@ -391,7 +390,9 @@
       'purchase-board': ['采购管理', '采购管理看板'],
       'supplier-board': ['分供商管理', '分供商管理看板'],
       'asset-board': ['资产管理', '资产管理看板'],
-      report: ['数据报表', { purchase: '采购数据报表', material: '物资数据报表', supplier: '分供商数据报表', asset: '资产数据报表' }[ds] || '采购数据报表'],
+      /* 面包屑父级与侧边栏分组一致（原先统一写「数据报表」，与「资产管理 › 资产数据报表」对不上） */
+      report: [{ purchase: '采购管理', material: '物资管理', supplier: '分供商管理', asset: '资产管理' }[ds] || '数据报表',
+        { purchase: '采购数据报表', material: '物资数据报表', supplier: '分供商数据报表', asset: '资产数据报表' }[ds] || '采购数据报表'],
       compliance: ['合规分析看板']
     };
     D.crumb(crumbMap[pk] || ['局级驾驶舱']);

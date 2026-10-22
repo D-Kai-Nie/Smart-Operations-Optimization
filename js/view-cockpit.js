@@ -544,23 +544,33 @@
     if (c.type === 'num') return D.fmtNum(v, c.digits == null ? 1 : c.digits);
     return D.fmtNum(v, 2);
   };
-  /* 合计行：金额/数量求和，比率取均值 */
-  function metricTotal(rows, cols) {
+  /* 合计行：金额/数量求和；比率默认取均值。
+     传了 weightKey 时比率按权重列加权（Σ率×权重 ÷ Σ权重），即「分子 ÷ 分母」口径——
+     资产看板的率值以资产金额为分母，合计必须加权，不能用单位均值 */
+  function metricTotal(rows, cols, weightKey) {
     const t = {};
     cols.forEach(function (c) {
       const vals = rows.map(function (r) { return r[c.key]; }).filter(function (v) { return typeof v === 'number'; });
       if (!vals.length) return;
+      if (c.type === 'pct' && weightKey) {
+        let num = 0, den = 0;
+        rows.forEach(function (r) {
+          const v = r[c.key], w = r[weightKey];
+          if (typeof v === 'number' && typeof w === 'number' && w > 0) { num += v * w; den += w; }
+        });
+        if (den) { t[c.key] = D.round(num / den, 2); return; }
+      }
       const s = vals.reduce(function (a, b) { return a + b; }, 0);
       t[c.key] = c.type === 'pct' ? D.round(s / vals.length, 2) : D.round(s, 2);
     });
     return t;
   }
-  /* 指标明细表：rows 由 D.metricRows 产出（含 name 与全部指标字段） */
+  /* 指标明细表：rows 为当前页；totalRows 为全量结果集（合计必须按全量算，不能只算当前页） */
   function metricListTable(o) {
     const fl = metricFieldList(o.metric);
     const all = [{ key: 'name', name: o.unitHead || '二级单位', type: 'text' }].concat(fl.basic, fl.info);
     const cols = D.colsOf('metric-' + o.metric, all, o.def || metricDef(o.metric));
-    const tot = metricTotal(o.rows, cols);
+    const tot = metricTotal(o.totalRows || o.rows, cols, o.weightKey);
     const val = function (r, c) {
       if (c.key === 'name') return unitLink(r.name, o.ds);      // 单位名只保留简称，全称进 tooltip
       const v = r[c.key];
@@ -1613,18 +1623,32 @@
      内容基准：`资产管理看板.png`（源页面「核心数据 · 资产」，截图左下角的缩略框为 Axure 面板，忽略）
      版式：沿用已评审优化的 ck-* 语言
      ============================================================ */
-  const ASB = { metric: 'turnover', page: 1, size: 10 };
+  const ASB = {
+    metric: 'turnover', page: 1, size: 10,
+    /* 统计区间（真日期控件）+ 两条筛选条各自的条件与反馈；看板/明细的筛选都落到同一张明细表 */
+    period: ['2025-06-01', '2026-05-31'],
+    conds: { board: {}, detail: {} },
+    hint: { board: '', detail: '' }
+  };
 
+  /* 卡片值不写死：由下方 AB_RANK 的二级单位率值按资产金额加权汇总（见 abAggRate），
+     与「二级单位明细表 · 合计行」同一个口径——卡片与列表不会再出现 73.53% / 6.46% 这种两套数。
+     ly/lm/target 是卡片上的同比（上年同期）/ 环比（上月）/ 内控目标，量级随列表口径校准 */
   const AB_IND = [
-    { key: 'turnover', name: '资产周转率', value: 73.53, unit: '%', dec: 2,
+    { key: 'turnover', name: '资产周转率', value: 0, unit: '%', dec: 2,
+      ly: 4.76, lm: 5.12, target: 5.00, better: 'high',
       desc: '资产周转额 ÷ 资产平均原值 × 100%', src: '物管系统资产模块' },
-    { key: 'idle', name: '资产闲置率', value: 5.85, unit: '%', dec: 2,
+    { key: 'idle', name: '资产闲置率', value: 0, unit: '%', dec: 2,
+      ly: 4.05, lm: 3.78, target: 4.00, better: 'low',
       desc: '闲置资产原值 ÷ 资产总原值 × 100%', src: '物管系统资产模块' },
-    { key: 'doneTurnover', name: '竣工项目资产周转率', value: 73.53, unit: '%', dec: 2,
+    { key: 'doneTurnover', name: '竣工项目资产周转率', value: 0, unit: '%', dec: 2,
+      ly: 58.40, lm: 63.45, target: 65.00, better: 'high',
       desc: '竣工项目资产周转额 ÷ 竣工项目资产平均原值 × 100%（口径待确认 Q-08）', src: '物管系统资产模块' },
-    { key: 'doneIdle', name: '竣工项目资产闲置率', value: 5.85, unit: '%', dec: 2,
+    { key: 'doneIdle', name: '竣工项目资产闲置率', value: 0, unit: '%', dec: 2,
+      ly: 3.55, lm: 3.28, target: 3.40, better: 'low',
       desc: '竣工项目闲置资产原值 ÷ 竣工项目资产总原值 × 100%（口径待确认 Q-08）', src: '物管系统资产模块' },
-    { key: 'depRate', name: '资产折旧率', value: 5.85, unit: '%', dec: 2,
+    { key: 'depRate', name: '资产折旧率', value: 0, unit: '%', dec: 2,
+      ly: 5.38, lm: 5.48, target: 5.60, better: 'low',
       desc: '当期折旧额 ÷ 资产原值 × 100%', src: '财务系统' }
   ];
   function abMetric(key) {
@@ -1644,35 +1668,128 @@
     return AB_TREND.map(function (v) { return D.round(v * k, 2); });
   }
 
-  /* 二级单位资产周转率（截图实测 10 行 + 合计） */
-  /* 二级单位资产周转率：与物资看板的表分开编数（原先两表前 8 行金额完全相同），
-     21 个二级单位 × 分页 = 真实数据 */
+  /* 二级单位资产明细：21 个单位 × 分页。
+     数据不是等差序列（原先周转率每行正好差 0.42、金额每行正好降 4.5%、调出额固定占 90%），
+     改为「按单位规模派生 + 确定性扰动」：金额逐行不规则递减、调出占比 86.6%~94.8%、
+     周转率有升有降；合计仍严格等于各行之和（296,947.26 / 329,611.44） */
   const AB_RANK = [
-    ['一公司', 24180.60, 26840.47, 8.35],
-    ['二公司', 23092.47, 25632.65, 7.93],
-    ['三公司', 22053.31, 24479.18, 7.51],
-    ['四公司', 21060.91, 23377.61, 7.09],
-    ['东北公司', 20113.17, 22325.62, 6.67],
-    ['总承包公司', 19208.08, 21320.97, 6.25],
-    ['南方公司', 18343.72, 20361.52, 5.83],
-    ['西南公司', 17518.25, 19445.26, 5.41],
-    ['华南公司', 16729.93, 18570.22, 4.99],
-    ['华北公司', 15977.08, 17734.56, 4.57],
-    ['土木公司', 14379.37, 15961.10, 4.02],
-    ['安装公司', 12941.44, 14364.99, 3.47],
-    ['华东公司', 11647.29, 12928.49, 2.92],
-    ['西北公司', 10482.56, 11635.64, 2.37],
-    ['西南建设', 9434.31, 10472.08, 1.82],
-    ['八局建投', 8490.88, 9424.87, 1.27],
-    ['发展建设分公司', 7641.79, 8482.38, 1.20],
-    ['装饰公司', 6877.61, 7634.15, 1.20],
-    ['轨道公司', 6189.85, 6870.73, 1.20],
-    ['北京公司', 5570.86, 6183.66, 1.20],
-    ['文旅博览公司', 5013.78, 5565.29, 1.20]
+    ['一公司', 22022.71, 25162.23, 7.47],
+    ['二公司', 21602.05, 24154.44, 7.14],
+    ['四公司', 20980.19, 22337.68, 7.25],
+    ['三公司', 20015.33, 23072.96, 6.83],
+    ['东北公司', 18201.74, 20780.31, 5.95],
+    ['总承包公司', 18169.38, 20088.52, 5.73],
+    ['南方公司', 17856.02, 18859.73, 5.64],
+    ['西南公司', 16002.72, 17504.42, 6.75],
+    ['华南公司', 15393.45, 16923.25, 5.42],
+    ['华北公司', 14381.28, 15809.50, 4.30],
+    ['土木公司', 12907.06, 14818.98, 4.82],
+    ['华东公司', 12335.60, 13422.14, 3.79],
+    ['安装公司', 12271.65, 13966.90, 4.89],
+    ['西北公司', 11592.28, 12870.63, 4.20],
+    ['西南建设', 10452.40, 12008.43, 3.51],
+    ['八局建投', 10177.37, 11252.99, 3.91],
+    ['发展建设分公司', 9816.30, 10522.26, 1.69],
+    ['轨道公司', 8834.02, 9387.23, 1.42],
+    ['装饰公司', 8510.14, 9821.94, 2.23],
+    ['北京公司', 8256.67, 8713.60, 1.04],
+    ['文旅博览公司', 7168.90, 8133.30, 1.60]
   ];
-  /* 合计取全部 21 行之和；比率类指标不可累加 */
-  const AB_RANK_TOTAL = ['296,947.26', '329,611.44'];
   const AB_RANK_N = AB_RANK.length;
+  /* 各指标的二级单位率值 = 该单位资产周转率 × 指标系数（量级对齐源图：周转 ~5%、闲置 ~4%、竣工周转 ~60%、折旧 ~5%） */
+  const AB_RATE_FACTOR = { turnover: 1, idle: 0.72, doneTurnover: 12, doneIdle: 0.64, depRate: 1.06 };
+  function abUnitRate(r, key) {
+    return D.round(r[3] * (AB_RATE_FACTOR[key] || 1), 2);
+  }
+  /* 汇总率 = Σ(单位率 × 资产总金额) ÷ Σ资产总金额（折旧用资产原值，与单位率的分母一致） */
+  function abAggRate(key, rows) {
+    const list = rows || AB_RANK;
+    const wOf = function (r) { return key === 'depRate' ? r[2] * 1.15 : r[2]; };
+    const den = list.reduce(function (a, r) { return a + wOf(r); }, 0) || 1;
+    const num = list.reduce(function (a, r) { return a + abUnitRate(r, key) * wOf(r); }, 0);
+    return D.round(num / den, 2);
+  }
+  AB_IND.forEach(function (m) { m.value = abAggRate(m.key); });
+
+  /* ---------- 明细筛选：让两条筛选条的「查询」真的改变明细表 ----------
+     21 个二级单位行没有项目级维度字段，按单位名做确定性派生（同一单位每次都得同一值），
+     使「项目类型 / 状态 / 业态 / 承包模式 / 地区 / 物料分类 / 物料小类」都能落到行上。
+     组织 / 实施单位是同一维度的两个入口，明细筛选优先。 */
+  const AB_ATTRS = {
+    '地区': function () { return D.AREAS; },
+    '物料分类': function () { return D.material.mid; },
+    '物料小类': function () { return D.material.small; },
+    '项目类型': function () { return D.TYPES; },
+    '项目状态': function () { return D.STATUS; },
+    '项目业态': function () { return D.FORMATS; },
+    '承包模式': function () { return D.MODES; }
+  };
+  function abHash(s) {
+    let h = 2166136261;
+    for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return h >>> 0;
+  }
+  function abUnitAttr(name, key) {
+    const list = AB_ATTRS[key] ? AB_ATTRS[key]() : null;
+    return list && list.length ? list[abHash(name + '#' + key) % list.length] : '';
+  }
+  function abUnitConds() {
+    const b = ASB.conds.board, d = ASB.conds.detail;
+    const conds = Object.assign({}, b, d);
+    /* 组织 / 实施单位指向同一行维度：明细筛选优先，避免「一公司 AND 二公司 = 0 行」 */
+    if (d['实施单位']) delete conds['组织'];
+    else if (b['组织']) delete conds['实施单位'];
+    return conds;
+  }
+  function abMatchUnit(r, conds) {
+    return Object.keys(conds).every(function (k) {
+      const v = conds[k];
+      if (!v) return true;
+      if (k === '组织' || k === '实施单位') {
+        return v.indexOf('中国建筑第八工程局') === 0 || r[0] === v;
+      }
+      return abUnitAttr(r[0], k) === v;
+    });
+  }
+  function abFilteredUnits() {
+    const conds = abUnitConds();
+    return abVisibleUnits().filter(function (r) { return abMatchUnit(r, conds); });
+  }
+  /* 统计区间：真日期控件（P1-7），两处筛选条共用同一区间 */
+  function abDateRange() {
+    return '<div class="ck-filter__item"><span class="ck-filter__label">日期选择</span>' +
+      '<span class="ck-grain" data-ck-grain="日期选择">' + esc(CS.settleGrain) + CARET + '</span>' +
+      '<span class="ck-daterange">' +
+      '<input class="ck-field ck-field--date" type="date" data-ab-period="start" value="' + esc(ASB.period[0]) + '"/>' +
+      '<span class="ck-daterange__sep">~</span>' +
+      '<input class="ck-field ck-field--date" type="date" data-ab-period="end" value="' + esc(ASB.period[1]) + '"/>' +
+      '</span></div>';
+  }
+  /* 筛选条底栏：作用域徽标 + 就地反馈 + 查询/清空/重置（与通用 actions 同款样式） */
+  function abActions(scope, chip) {
+    return '<div class="ck-filter__foot">' +
+      '<span class="ck-filter__scope">' + esc(chip) + '</span>' +
+      '<span class="ck-filter__hint"' + (ASB.hint[scope] ? '' : ' hidden') + '>' + esc(ASB.hint[scope] || '') + '</span>' +
+      '<span class="ck-filter__foot-right">' +
+      '<button class="ck-btn ck-btn--primary" data-ab-query="' + scope + '">查询</button>' +
+      '<button class="ck-link" data-ab-clear="' + scope + '">清空</button>' +
+      '<button class="ck-link" data-ab-reset="' + scope + '">重置</button>' +
+      '</span></div>';
+  }
+  function abReadConds(box) {
+    const conds = {};
+    box.querySelectorAll('[data-ck-field]').forEach(function (f) {
+      const v = (f.value || '').trim();
+      if (v) conds[f.getAttribute('data-ck-field')] = v;
+    });
+    return conds;
+  }
+  function abReadPeriod(box) {
+    const s = box.querySelector('[data-ab-period="start"]');
+    const e = box.querySelector('[data-ab-period="end"]');
+    if (s && s.value) ASB.period[0] = s.value;
+    if (e && e.value) ASB.period[1] = e.value;
+  }
   /* 二级单位资产周转率明细的动态列（Axure 局驾驶舱核心数据 · 资产「设置列」口径） */
   const AB_COLS = [
     { key: 'org2', name: '二级单位', width: 160 },
@@ -1703,52 +1820,73 @@
     turnover: 'assetTurnover', doneTurnover: 'assetTurnover',
     idle: 'assetIdle', doneIdle: 'assetIdle', depRate: 'assetDepRate'
   };
-  function abRankTable() {
-    /* R2：受限视角只返回本单位行 */
+  /* R2：受限视角只返回本单位行 */
+  function abVisibleUnits() {
     const scope = D.scope.name;
-    const all = AB_RANK.filter(function (r) {
+    return AB_RANK.filter(function (r) {
       return D.scope.level === 1 || r[0].indexOf(scope.replace(/公司$/, '')) >= 0;
     });
+  }
+  function abRankTable() {
+    const all = abFilteredUnits();
+    if (!all.length) {
+      return '<div class="ck-table__empty">没有符合筛选条件的二级单位，请调整「明细筛选」后重新查询</div>';
+    }
     const pages = Math.max(1, Math.ceil(all.length / ASB.size));
     if (ASB.page > pages) ASB.page = pages;
-    const rows = all.slice((ASB.page - 1) * ASB.size, (ASB.page - 1) * ASB.size + ASB.size);
     const metric = AB_METRIC_MAP[ASB.metric] || 'assetTurnover';
-    const factor = ASB.metric === 'idle' || ASB.metric === 'doneIdle' ? 1
-      : ASB.metric === 'depRate' ? 2 : 0;
-    const data = rows.map(function (r) {
-      const base = D.reportUnitMetrics(r[0]) || {};
-      const total = D.round((base.sum || 1e9) / 1e4 * 1.4, 2);
-      const rate = r[3];
-      if (metric === 'assetIdle') return { name: r[0], idleAmt: D.round(total * rate / 100, 2), totalAmt: total, rate: rate };
-      if (metric === 'assetDepRate') return { name: r[0], depAmt: D.round(total * rate / 100, 2), origAmt: D.round(total * 1.15, 2), rate: rate };
-      return { name: r[0], outAmt: r[1], totalAmt: r[2], rate: rate };
+    const key = ASB.metric;
+    /* 全量行：率值随指标切换；金额与率值同口径（闲置额 = 总资产 × 闲置率、折旧额 = 原值 × 折旧率） */
+    const data = all.map(function (r) {
+      const total = r[2];
+      const rate = abUnitRate(r, key);
+      if (metric === 'assetIdle') {
+        return { name: r[0], idleAmt: D.round(total * rate / 100, 2), totalAmt: total, rate: rate };
+      }
+      if (metric === 'assetDepRate') {
+        const orig = D.round(total * 1.15, 2);
+        return { name: r[0], depAmt: D.round(orig * rate / 100, 2), origAmt: orig, rate: rate };
+      }
+      return { name: r[0], outAmt: r[1], totalAmt: total, rate: rate };
     });
-    return metricListTable({ metric: metric, rows: data, ds: 'asset',
-      page: ASB.page, size: ASB.size, totalName: '全部 ' + AB_RANK_N + ' 个单位' });
+    const rows = data.slice((ASB.page - 1) * ASB.size, (ASB.page - 1) * ASB.size + ASB.size);
+    /* totalRows 传全量：合计行覆盖全部单位且跨页不变；率值按资产金额加权 */
+    return metricListTable({ metric: metric, rows: rows, totalRows: data,
+      weightKey: metric === 'assetDepRate' ? 'origAmt' : 'totalAmt',
+      ds: 'asset', page: ASB.page, size: ASB.size, totalName: '全部 ' + all.length + ' 个单位' });
   }
 
   function assetBoardView() {
     const m = abMetric(ASB.metric);
+    const unitN = abFilteredUnits().length;
+    const bc = ASB.conds.board, dc = ASB.conds.detail;
     return '<div class="ck-view ck-view--metrics">' +
-      /* 5 指标卡（与页签双向联动） */
+      /* 5 指标卡（与页签双向联动；名称在上 + 同比徽标 + 数值 + 环比/内控目标，与其它看板同一套卡片结构） */
       '<div class="ck-metrics ck-metrics--5">' + AB_IND.map(function (x) {
-        return '<div class="ck-metriccard' + (ASB.metric === x.key ? ' ck-metriccard--active' : '') +
+        const yoy = D.round(x.value - x.ly, 2);
+        const mom = D.round(x.value - x.lm, 2);
+        const good = x.better === 'low' ? yoy <= 0 : yoy >= 0;
+        const ok = x.better === 'low' ? x.value <= x.target : x.value >= x.target;
+        return '<div class="ck-metriccard ck-metriccard--kpi' + (ASB.metric === x.key ? ' ck-metriccard--active' : '') +
           '" data-ab-metric="' + x.key + '">' +
+          '<div class="ck-kpi__head"><span class="ck-kpi__name">' + esc(x.name) + '</span>' +
+          '<span class="ck-kpi__trend ck-kpi__trend--' + (good ? 'good' : 'bad') + '">同比 ' +
+          (yoy >= 0 ? '↑' : '↓') + Math.abs(yoy).toFixed(2) + 'pp</span></div>' +
           '<div class="ck-metriccard__value">' + D.fmtNum(x.value, x.dec) +
           '<span>' + esc(x.unit) + '</span></div>' +
-          '<div class="ck-metriccard__label">' + esc(x.name) + '</div></div>';
+          '<div class="ck-kpi__sub">环比 ' + (mom >= 0 ? '+' : '') + mom.toFixed(2) + 'pp　·　目标 ' +
+          x.target.toFixed(2) + '%，' + (ok ? '已达标' : '未达标') + '</div></div>';
       }).join('') + '</div>' +
 
-      /* 筛选条 */
-      '<div class="ck-filter ck-filter--panel">' +
+      /* 筛选条（看板作用域）：查询结果落到下方明细表 */
+      '<div class="ck-filter ck-filter--panel" data-ab-scope="board">' +
       '<div class="ck-filter__row">' +
-      field('项目类型', '') + field('项目业态', '') + field('项目状态', '') + field('承包模式', '') +
+      field('项目类型', bc['项目类型'] || '') + field('项目业态', bc['项目业态'] || '') +
+      field('项目状态', bc['项目状态'] || '') + field('承包模式', bc['承包模式'] || '') +
       '</div><div class="ck-filter__row">' +
-      '<div class="ck-filter__item"><span class="ck-filter__label">日期选择</span>' +
-      '<span class="ck-grain" data-ck-grain="日期选择">' + esc(CS.settleGrain) + CARET + '</span>' +
-      '<span class="ck-field ck-field--date">2025-06-01 ~ 2026-05-31</span></div>' +
-      field('地区', '') + field('组织', '') + field('物料分类', '') +
-      '</div>' + actions() + '</div>' +
+      abDateRange() +
+      field('地区', bc['地区'] || '') + field('组织', bc['组织'] || '') + field('物料分类', bc['物料分类'] || '') +
+      '</div>' + abActions('board', '看板筛选') + '</div>' +
 
       /* 指标页签 + 红色趋势 */
       '<div class="ck-tabsrow">' + AB_IND.map(function (x) {
@@ -1758,29 +1896,39 @@
       subHead(m.name + '随时间变化的趋势') +
       '<div class="dsc-chart" id="abTrend" style="height:280px"></div>' +
 
-      /* 二级单位资产周转率 */
-      section('二级单位资产周转率',
-        '<div class="ck-filter">' +
+      /* 二级单位明细（标题跟随当前指标；明细筛选只作用于这张表） */
+      section('二级单位' + m.name,
+        '<div class="ck-filter" data-ab-scope="detail">' +
         '<div class="ck-filter__row">' +
-        '<div class="ck-filter__item"><span class="ck-filter__label">日期选择</span>' +
-        '<span class="ck-grain" data-ck-grain="日期选择">' + esc(CS.settleGrain) + CARET + '</span>' +
-        '<span class="ck-field ck-field--date">2025-06-01 ~ 2026-05-31</span></div>' +
-        field('实施单位', '') + field('物料小类', '') +
+        abDateRange() +
+        field('实施单位', dc['实施单位'] || '') + field('物料小类', dc['物料小类'] || '') +
         '</div><div class="ck-filter__row">' +
-        field('项目类型', '') + field('项目状态', '') + field('项目业态', '') + field('承包模式', '') +
-        '</div>' + actions() + '</div>' +
+        field('项目类型', dc['项目类型'] || '') + field('项目状态', dc['项目状态'] || '') +
+        field('项目业态', dc['项目业态'] || '') + field('承包模式', dc['承包模式'] || '') +
+        '</div>' + abActions('detail', '明细筛选') + '</div>' +
         '<div class="dsc-card u-mb-lg"><div class="dsc-card__header">' +
-        '<div class="dsc-card__title">二级单位资产周转率明细</div>' +
-        '<div class="dsc-card__extra">共 ' + AB_RANK_N + ' 个二级单位　' +
+        '<div class="dsc-card__title">二级单位' + esc(m.name) + '明细</div>' +
+        '<div class="dsc-card__extra">共 ' + unitN + ' 个二级单位　' +
         D.colGear('data-ab-columns', '设置列：本指标的明细列表字段（基本信息 + 指标信息）') + '</div></div>' +
         abRankTable() +
-        '<div data-ab-pager>' + D.pager({ page: ASB.page, size: ASB.size, total: AB_RANK_N }) + '</div>' +
+        '<div data-ab-pager>' + D.pager({ page: ASB.page, size: ASB.size, total: unitN }) + '</div>' +
         '</div>') +
 
       /* 项目资产类别资产周转率 */
       section('项目资产类别资产周转率',
         '<div class="dsc-split dsc-split--2 u-mt-lg">' +
-        '<div>' + subHead('资产类别构成', '按资产原值占比估算') + '<div class="dsc-chart" id="abPie" style="height:320px"></div></div>' +
+        /* 饼图不再画引线标注（10 个小扇区的引线会交叉堆叠），改为右侧图例列表 */
+        /* P2-12：估算值不能与取数结果同款呈现——加「示意」角标并写明暂无权威口径 */
+        '<div>' + subHead('资产类别构成',
+          '<span class="ck-demo-tag" title="资产类别构成暂无权威口径，占比为示意值">示意</span>' +
+          '按资产原值占比估算，暂无权威口径') +
+        '<div class="ck-pie-split"><div class="dsc-chart" id="abPie" style="height:320px"></div>' +
+        '<div class="ck-pielegend">' + AB_PIE.map(function (x, i) {
+          const c = x.color || D.C.series[i % D.C.series.length];
+          return '<span class="ck-pielegend__item"><i style="background:' + c + '"></i>' +
+            '<span class="ck-pielegend__name">' + esc(x.name) + '</span>' +
+            '<b>' + D.fmtNum(x.value, 2) + '%</b></span>';
+        }).join('') + '</div></div></div>' +
         '<div>' + subHead('资产原值 / 调出金额 / 周转率', '单位：亿元 / %') +
         '<div class="dsc-chart" id="abCombo" style="height:320px"></div>' +
         '<div class="ck-legend">' +
@@ -1788,6 +1936,13 @@
         '<span><i style="background:#7FC4F5"></i>资产调出金额</span>' +
         '<span><i class="ck-legend__line ck-legend__line--green"></i>资产周转率</span>' +
         '</div></div></div>') +
+
+      /* 相关报表：概览型看板需要单位 / 项目级明细的下钻出口（与分供商看板同款） */
+      '<div class="dsc-card u-mt-lg"><div class="dsc-card__body dsc-relbar">' +
+      '<span class="dsc-relbar__label">相关报表</span>' +
+      '<button class="dsc-btn" data-ab-report>资产数据报表</button>' +
+      '<span class="dsc-relbar__hint">本页为概览型看板；二级单位 / 项目级资产明细见「资产数据报表」</span>' +
+      '</div></div>' +
       '</div>';
   }
 
@@ -1839,11 +1994,14 @@
         categories: AB_MONTHS,
         series: [{ name: m.name, data: abMetricTrend(m), color: '#D0021B' }]
       }, { height: 280, area: false, lineWidth: 1.8, dotR: 3.5, unit: m.unit, tipDigits: 2,
-        dataLabels: true, labelDigits: 2, padL: 64 });
+        dataLabels: true, labelDigits: 2, padL: 64,
+        /* 刻度保留 2 位小数：率值区间窄（5.18% 上下，步长 0.05），取整/1 位都会出现重复刻度 */
+        yDigits: 2, yUnit: m.unit });
     }
 
     const pie = root.querySelector('#abPie');
-    if (pie) D.pieChart(pie, AB_PIE, { height: 320 });
+    /* labels:false → 不画引线标注；类别与占比由右侧图例列表承担（10 个扇区的引线会交叉） */
+    if (pie) D.pieChart(pie, AB_PIE, { height: 320, labels: false, cx: 0.5 });
 
     const combo = root.querySelector('#abCombo');
     if (combo) {
@@ -1854,7 +2012,10 @@
           { name: '资产调出金额', data: AB_COMBO.out, color: '#7FC4F5', unit: '亿' },
           { name: '资产周转率', data: AB_COMBO.rate, color: '#17B98A', type: 'line' }
         ]
-      }, { height: 320, yDigits: 2, padR: 64, dataLabels: false });
+      }, { height: 320, yDigits: 2, padR: 64, dataLabels: false,
+        /* 右轴是周转率，必须带 %，否则 12.5 / 10.0 / 7.5 分不清是比率还是金额；
+           类目名是「土木公司总部」这类长名，斜置 30° 避免横向压成一串（Axure 源图同样斜置） */
+        rDigits: 1, y2Unit: '%', rotateX: 30, padB: 96 });
     }
 
     D.delegate(root, [
@@ -1863,6 +2024,48 @@
       { sel: '[data-ab-columns]', fn: function () {
         const k = AB_METRIC_MAP[ASB.metric] || 'assetTurnover';
         metricColPicker(k, abMetric(ASB.metric).name + ' · 指标明细列表');
+      } },
+      /* 查询：两条筛选条都落到明细表（此前只弹一行「已记录条件」，数字不动） */
+      { sel: '[data-ab-query]', fn: function (el) {
+        const scope = el.getAttribute('data-ab-query');
+        const box = el.closest('.ck-filter');
+        if (!box) return;
+        ASB.conds[scope] = abReadConds(box);
+        abReadPeriod(box);
+        ASB.page = 1;
+        /* 命中数按两条筛选条的并集算：另一条已生效的条件也要在反馈里说清楚 */
+        const mine = Object.keys(ASB.conds[scope]).length;
+        const other = Object.keys(ASB.conds[scope === 'board' ? 'detail' : 'board']).length;
+        const total = Object.keys(abUnitConds()).length;
+        const hits = abFilteredUnits().length;
+        ASB.hint[scope] = (mine || other)
+          ? '已按 ' + total + ' 项条件筛选' + (other ? '（含另一筛选条 ' + other + ' 项）' : '') +
+            ' · 命中 ' + hits + ' 个单位' + (scope === 'board' ? '（明细见下方）' : '')
+          : '未设置筛选条件，显示全部 ' + abVisibleUnits().length + ' 个单位';
+        D.render();
+        D.toast(ASB.hint[scope]);
+      } },
+      { sel: '[data-ab-clear]', fn: function (el) {
+        const scope = el.getAttribute('data-ab-clear');
+        ASB.conds[scope] = {};
+        ASB.hint[scope] = '';
+        ASB.page = 1;
+        D.render();
+        D.toast('已清空' + (scope === 'board' ? '看板' : '明细') + '筛选条件');
+      } },
+      { sel: '[data-ab-reset]', fn: function () {
+        ASB.conds = { board: {}, detail: {} };
+        ASB.hint = { board: '', detail: '' };
+        ASB.period = ['2025-06-01', '2026-05-31'];
+        ASB.page = 1;
+        D.render();
+        D.toast('已重置查询条件');
+      } },
+      /* 相关报表出口：带上当前组织视角（局总部不传 org） */
+      { sel: '[data-ab-report]', fn: function () {
+        const org = D.scope.level > 1 ? D.scope.name : '';
+        D.toast('打开资产数据报表' + (org ? '（组织视角 ' + org + '）' : ''));
+        D.nav('report', org ? { ds: 'asset', org: org } : { ds: 'asset' });
       } }
     ]);
 

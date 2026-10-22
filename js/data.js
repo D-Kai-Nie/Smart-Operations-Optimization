@@ -618,7 +618,13 @@ window.APP = window.APP || {};
         invDate: '2026-0' + (1 + Math.floor(rnd() * 9)) + '-' + String(1 + Math.floor(rnd() * 27)).padStart(2, '0'),
         transferCode: rnd() > 0.5 ? 'DB' + (20260000 + i * 9) : '—',
         transferType: pick(rnd, ['调入', '调出']),
-        transferDate: '2026-0' + (1 + Math.floor(rnd() * 9)) + '-' + String(1 + Math.floor(rnd() * 27)).padStart(2, '0')
+        transferDate: '2026-0' + (1 + Math.floor(rnd() * 9)) + '-' + String(1 + Math.floor(rnd() * 27)).padStart(2, '0'),
+        /* 报表筛选用的行字段：实施单位（二级|三级）、项目属性、统计日期。
+           此前这些条件只在筛选条里，行上没有对应字段，查询被 applyConds 当作"不参与过滤"放行 */
+        org: p.org + '|' + (p.subOrg || ''),
+        pType: p.type, pFormat: p.format, pStatus: p.status, pMode: p.mode,
+        pArea: p.area + '|' + p.city,
+        date: '2026-0' + (1 + Math.floor(rnd() * 9)) + '-' + String(1 + Math.floor(rnd() * 15)).padStart(2, '0')
       };
     }).filter(function (r) { return filter ? filter(r) : true; });
   };
