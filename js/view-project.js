@@ -15,7 +15,8 @@
     planKind: 'month',
     matBig: '', matMid: '', matSmall: '',
     settleView: 'chart',
-    contractPage: 1                  // 合同明细分析当前页
+    contractPage: 1,                 // 合同明细分析当前页
+    assetDoc: 'transfer'             // 资产页签：资产调拨 / 资产处置
   };
   D.projectState = PS;
 
@@ -81,15 +82,19 @@
   /* 分供商履约 */
   const PJ_SUP_COLS = [
     P_COL('idx', '序号', 56, { sticky: true }),
-    P_COL('supplier', '分供商', 210, { sticky2: true, link: true }),
+    /* P0：分供商名称在行数据里的字段是 name（此前列 key 写成 supplier，整列渲染成「—」） */
+    P_COL('name', '分供商', 210, { sticky2: true, link: true }),
     P_COL('cat', '分供商分类', 130), P_COL('grade', '局评价等级', 110),
     P_COL('matBig', '物料大类', 130), P_COL('matMid', '物料中类', 120), P_COL('matSmall', '物料小类', 120),
     P_COL('matCode', '物料编码', 140), P_COL('matDesc', '物料描述', 180),
     P_NUM('contractAmt', '合同金额', 130), P_NUM('perfAmt', '履约金额', 130),
     P_NUM('claimCount', '索赔次数', 110), P_NUM('badReturnCount', '不合格退货次数', 150),
-    P_NUM('winAmt', '中标金额', 130), P_NUM('perfRate', '履约率', 100), P_NUM('score', '评价得分', 100)
+    P_NUM('winAmt', '中标金额', 130), P_NUM('perfRate', '履约率', 100, { pct: true }),
+    P_NUM('score', '评价得分', 100)
   ];
-  const PJ_SUP_DEF = ['idx', 'supplier', 'cat', 'grade', 'contractAmt', 'perfAmt', 'claimCount', 'badReturnCount'];
+  /* 资源履约质量表默认列：分供商 → 分类/等级 → 物料三级 → 合同/履约/履约率/评价得分 */
+  const PJ_SUP_DEF = ['idx', 'name', 'cat', 'grade', 'matBig', 'matMid', 'matSmall',
+    'contractAmt', 'perfAmt', 'perfRate', 'score'];
 
   /* ============================================================
      物资页签其余列表 / 资产页签调拨·处置
@@ -507,20 +512,39 @@
     return [{ title: '合同信息', items: pick(basicKeys) }, { title: '合同明细信息', items: pick(infoKeys) }];
   };
 
+  let PJ_PURCHASE_ROWS = [];
+  /* 合同金额按项目规模缩放（合同总额 ≈ 项目总采购金额 × 1.15）：
+     生成器里的单价是全局样本量级，不缩放会得到比项目采购额大一个数量级的「项目合同总额」 */
+  function pjScaleContracts(rows, purchase) {
+    const sum = rows.reduce(function (a, r) { return a + (r.amtTax || 0); }, 0) || 1;
+    /* amtTax 单位为元，purchase 单位为万元：目标合同总额 = 项目采购额 × 1.15（万元） */
+    const k = (purchase || 4000) * 1e4 * 1.15 / sum;
+    const money = ['amtTax', 'amtNoTax', 'taxAmt', 'inAmtTax', 'inAmtNoTax', 'costAmtTax',
+      'costAmtNoTax', 'orderAmt', 'acceptAmt', 'settleAmt', 'shouldPay', 'paidAmt', 'unpaidAmt'];
+    return rows.map(function (r) {
+      const o = Object.assign({}, r);
+      o.qty = D.round(r.qty * k, 2);
+      money.forEach(function (key) { if (typeof o[key] === 'number') o[key] = D.round(o[key] * k, 2); });
+      return o;
+    });
+  }
   function contractSection(p) {
-    /* 生成量放大后再按本项目所属二级单位过滤：46 条原始数据过滤后只剩个位数，
-       分页器只有 1 页（等于没有分页）。600 条过滤后可稳定得到 2~4 页 */
-    const rows = D.genContractRows(600, function (r) { return r.org2 === p.org; });
+    /* 只取当前项目的合同：生成器直接注入项目上下文，不再用「按二级单位过滤」的近似口径 */
+    const rows = pjScaleContracts(D.genContractRows(40, null, p), p.purchase);
+    PJ_PURCHASE_ROWS = rows;
     const cols = D.colsOf('pj-contract', PJ_CONTRACT_COLS, PJ_CONTRACT_DEF);
     const size = 10;
     const pages = Math.max(1, Math.ceil(rows.length / size));
     if (PS.contractPage > pages) PS.contractPage = pages;
     const paged = rows.slice((PS.contractPage - 1) * size, (PS.contractPage - 1) * size + size);
+    const sumOf = function (k) {
+      return D.round(rows.reduce(function (a, r) { return a + (r[k] || 0); }, 0) / 1e4, 2);
+    };
     return section('合同分析',
       '<div class="dsc-card u-mb-lg"><div class="dsc-card__body">' +
       '  <div class="project-cockpit-page__kpis">' +
-      stat('项目合同数量', rows.length, '个', 0) + stat('项目合同总额', 1164.43, '万元') +
-      stat('合同已下单金额', 986.20, '万元') + stat('合同已结算金额', 763.55, '万元') +
+      stat('项目合同数量', rows.length, '个', 0) + stat('项目合同总额', sumOf('amtTax'), '万元') +
+      stat('合同已下单金额', sumOf('orderAmt'), '万元') + stat('合同已结算金额', sumOf('settleAmt'), '万元') +
       '  </div>' +
       '  <div class="dsc-filter-inline u-mt-lg">' +
       '    <div class="dsc-filter-inline__item"><span class="dsc-filter-inline__label">合同签订日期</span>' +
@@ -548,8 +572,26 @@
   }
 
   /* ---------- 履约分析 ---------- */
+  /* 集采情况按当前项目的合同物料分类汇总（此前误用 genMaterialMarket，
+     类目是各二级单位 / 三级单位 / 项目名称——项目页不应出现其它单位的数据） */
+  function pjFulfillMix(level) {
+    const key = level === 1 ? 'matBig' : level === 2 ? 'matMid' : 'matSmall';
+    const m = {};
+    PJ_PURCHASE_ROWS.forEach(function (r) {
+      const k = r[key];
+      if (k) m[k] = (m[k] || 0) + (r.amtTax || 0) / 1e4;
+    });
+    return Object.keys(m).map(function (k) { return { name: k, amt: D.round(m[k], 2) }; })
+      .sort(function (a, b) { return b.amt - a.amt; }).slice(0, 8);
+  }
   function fulfillSection(p) {
     const rows = D.genSettlePriceRows();
+    const rateM = projMetrics(p).filter(function (m) { return m.name === '集中采购率'; })[0] || { value: 0 };
+    const rate = rateM.value;
+    const central = D.round(p.purchase * rate / 100, 2);
+    const contractAmt = D.round(PJ_PURCHASE_ROWS.reduce(function (a, r) {
+      return a + (r.amtTax || 0);
+    }, 0) / 1e4, 2);
     return section('履约分析',
       '<div class="dsc-card u-mb-lg"><div class="dsc-card__body">' +
       '  <div class="dsc-filter-inline u-mb-lg">' +
@@ -563,8 +605,8 @@
       sel('物料小分类', D.material.small) + '</div>' +
       '  </div>' +
       '  <div class="project-cockpit-page__kpis">' +
-      stat('总采购金额', 164.43, '万元') + stat('集中采购金额', 2.95, '万元') +
-      stat('采购签约金额', 1382.60, '万元') + stat('集中采购率', 1.79, '%') +
+      stat('总采购金额', p.purchase, '万元') + stat('集中采购金额', central, '万元') +
+      stat('采购签约金额', contractAmt, '万元') + stat('集中采购率', rate, '%') +
       '  </div>' +
       '</div></div>' +
       '<div class="cockpit-rank3">' +
@@ -596,43 +638,260 @@
       '</div>');
   }
 
-  /* ---------- 物资 / 分供商 / 资产（页签切换时替换招采分析块） ---------- */
+  /* ---------- 物资 / 分供商 / 资产（页签切换时替换招采分析块） ----------
+     列表筛选：每个列表按自身字段真过滤（此前复用看板逻辑，只记录条件、表格不变） */
+  const PJ_FILTERS = {};   // listKey → { 字段名: 值 }
+  const PJ_HINTS = {};     // listKey → 就地反馈
+  const PJ_ROWS = {};      // listKey → 未过滤行（查询时算命中数）
+  /* 筛选标签 → 行字段：列名对上时直接用列 key，对不上的在这里补别名 */
+  const PJ_FIELD_ALIAS = {
+    '月度需用计划号': 'planCode', '盘点单号': 'invCode', '处理方案编号': 'applyCode',
+    '处理记录编号': 'applyCode', '分供商': 'name', '分供商名称': 'supplier', '供应商': 'supplier',
+    '合同': 'contractCode', '合同单号': 'contractCode', '收货单号': 'receiveCode',
+    '关联收货单号': 'receiveCode', '领料单号': 'pickCode', '对账单号': 'checkCode',
+    '处理日期': 'date', '退货日期': 'date', '结算日期': 'date', '合同签订日期': 'date',
+    '调拨申请时间': 'applyDate', '调拨完成时间': 'transferDate', '处置日期': 'disposeDate',
+    '是否办理总结算': 'isFinalSettle', '其他采购属性': 'otherAttr', '达处置条件': 'condition',
+    '局评价等级': 'grade', '保管人': 'keeperUser', '是否处置': 'disposed'
+  };
+  function pjRowKey(listKey, label) {
+    const def = PJ_LISTS[listKey];
+    const cols = def ? def.cols : [];
+    const exact = cols.filter(function (c) { return c.name === label; })[0];
+    if (exact) return exact.key;
+    const near = cols.filter(function (c) {
+      return c.name.indexOf(label) === 0 || label.indexOf(c.name) === 0;
+    })[0];
+    return near ? near.key : (PJ_FIELD_ALIAS[label] || '');
+  }
+  function pjMatchRow(row, conds, listKey) {
+    return Object.keys(conds).every(function (label) {
+      const want = String(conds[label]);
+      const key = pjRowKey(listKey, label);
+      if (key && row[key] != null) return String(row[key]).indexOf(want) >= 0;
+      /* 预设日期区间（如 2026-01 ~ 2026-09）：匹配行内任意 ISO 日期字段 */
+      const m = want.match(/^(\d{4}-\d{2})\s*~\s*(\d{4}-\d{2})$/);
+      if (m) {
+        return Object.keys(row).some(function (rk) {
+          const rv = row[rk];
+          return typeof rv === 'string' && /^\d{4}-\d{2}/.test(rv) &&
+            rv.slice(0, 7) >= m[1] && rv.slice(0, 7) <= m[2];
+        });
+      }
+      /* 未映射字段：退化为「任一字段包含」，不让条件被静默忽略 */
+      return Object.keys(row).some(function (rk) {
+        return row[rk] != null && String(row[rk]).indexOf(want) >= 0;
+      });
+    });
+  }
+  function pjFilterRows(listKey, rows) {
+    const conds = PJ_FILTERS[listKey];
+    if (!conds || !Object.keys(conds).length) return rows;
+    return rows.filter(function (r) { return pjMatchRow(r, conds, listKey); });
+  }
+  /* 列表分页：每个列表独立页码 / 每页条数（Axure 各列表 10 条/页） */
+  const PJ_PAGES = {};
+  function pjPageOf(listKey) {
+    if (!PJ_PAGES[listKey]) PJ_PAGES[listKey] = { page: 1, size: 10 };
+    return PJ_PAGES[listKey];
+  }
+  function pjPageRows(listKey, rows) {
+    const pg = pjPageOf(listKey);
+    const pages = Math.max(1, Math.ceil(rows.length / pg.size));
+    if (pg.page > pages) pg.page = pages;
+    if (pg.page < 1) pg.page = 1;
+    const start = (pg.page - 1) * pg.size;
+    return { rows: rows.slice(start, start + pg.size), page: pg.page, size: pg.size,
+      total: rows.length, start: start };
+  }
+  function pjPager(key, view) {
+    return '<div data-pjf-pager="' + esc(key) + '">' +
+      D.pager({ page: view.page, size: view.size, total: view.total }) + '</div>';
+  }
+  function pjFilterActions(listKey, adv, moreOpen) {
+    const hint = PJ_HINTS[listKey] || '';
+    return '<div class="ck-filter__foot">' +
+      (adv ? '<span class="ck-link ck-link--adv' + (moreOpen ? ' ck-link--on' : '') + '" data-ck-adv>' +
+        (moreOpen ? '收起' : '展开') + GRAIN_CARET + '</span>' : '') +
+      '<span class="ck-filter__hint"' + (hint ? '' : ' hidden') + '>' + esc(hint) + '</span>' +
+      '<span class="ck-filter__foot-right">' +
+      '<button class="ck-btn ck-btn--primary" data-pjf-query="' + esc(listKey) + '">查询</button>' +
+      '<button class="ck-link" data-pjf-clear="' + esc(listKey) + '">清空</button>' +
+      '<button class="ck-link" data-pjf-reset="' + esc(listKey) + '">重置</button>' +
+      '</span></div>';
+  }
   /* 区块通用查询条件（Axure《项目驾驶舱》各列表上方的查询条件；展开后按钮统一在右下角） */
-  function pjFilter(fields, more, adv) {
-    /* 默认收起：与 Axure《项目驾驶舱》查询条件的「展开 / 收起」一致（此前一律铺开，
-       展开按钮点了也没变化）。adv === false 时不渲染更多条件与展开入口。 */
-    return '<div class="ck-filter ck-filter--panel">' +
-      '<div class="ck-filter__row">' + fields.map(function (f) { return D.ckField(f[0], f[1] || ''); }).join('') + '</div>' +
-      '<div class="ck-filter__more" hidden>' +
-      (more || []).map(function (f) { return D.ckField(f[0], f[1] || ''); }).join('') + '</div>' +
-      D.ckActions(adv !== false) + '</div>';
+  function pjFilter(fields, more, adv, listKey) {
+    /* 默认收起：与 Axure《项目驾驶舱》查询条件的「展开 / 收起」一致。
+       adv === false 时不渲染更多条件与展开入口。已生效的条件若来自「更多」，
+       重绘后保持展开，避免条件被藏起来。 */
+    const cur = PJ_FILTERS[listKey] || {};
+    const moreFields = more || [];
+    const moreOpen = moreFields.some(function (f) { return !!cur[f[0]]; });
+    return '<div class="ck-filter ck-filter--panel"' +
+      (listKey ? ' data-pj-filter="' + esc(listKey) + '"' : '') + '>' +
+      '<div class="ck-filter__row">' + fields.map(function (f) {
+        return pjCkField(f[0], cur[f[0]] || '');
+      }).join('') + '</div>' +
+      '<div class="ck-filter__more"' + (moreOpen ? '' : ' hidden') + '>' +
+      moreFields.map(function (f) { return pjCkField(f[0], cur[f[0]] || ''); }).join('') + '</div>' +
+      pjFilterActions(listKey, adv !== false, moreOpen) + '</div>';
+  }
+
+  /* 项目驾驶舱的数据边界：生成器是「全公司样本」，项目页只保留当前项目的数据。
+     项目 / 二三级单位 / 库房 / 保管单位等组织字段统一改写为当前项目及其上级单位，
+     其它二三级单位与其它项目不再出现在列表、排名或图表里。 */
+  function pjScopeRows(rows, p) {
+    const unit = p.subOrg || p.org;
+    const city = p.city || '';
+    const wh = function (v) { return String(v || '').split('·').pop() || '一号库'; };
+    return (rows || []).map(function (r) {
+      const o = Object.assign({}, r);
+      if ('project' in o) o.project = p.name;
+      if ('projectCode' in o) o.projectCode = p.code;
+      if ('org2' in o) o.org2 = p.org;
+      if ('org3' in o) o.org3 = unit;
+      if ('org' in o && typeof o.org === 'string' && o.org.indexOf('|') >= 0) o.org = p.org + '|' + unit;
+      if ('implOrg' in o) o.implOrg = unit;
+      if ('pickUnit' in o) o.pickUnit = o.part ? o.part + '施工队' : unit;
+      if ('level1' in o) o.level1 = p.org + '本级库';
+      if ('sourceOrg' in o) o.sourceOrg = p.org;
+      if ('keeper' in o) o.keeper = unit + '物资部';
+      if ('owner' in o) o.owner = unit + '项目部';
+      if ('belong' in o) o.belong = p.org;
+      if ('location' in o) o.location = city + '·' + wh(o.location);
+      /* 调拨：一方是本项目（三级），另一方是本项目所属二级单位；
+         调出 / 调入方向跟随单据类型，不再出现其它公司的项目 */
+      const isIn = o.transferType === '调入' || o.fromOrgType === '调入方';
+      if ('outOrg' in o) o.outOrg = isIn ? p.org : unit;
+      if ('inOrg' in o) o.inOrg = isIn ? unit : p.org;
+      if ('outImpl' in o) o.outImpl = (isIn ? p.org : unit) + '物资部';
+      if ('inImpl' in o) o.inImpl = (isIn ? unit : p.org) + '物资部';
+      if ('outProject' in o) o.outProject = isIn ? '公司本部' : p.name;
+      if ('inProject' in o) o.inProject = isIn ? p.name : '公司本部';
+      return o;
+    });
+  }
+
+  /* 筛选下拉同样按项目收口：单位 / 项目类条件只列当前项目及其所属单位，
+     不再让用户选到其它单位 / 项目（即使选了也必然 0 条） */
+  let PJ_SCOPE_PROJECT = null;
+  function pjCkField(label, value) {
+    const p = PJ_SCOPE_PROJECT;
+    if (!p) return D.ckField(label, value);
+    const unit = p.subOrg || p.org;
+    let list = null;
+    if (label === '实施单位' || label === '调出项目实施单位' || label === '调入项目实施单位') {
+      list = [unit];
+    } else if (label === '领用单位') {
+      list = ['主体结构施工队', '基础工程施工队', '装饰装修施工队', '机电安装施工队', '室外工程施工队'];
+    } else if (label === '一级库') {
+      list = [p.org + '本级库'];
+    } else if (label === '保管单位') {
+      list = [unit + '物资部'];
+    } else if (label === '调出公司' || label === '调入公司') {
+      list = [p.org, unit];
+    } else if (label === '调出项目' || label === '调入项目' || label === '项目名称') {
+      list = [p.name];
+    }
+    if (!list) return D.ckField(label, value);
+    return '<div class="ck-filter__item"><span class="ck-filter__label">' + esc(label) + '</span>' +
+      '<select class="ck-field ck-field--select" data-ck-field="' + esc(label) + '">' +
+      '<option value="">请选择</option>' + list.map(function (o) {
+        return '<option value="' + esc(o) + '"' + (o === value ? ' selected' : '') + '>' + esc(o) + '</option>';
+      }).join('') + '</select></div>';
   }
 
   /* 列表区块通用构件：查询条件（Axure 同一套「展开/收起」）→ 卡片头（标题 + 条数 + 设置列齿轮）→ 表格
      pjListBlock：只要区块本体（供一个 section 下挂多个列表）；pjList：区块 + 外层 section */
   function pjList(o) { return section(o.section || o.title, pjListBlock(o)); }
   function pjListBlock(o) {
-    return pjFilter(o.fields, o.more) +
+    PJ_ROWS[o.key] = o.rows;
+    const rows = pjFilterRows(o.key, o.rows);
+    const view = pjPageRows(o.key, rows);
+    const tableBody = D.table({
+      cols: D.colsOf(o.key, PJ_LISTS[o.key].cols, PJ_LISTS[o.key].def),
+      rows: view.rows.map(function (r, i) { return Object.assign({ idx: view.start + i + 1 }, r); }),
+      maxHeight: o.height || 360,
+      foot: pjPager(o.key, view)
+    }) + (rows.length ? '' : '<div class="dsc-table__footnote">没有符合筛选条件的记录，请调整条件后重新查询</div>');
+    const body = o.rank
+      ? '<div class="pj-listsplit"><div class="pj-listsplit__main">' + tableBody + '</div>' +
+        '<div class="pj-listsplit__rank">' +
+        pjRankCard(o.rank.title, o.rank.rows, o.rank.unit, o.rank.digits) + '</div></div>'
+      : tableBody;
+    return pjFilter(o.fields, o.more, undefined, o.key) +
       '<div class="dsc-card' + (o.last ? '' : ' u-mb-lg') + '">' +
       '<div class="dsc-card__header"><div class="dsc-card__title">' + esc(o.title) + '</div>' +
-      '<div class="dsc-card__extra">' + (o.tip ? esc(o.tip) + '　·　' : '') + '共 ' + o.rows.length + ' 条' +
+      '<div class="dsc-card__extra">' + (o.tip ? esc(o.tip) : '') +
       D.colGear('data-pj-cols="' + o.key + '"', '设置列：' + o.title + '（Axure 列表字段选择）') +
-      '</div></div>' +
-      D.table({
-        cols: D.colsOf(o.key, PJ_LISTS[o.key].cols, PJ_LISTS[o.key].def),
-        rows: o.rows.map(function (r, i) { return Object.assign({ idx: i + 1 }, r); }),
-        maxHeight: o.height || 360
-      }) + '</div>';
+      '</div></div>' + body + '</div>';
+  }
+
+  /* 物资计划：物料小类计划占比（Axure 图 + 小类汇总表） */
+  const PJ_PLAN_MIX = [
+    ['普通钢筋', 211.97, 78.5], ['普通混凝土', 285.00, 65.2], ['角钢', 68.74, 72.4],
+    ['圆钢', 62.25, 69.8], ['三角钢', 151.97, 58.6], ['铝板材', 18.76, 81.2], ['铜线材', 78.32, 76.9]
+  ];
+  function pjPlanMixTable() {
+    const total = PJ_PLAN_MIX.reduce(function (a, x) { return a + x[1]; }, 0);
+    const rows = PJ_PLAN_MIX.map(function (x, i) {
+      return { idx: i + 1, name: x[0], amt: x[1], cAmt: D.round(x[1] * x[2] / 100, 2),
+        pct: D.round(x[1] / total * 100, 2), cRate: x[2] };
+    });
+    return D.table({ cols: [
+      { key: 'idx', name: '序号', width: 56 },
+      { key: 'name', name: '物料小类', width: 130 },
+      { key: 'amt', name: '总采购金额(万元)', width: 150, num: true },
+      { key: 'cAmt', name: '集中采购金额(万元)', width: 160, num: true },
+      { key: 'pct', name: '占比', width: 100, pct: true },
+      { key: 'cRate', name: '集中采购率', width: 120, pct: true }
+    ], rows: rows, maxHeight: 320 });
+  }
+  /* 物资验收：按物料大类统计验收单数量（笔） */
+  function pjAcceptDist() {
+    const rows = D.genAcceptRows();
+    const m = {};
+    rows.forEach(function (r) { m[r.matBig] = (m[r.matBig] || 0) + 1; });
+    return Object.keys(m).map(function (k) { return { name: k, value: m[k] }; })
+      .sort(function (a, b) { return b.value - a.value; });
+  }
+  /* 物资使用：按物料中类 / 小类汇总领用金额（万元） */
+  function pjPickDist(key) {
+    const rows = D.genPickRows();
+    const m = {};
+    rows.forEach(function (r) {
+      const k = r[key];
+      if (!k) return;
+      m[k] = (m[k] || 0) + (r.amtTax || 0);
+    });
+    return Object.keys(m).map(function (k) { return { name: k, value: D.round(m[k] / 1e4, 2) }; })
+      .sort(function (a, b) { return b.value - a.value; }).slice(0, 8);
   }
 
   function materialTab(p) {
-    const plans = D.genPlanRows(PS.planKind);
+    /* 列表数据统一按当前项目收口（组织 / 项目字段改写，见 pjScopeRows） */
+    const plansAll = pjScopeRows(D.genPlanRows(PS.planKind), p);
+    PJ_ROWS['pj-plan'] = plansAll;
+    const plans = pjFilterRows('pj-plan', plansAll);
+    const planView = pjPageRows('pj-plan', plans);
     const planCols = D.colsOf('pj-plan', PJ_PLAN_COLS, PJ_PLAN_DEF);
+    const pickRows = pjScopeRows(D.genPickRows(), p), returnRows = D.genReturnRows(),
+      invRows = pjScopeRows(D.genInventoryRows(), p), transferRows = pjScopeRows(D.genTransferRows(), p),
+      scrapRows = D.genScrapRows();
     /* 区块名与 Axure《项目驾驶舱 › 物资页签》的区块标题（fs=20）逐字对齐：
        物资计划情况 → 物资验收情况 → 物资使用情况 → 项目结算情况 */
     return section('物资计划情况',
-      pjFilter([['计划月份'], ['月度需用计划号'], ['物料大类'], ['物料中类'], ['物料小类']],
-        [['物料描述'], ['计划使用部位'], ['领用单位'], ['领料单号'], ['编制人'], ['一级库'], ['项目名称']]) +
+      '<div class="dsc-card u-mb-lg"><div class="dsc-card__header">' +
+      '<div class="dsc-card__title">物料小类计划占比情况</div>' +
+      '<div class="dsc-card__extra">计划金额（万元）· 7 个物料小类</div></div>' +
+      '<div class="dsc-split dsc-split--2-3">' +
+      '<div class="dsc-card__body"><div class="dsc-chart" id="pjPlanMix" style="height:240px"></div></div>' +
+      '<div class="dsc-card__body">' + pjPlanMixTable() + '</div></div></div>' +
+      pjFilter([['计划月份'], ['物料大类'], ['物料中类'], ['物料小类']],
+        [['月度需用计划号'], ['物料描述'], ['计划使用部位'], ['领用单位'], ['领料单号'], ['编制人'],
+          ['一级库'], ['项目名称']],
+        undefined, 'pj-plan') +
       '<div class="dsc-card u-mb-lg">' +
       '<div class="dsc-card__header"><div class="dsc-card__title">需用计划列表</div>' +
       '<div class="dsc-card__extra"><span class="dsc-tabs dsc-tabs--pill" style="margin:0" data-plankind>' +
@@ -642,57 +901,178 @@
       }).join('') + '</span>' +
       D.colGear('data-pj-cols="pj-plan"', '设置列：需用计划列表（Axure 列表字段选择-物资页签）') + '</div></div>' +
       D.table({
-        cols: planCols, rows: plans.map(function (r, i) { return Object.assign({ idx: i + 1 }, r); }),
-        maxHeight: 420
-      }) + '</div>') +
+        cols: planCols,
+        rows: planView.rows.map(function (r, i) { return Object.assign({ idx: planView.start + i + 1 }, r); }),
+        maxHeight: 420, foot: pjPager('pj-plan', planView)
+      }) + (plans.length ? '' : '<div class="dsc-table__footnote">没有符合筛选条件的记录，请调整条件后重新查询</div>') +
+      '</div>') +
       section('物资验收情况',
-        pjListBlock({ title: '物资验收列表', key: 'pj-accept', rows: D.genAcceptRows(), last: true,
+        '<div class="dsc-card u-mb-lg"><div class="dsc-card__header">' +
+        '<div class="dsc-card__title">物资验收单分布</div>' +
+        '<div class="dsc-card__extra">按物料大类 · 验收单数量（笔）</div></div>' +
+        '<div class="dsc-card__body"><div class="dsc-chart" id="pjAcceptDist" style="height:220px"></div></div></div>' +
+        pjListBlock({ title: '物资验收列表', key: 'pj-accept', rows: pjScopeRows(D.genAcceptRows(), p), last: true,
           tip: '收验货 → 收料单据链路',
           fields: [['结算月份'], ['结算周期'], ['结算明细类型'], ['分供商名称']],
           more: [['物料大类'], ['物料中类'], ['物料小类'], ['一级库'], ['责任人'], ['是否对账']] })) +
       section('物资使用情况',
-        pjListBlock({ title: '物资领料列表', key: 'pj-pick', rows: D.genPickRows(),
+        '<div class="dsc-card u-mb-lg"><div class="dsc-card__header">' +
+        '<div class="dsc-card__title">物料领用金额分布</div>' +
+        '<div class="dsc-card__extra">按物料中类 / 小类 · 领用金额（万元）</div></div>' +
+        '<div class="dsc-split dsc-split--2">' +
+        '<div class="dsc-card__body">' + subHead('物料中类领用金额') +
+        '<div class="dsc-chart" id="pjPickMid" style="height:220px"></div></div>' +
+        '<div class="dsc-card__body">' + subHead('物料小类领用金额') +
+        '<div class="dsc-chart" id="pjPickSmall" style="height:220px"></div></div></div></div>' +
+        pjListBlock({ title: '物资领料列表', key: 'pj-pick', rows: pickRows,
           tip: '点击领料单号查看关联对账单',
-          fields: [['领料单号'], ['领用单位'], ['一级库'], ['物料大类'], ['物料中类'], ['物料小类'], ['使用部位']],
-          more: [['责任人'], ['对账单号']] }) +
-        pjListBlock({ title: '物资退货列表', key: 'pj-return', rows: D.genReturnRows(),
+          fields: [['领料单号'], ['领用单位'], ['物料大类'], ['物料中类'], ['物料小类']],
+          more: [['一级库'], ['使用部位'], ['责任人'], ['对账单号']],
+          rank: { title: '领用单位数量排名TOP8', rows: pjAggTop(pickRows, 'qty', 8, 'pickUnit'), unit: '', digits: 0 } }) +
+        pjListBlock({ title: '物资退货列表', key: 'pj-return', rows: returnRows,
           tip: '点击退货单号 / 是否结算查看关联结算单',
-          fields: [['退货单号'], ['退货类型'], ['收货单号'], ['物料大类'], ['物料中类'], ['物料小类']],
-          more: [['分供商名称'], ['合同'], ['结算单'], ['退货日期']] }) +
-        pjListBlock({ title: '物资盘点列表', key: 'pj-inv', rows: D.genInventoryRows(),
+          fields: [['退货单号'], ['退货类型'], ['物料大类'], ['物料小类']],
+          more: [['收货单号'], ['物料中类'], ['分供商名称'], ['合同'], ['结算单'], ['退货日期']] }) +
+        pjListBlock({ title: '物资盘点列表', key: 'pj-inv', rows: invRows,
           tip: '点击盘点方案编号查看盘点单',
-          fields: [['盘点单号'], ['实施单位'], ['盘点类型'], ['盘点范围'], ['物料大类'], ['物料中类'], ['物料小类']],
-          more: [['供应商'], ['库房名称'], ['合同'], ['订单编号'], ['发货单号'], ['收料单号'], ['领料单号']] }) +
-        pjListBlock({ title: '物资调拨台账', key: 'pj-transfer', rows: D.genTransferRows(),
+          rank: { title: '库房盘点数量TOP8', rows: pjAggTop(invRows, 'bookQty', 8, 'warehouse'), unit: '', digits: 0 },
+          fields: [['盘点单号'], ['实施单位'], ['盘点类型'], ['物料大类'], ['物料小类']],
+          more: [['盘点范围'], ['物料中类'], ['供应商'], ['库房名称'], ['合同'], ['订单编号'], ['发货单号'],
+            ['收料单号'], ['领料单号']] }) +
+        pjListBlock({ title: '物资调拨台账', key: 'pj-transfer', rows: transferRows,
           tip: '调入 / 调出双视角',
-          fields: [['调拨单号'], ['调拨类型'], ['调出公司'], ['调入公司'], ['调出项目'], ['调入项目'],
-            ['调出项目实施单位'], ['调入项目实施单位'], ['物料小类']],
-          more: [['物料大类'], ['物料中类'], ['物料描述'], ['发起单位类型']] }) +
-        pjListBlock({ title: '闲置废旧物资处理台账', key: 'pj-scrap', rows: D.genScrapRows(), last: true,
+          rank: { title: '调出单位申请数量TOP8', rows: pjAggTop(transferRows, 'applyQty', 8, 'outOrg'), unit: '', digits: 0 },
+          fields: [['调拨单号'], ['调拨类型'], ['调出公司'], ['调入公司'], ['物料小类']],
+          more: [['调出项目'], ['调入项目'], ['调出项目实施单位'], ['调入项目实施单位'],
+            ['物料大类'], ['物料中类'], ['物料描述'], ['发起单位类型']] }) +
+        pjListBlock({ title: '闲置废旧物资处理台账', key: 'pj-scrap', rows: scrapRows, last: true,
           tip: '处理方式：销售 / 销毁',
-          fields: [['处理方案编号'], ['处理记录编号'], ['处理方式'], ['收购方'], ['处理人'], ['废宝类型']],
-          more: [['供应商'], ['物料大类'], ['物料中类'], ['物料小类'], ['处理日期']] })) +
+          fields: [['处理方案编号'], ['处理方式'], ['收购方'], ['废宝类型']],
+          more: [['处理记录编号'], ['处理人'], ['供应商'], ['物料大类'], ['物料中类'], ['物料小类'],
+            ['处理日期']] })) +
       section('项目结算情况',
-        pjListBlock({ title: '项目结算明细列表', key: 'pj-settle', rows: D.genSettleRows(30), last: true,
+        pjListBlock({ title: '项目结算明细列表', key: 'pj-settle', rows: pjScopeRows(D.genSettleRows(30), p), last: true,
           tip: '物料大类 → 中类 → 小类三级可下钻',
-          fields: [['结算单'], ['合同'], ['供应商'], ['物料大类'], ['物料中类'], ['物料小类']],
-          more: [['合同签订日期'], ['结算日期'], ['是否办理总结算'], ['结算单状态']], height: 420 }));
+          fields: [['结算单'], ['供应商'], ['物料大类'], ['物料小类']],
+          more: [['合同'], ['物料中类'], ['合同签订日期'], ['结算日期'], ['是否办理总结算'], ['结算单状态']],
+          height: 420 }));
   }
 
+  /* 分供商页签：KPI / TOP10 / 中标签约转化 / 履约分布 / 资源履约质量表（对齐 Axure） */
+  function pjAggTop(rows, valKey, n, nameKey) {
+    const m = {};
+    const nk = nameKey || 'name';
+    rows.forEach(function (r) {
+      const name = r[nk];
+      if (!name) return;
+      if (!m[name]) m[name] = { name: name, value: 0 };
+      m[name].value += (r[valKey] || 0);
+    });
+    return Object.keys(m).map(function (k) { return m[k]; })
+      .sort(function (a, b) { return b.value - a.value; }).slice(0, n || 10);
+  }
+  function pjRankCard(title, rows, unit, digits) {
+    return '<div class="pj-rank"><div class="pj-rank__title">' + esc(title) + '</div>' +
+      rows.map(function (r, i) {
+        return '<div class="pj-rank__row"><span class="pj-rank__no">' + (i + 1) + '</span>' +
+          '<span class="pj-rank__name" title="' + esc(r.name) + '">' + esc(r.name) + '</span>' +
+          '<b>' + D.fmtNum(r.value, digits == null ? 0 : digits) + '<i>' + esc(unit) + '</i></b></div>';
+      }).join('') + '</div>';
+  }
+  function pjSupKpis(rows) {
+    const sum = function (k) { return rows.reduce(function (a, r) { return a + (r[k] || 0); }, 0); };
+    const perf = sum('perfAmt');
+    const good = rows.filter(function (r) { return r.grade === '优秀'; })
+      .reduce(function (a, r) { return a + r.perfAmt; }, 0);
+    const avg = rows.length ? perf / rows.length : 0;
+    const rate = perf ? good / perf * 100 : 0;
+    const cards = [
+      ['分供商履约额', perf, '万元', 0.82],
+      ['优质分供商履约额', good, '万元', 0.76],
+      ['平均履约额', avg, '万元', 0.88],
+      ['优质分供商履约额占比', rate, '%', 0.96]
+    ];
+    return '<div class="dsc-grid dsc-grid--4 u-mb-lg pj-supkpis">' + cards.map(function (c) {
+      return '<div class="dsc-kpi"><div class="dsc-kpi__name">' + esc(c[0]) + '</div>' +
+        '<div class="dsc-kpi__value">' + D.fmtNum(c[1], 2) +
+        '<span class="dsc-kpi__unit">' + esc(c[2]) + '</span></div>' +
+        '<div class="dsc-kpi__foot">上年度 ' + D.fmtNum(c[1] * c[3], 2) + ' ' + esc(c[2]) + '</div></div>';
+    }).join('') + '</div>';
+  }
+  function pjConversion(rows) {
+    const names = {};
+    rows.forEach(function (r) { if (r.name) names[r.name] = 1; });
+    const win = Object.keys(names).length || rows.length || 1;
+    const sign = Math.max(1, Math.round(win * 0.78));
+    const perf = Math.max(1, Math.round(sign * 0.72));
+    const steps = [['中标分供商', win], ['签约分供商', sign], ['履约分供商', perf]];
+    const rates = [sign / win, perf / sign];
+    return '<div class="pj-conv">' + steps.map(function (s, i) {
+      return '<div class="pj-conv__step"><span>' + esc(s[0]) + '</span><b>' + s[1] + ' 个</b></div>' +
+        '<div class="pj-conv__bar"><i style="width:' + Math.max(6, Math.round(s[1] / win * 100)) + '%"></i></div>' +
+        (i < rates.length ? '<div class="pj-conv__rate">转化率 ' + D.fmtNum(rates[i] * 100, 1) + '%</div>' : '');
+    }).join('') + '</div>';
+  }
+  function pjSupplierDist(rows) {
+    const m = {};
+    (rows || []).forEach(function (r) { m[r.cat] = (m[r.cat] || 0) + r.perfAmt; });
+    return Object.keys(m).map(function (k) { return { name: k, value: D.round(m[k], 2) }; })
+      .sort(function (a, b) { return b.value - a.value; });
+  }
+  /* 分供商数据原本是「单位级」量级（履约额几十亿），落到单个项目必须压到项目采购规模：
+     履约额合计 = 项目总采购金额 × 0.9，四类金额同比例缩放，履约率/得分不受影响 */
+  function pjScaleSupplier(rows, purchase) {
+    const sum = rows.reduce(function (a, r) { return a + (r.perfAmt || 0); }, 0) || 1;
+    const k = (purchase || 4000) * 0.9 / sum;
+    return rows.map(function (r) {
+      return Object.assign({}, r, {
+        contractAmt: D.round(r.contractAmt * k, 2), perfAmt: D.round(r.perfAmt * k, 2),
+        payAmt: D.round(r.payAmt * k, 2), winAmt: D.round(r.winAmt * k, 2)
+      });
+    });
+  }
+  let PJ_SUP_DIST = [];
   function supplierTab(p) {
-    const rows = D.genSupplierRows(30);
+    const rowsAll = pjScaleSupplier(pjScopeRows(D.genSupplierRows(30), p), p.purchase);
+    PJ_SUP_DIST = pjSupplierDist(rowsAll);
+    PJ_ROWS['pj-supplier'] = rowsAll;
+    const rows = pjFilterRows('pj-supplier', rowsAll);
+    const view = pjPageRows('pj-supplier', rows);
     const cols = D.colsOf('pj-supplier', PJ_SUP_COLS, PJ_SUP_DEF);
+    /* 合计行：金额求和、履约率/得分取平均 */
+    const tot = D.totalOf(cols, rows);
+    const scoreCol = cols.filter(function (c) { return c.key === 'score'; })[0];
+    if (scoreCol && rows.length) {
+      tot.score = D.round(rows.reduce(function (a, r) { return a + (r.score || 0); }, 0) / rows.length, 2);
+    }
     return section('分供商履约',
-      pjFilter([['分供商'], ['分供商分类'], ['局评价等级'], ['物料大类']],
-        [['物料中类'], ['物料小类'], ['物料编码'], ['项目名称']]) +
+      pjSupKpis(rowsAll) +
+      '<div class="pj-ranks u-mb-lg">' +
+      pjRankCard('分供商供货次数排名TOP10', pjAggTop(rowsAll, 'winCount'), '次', 0) +
+      pjRankCard('分供商结算金额排名TOP10', pjAggTop(rowsAll, 'perfAmt'), '万元', 0) +
+      pjRankCard('分供商支付金额排名TOP10', pjAggTop(rowsAll, 'payAmt'), '万元', 0) +
+      '</div>' +
+      '<div class="dsc-split dsc-split--2 u-mb-lg">' +
       '<div class="dsc-card"><div class="dsc-card__header">' +
-      '<div class="dsc-card__title">本项目分供商台账</div>' +
-      '<div class="dsc-card__extra">共 ' + rows.length + ' 条' +
-      D.colGear('data-pj-cols="pj-supplier"', '设置列：分供商履约台账（Axure 列表字段选择-资源+资产）') + '</div></div>' +
+      '<div class="dsc-card__title">分供商中标签约转化</div>' +
+      '<div class="dsc-card__extra">中标 → 签约 → 履约</div></div>' +
+      '<div class="dsc-card__body">' + pjConversion(rowsAll) + '</div></div>' +
+      '<div class="dsc-card"><div class="dsc-card__header">' +
+      '<div class="dsc-card__title">分供商履约分布</div>' +
+      '<div class="dsc-card__extra">按分供商分类 · 履约额（万元）</div></div>' +
+      '<div class="dsc-card__body"><div class="dsc-chart" id="pjSupDist" style="height:220px"></div></div></div>' +
+      '</div>' +
+      pjFilter([['分供商'], ['分供商分类'], ['局评价等级'], ['物料大类']],
+        [['物料中类'], ['物料小类'], ['物料编码'], ['项目名称']], undefined, 'pj-supplier') +
+      '<div class="dsc-card"><div class="dsc-card__header">' +
+      '<div class="dsc-card__title">资源履约质量表</div>' +
+      '<div class="dsc-card__extra">' +
+      D.colGear('data-pj-cols="pj-supplier"', '设置列：资源履约质量表（Axure 列表字段选择-资源+资产）') + '</div></div>' +
       D.table({
-        cols: cols, rows: rows.map(function (r, i) { return Object.assign({ idx: i + 1 }, r); }),
-        maxHeight: 460
-      }) + '</div>');
+        cols: cols, rows: view.rows.map(function (r, i) { return Object.assign({ idx: view.start + i + 1 }, r); }),
+        maxHeight: 460, totalRow: tot, foot: pjPager('pj-supplier', view)
+      }) + (rows.length ? '' : '<div class="dsc-table__footnote">没有符合筛选条件的记录，请调整条件后重新查询</div>') +
+      '</div>');
   }
 
   /* 资产台账全数据（Axure 列表字段选择-资源+资产 · 全资产明细数据） */
@@ -797,62 +1177,98 @@
     'pj-adisp': { cols: PJ_ADISP_COLS, def: PJ_ADISP_DEF, title: '资产处置台账' }
   };
 
-  /* 资产周转情况（Axure《项目驾驶舱 › 资产页签》首个区块；指标取数同资产管理看板） */
-  function assetTurnoverSection() {
-    const i = Math.max(0, D.projects.indexOf(curProject(D.projectState.__q || {})));
-    const cats = ['施工机械', '临建设施', '办公设备', '生活设施', '测量仪器'];
-    const rows = cats.map(function (c, k) {
-      const amt = D.round(1860 - k * 268.4 + (i % 5) * 42, 1);
-      const out = D.round(amt * (0.12 + k * 0.03), 1);
-      const times = D.round(2.6 - k * 0.32, 2);
-      return { cat: c, amt: amt, out: out, times: times, rate: D.round(times / 4 * 100, 1) };
+  /* 资产周转情况：Axure 用物料类别树图 + 右侧「全资产明细数据」；
+     这里用环图 + 百分比图例承载类别构成，右侧换成资产级明细（不再是 5 行类别汇总） */
+  const PJ_ASSET_MIX = [
+    { name: '管材', value: 55.04, color: '#4285F4' },
+    { name: '电线电缆', value: 34.97, color: '#1F4E79' },
+    { name: '电气线路敷设材料', value: 4.50, color: '#34A853' },
+    { name: '零星材料', value: 3.34, color: '#FB923C' },
+    { name: '光源、灯具、开关', value: 2.15, color: '#EA4335' }
+  ];
+  function assetTurnoverSection(p) {
+    const assetRows = pjScopeRows(D.genAssetRows(8), p).map(function (r, i) {
+      const rate = r.assetCount ? D.round(r.usingCount / r.assetCount * 100, 2) : 0;
+      return {
+        assetCode: r.assetCode, desc: r.desc, category: r.category,
+        buyAmt: D.round(r.buyAmt, 2), inAmt: D.round(r.assetAmt * 0.2, 2),
+        outAmt: D.round(r.disposeAmt, 2), rate: rate
+      };
     });
     return section('资产周转情况',
       '<div class="dsc-card"><div class="dsc-card__header">' +
-      '<div class="dsc-card__title">资产周转率明细</div>' +
-      '<div class="dsc-card__extra">周转率 = 年度调出金额 ÷ 资产原值　·　口径见 PRD Q-08（待确认）</div></div>' +
-      '<div class="dsc-split dsc-split--2">' +
-      '<div class="dsc-card__body"><div class="dsc-chart" id="pjAssetTurn" style="height:240px"></div></div>' +
+      '<div class="dsc-card__title">资产类别周转率</div>' +
+      '<div class="dsc-card__extra">按物料类别占用原值占比　·　周转率口径见 PRD Q-08（待确认）</div></div>' +
+      '<div class="dsc-split dsc-split--2-3 pj-assetsplit">' +
+      '<div class="dsc-card__body"><div class="pj-assetmix">' +
+      '<div class="dsc-chart" id="pjAssetMix" style="height:220px"></div>' +
+      '<div class="pj-assetmix__legend">' + PJ_ASSET_MIX.map(function (x) {
+        return '<div class="pj-assetmix__item"><i style="background:' + x.color + '"></i>' +
+          '<span>' + esc(x.name) + '</span><b>' + D.fmtNum(x.value, 2) + '%</b></div>';
+      }).join('') + '</div></div></div>' +
       '<div class="dsc-card__body">' +
+      '<div class="dsc-subhead"><span class="dsc-subhead__title">全资产明细数据</span>' +
+      '<span class="dsc-subhead__extra">资产采购 / 调入 / 调出 / 周转率</span></div>' +
       D.table({
         cols: [
-          { key: 'idx', name: '序号', width: 56 },
-          { key: 'cat', name: '资产类别', width: 130 },
-          { key: 'amt', name: '资产原值(万元)', width: 140, num: true },
-          { key: 'out', name: '调出金额(万元)', width: 140, num: true },
-          { key: 'times', name: '周转次数', width: 110, num: true },
-          { key: 'rate', name: '资产周转率', width: 110, pct: true }
-        ], rows: rows.map(function (r, k) { return Object.assign({ idx: k + 1 }, r); }), maxHeight: 240
+          { key: 'idx', name: '序号', width: 56, sticky: true },
+          { key: 'assetCode', name: '资产编码', width: 140, sticky2: true },
+          { key: 'desc', name: '资产描述', width: 120 },
+          { key: 'category', name: '资产类别', width: 110 },
+          { key: 'buyAmt', name: '资产采购金额(万元)', width: 140, num: true },
+          { key: 'inAmt', name: '项目调入资产金额(万元)', width: 150, num: true },
+          { key: 'outAmt', name: '项目调出资产金额(万元)', width: 150, num: true },
+          { key: 'rate', name: '资产周转率', width: 100, pct: true }
+        ], rows: assetRows.map(function (r, k) { return Object.assign({ idx: k + 1 }, r); }), maxHeight: 260
       }) + '</div></div></div>');
   }
 
   function assetTab(p) {
-    const rows = D.genAssetRows(30);
+    const rowsAll = pjScopeRows(D.genAssetRows(30), p);
+    PJ_ROWS['pj-asset'] = rowsAll;
+    const rows = pjFilterRows('pj-asset', rowsAll);
+    const view = pjPageRows('pj-asset', rows);
     const cols = D.colsOf('pj-asset', PJ_ASSET_COLS, PJ_ASSET_DEF);
+    const atRows = pjScopeRows(D.genAssetTransferRows(), p);
+    const docTab = PS.assetDoc === 'dispose' ? 'dispose' : 'transfer';
+    const docBar = '<div class="dsc-tabs dsc-tabs--pill u-mb-lg" data-pjadjust>' +
+      [['transfer', '资产调拨'], ['dispose', '资产处置']].map(function (d) {
+        return '<div class="dsc-tabs__item' + (docTab === d[0] ? ' dsc-tabs__item--active' : '') +
+          '" data-pdoc="' + d[0] + '">' + d[1] + '</div>';
+      }).join('') + '</div>';
+    const docBlock = docTab === 'transfer'
+      ? pjListBlock({ title: '资产调拨台账', key: 'pj-atrans', rows: atRows, last: true,
+        tip: '调拨总额 / 原值总额 双口径',
+        fields: [['资产调拨单'], ['资产编号'], ['调出公司'], ['调入公司']],
+        more: [['调出项目'], ['调出项目实施单位'], ['调入项目'], ['调入项目实施单位'], ['资产属性'],
+          ['资产类别'], ['资产状态'], ['调拨申请时间'], ['调拨完成时间']],
+        /* 排名单位是万元，源字段 amtNoTax 是元（表格列不标单位），需先换算 */
+        rank: { title: '调出单位金额排名TOP8',
+          rows: pjAggTop(atRows.map(function (r) {
+            return Object.assign({}, r, { amtWan: D.round((r.amtNoTax || 0) / 1e4, 2) });
+          }), 'amtWan', 8, 'outOrg'), unit: '万元', digits: 0 } })
+      : pjListBlock({ title: '资产处置台账', key: 'pj-adisp', rows: pjScopeRows(D.genAssetDisposeRows(), p), last: true,
+        tip: '达处置条件的资产方可发起处置',
+        fields: [['资产处置单'], ['资产编号'], ['资产状态'], ['达处置条件']],
+        more: [['资产属性'], ['资产类别'], ['品牌'], ['其他采购属性'], ['存放地点'], ['保管人'],
+          ['处置日期']] });
     /* 区块名与 Axure《项目驾驶舱 › 资产页签》的区块标题（fs=20）逐字对齐：
        资产周转情况 → 资产调拨与处置 → 资产台账全数据 */
-    return assetTurnoverSection() +
-      section('资产调拨与处置',
-        pjListBlock({ title: '资产调拨台账', key: 'pj-atrans', rows: D.genAssetTransferRows(),
-          tip: '调拨总额 / 原值总额 双口径',
-          fields: [['资产调拨单'], ['资产编号'], ['调出公司'], ['调出项目'], ['调出项目实施单位'], ['调入公司']],
-          more: [['调入项目'], ['调入项目实施单位'], ['资产属性'], ['资产类别'], ['资产状态'],
-            ['调拨申请时间'], ['调拨完成时间']] }) +
-        pjListBlock({ title: '资产处置台账', key: 'pj-adisp', rows: D.genAssetDisposeRows(), last: true,
-          tip: '达处置条件的资产方可发起处置',
-          fields: [['资产处置单'], ['资产编号'], ['资产状态'], ['资产属性'], ['资产类别'], ['达处置条件']],
-          more: [['品牌'], ['其他采购属性'], ['存放地点'], ['保管人'], ['处置日期']] })) +
+    return assetTurnoverSection(p) +
+      section('资产调拨与处置', docBar + docBlock) +
       section('资产台账全数据',
         pjFilter([['资产状态'], ['资产属性'], ['资产类别'], ['存放地点']],
-          [['保管单位'], ['使用人'], ['是否验收'], ['是否盘点'], ['是否调拨'], ['是否处置']]) +
+          [['保管单位'], ['使用人'], ['是否验收'], ['是否盘点'], ['是否调拨'], ['是否处置']],
+          undefined, 'pj-asset') +
         '<div class="dsc-card"><div class="dsc-card__header">' +
-        '<div class="dsc-card__title">资产台账全数据</div>' +
-        '<div class="dsc-card__extra">在用 / 闲置 / 报废 / 维保 四状态可穿透　·　共 ' + rows.length + ' 条' +
+        '<div class="dsc-card__title">资产台账</div>' +
+        '<div class="dsc-card__extra">在用 / 闲置 / 报废 / 维保 四状态可穿透' +
         D.colGear('data-pj-cols="pj-asset"', '设置列：资产台账全数据（Axure 列表字段选择-资源+资产）') + '</div></div>' +
         D.table({
-          cols: cols, rows: rows.map(function (r, i) { return Object.assign({ idx: i + 1 }, r); }),
-          maxHeight: 460
-        }) + '</div>');
+          cols: cols, rows: view.rows.map(function (r, i) { return Object.assign({ idx: view.start + i + 1 }, r); }),
+          maxHeight: 460, foot: pjPager('pj-asset', view)
+        }) + (rows.length ? '' : '<div class="dsc-table__footnote">没有符合筛选条件的记录，请调整条件后重新查询</div>') +
+        '</div>');
   }
 
   /* ============================================================
@@ -860,6 +1276,7 @@
      ============================================================ */
   D.pages.project = function (q) {
     const p = curProject(q);
+    PJ_SCOPE_PROJECT = p;
     PS.project = p.name;
     PS.__q = q || {};
     const body = PS.tab === 'material' ? materialTab(p)
@@ -963,29 +1380,66 @@
       }
     });
 
-    /* 资产周转情况：周转次数 / 调出金额 双轴组合图 */
-    const at = root.querySelector('#pjAssetTurn');
-    if (at) {
-      const cats = ['施工机械', '临建设施', '办公设备', '生活设施', '测量仪器'];
-      D.comboChart(at, {
-        categories: cats,
-        series: [
-          { name: '资产原值', data: cats.map(function (c, k) { return D.round(1860 - k * 268.4, 1); }),
-            type: 'bar', color: '#7FC8F1', color2: '#CDE9FB', unit: '万元' },
-          { name: '调出金额', data: cats.map(function (c, k) { return D.round(1860 * (0.12 + k * 0.03), 1); }),
-            type: 'bar', color: '#0093E5', color2: '#8FD3F4', unit: '万元' },
-          { name: '周转次数', data: cats.map(function (c, k) { return D.round(2.6 - k * 0.32, 2); }),
-            type: 'line', axis: 'right', color: '#D0021B' }
-        ]
-      }, { height: 240, rotateX: 24, yDigits: 0, yUnit: '万元', y2Unit: '次', padB: 56, padR: 44 });
+    /* 资产周转情况：物料类别占用原值构成（环图，替代原 5 类别等差柱线图） */
+    const am = root.querySelector('#pjAssetMix');
+    if (am) {
+      D.pieChart(am, PJ_ASSET_MIX, {
+        height: 220, hole: 0.55, labels: false, cx: 0.5, digits: 2, unit: '%'
+      });
     }
 
     [['pjBig', 1], ['pjMid', 2], ['pjSmall', 3]].forEach(function (pair) {
       const el = root.querySelector('#' + pair[0]);
       if (!el) return;
-      const rows = D.genMaterialMarket('钢材', pair[1]).slice(0, 8);
+      const rows = pjFulfillMix(pair[1]);
       D.hbarChart(el, rows.map(function (r) { return { name: r.name, value: r.amt }; }),
         { rowH: 22, padL: 96, padR: 58, unit: ' 万元', digits: 0, nameMax: 9 });
+    });
+
+    /* 物资计划：物料小类计划占比（金额，万元） */
+    const planMixEl = root.querySelector('#pjPlanMix');
+    if (planMixEl) {
+      D.barChart(planMixEl, {
+        categories: PJ_PLAN_MIX.map(function (x) { return x[0]; }),
+        series: [{ name: '计划金额', data: PJ_PLAN_MIX.map(function (x) { return x[1]; }), color: '#0093E5' }]
+      }, { height: 240, yDigits: 0, yUnit: '万元', dataLabels: true, labelDigits: 0, rotateX: 24, padB: 64 });
+    }
+    /* 物资验收：按物料大类的验收单数量 */
+    const accDist = root.querySelector('#pjAcceptDist');
+    if (accDist) {
+      const dist = pjAcceptDist();
+      D.barChart(accDist, {
+        categories: dist.map(function (x) { return x.name; }),
+        series: [{ name: '验收单数量', data: dist.map(function (x) { return x.value; }), color: '#0093E5' }]
+      }, { height: 220, yDigits: 0, yUnit: '笔', dataLabels: true, labelDigits: 0, rotateX: 24, padB: 64 });
+    }
+    /* 物资使用：物料中类 / 小类领用金额（横向条形） */
+    [['pjPickMid', 'matMid'], ['pjPickSmall', 'matSmall']].forEach(function (pair) {
+      const el = root.querySelector('#' + pair[0]);
+      if (!el) return;
+      const rows = pjPickDist(pair[1]);
+      D.hbarChart(el, rows.map(function (r) { return { name: r.name, value: r.value }; }),
+        { rowH: 22, padL: 100, padR: 60, unit: ' 万元', digits: 0, nameMax: 10 });
+    });
+
+    /* 分供商页签：履约分布（按分供商分类） */
+    const supDist = root.querySelector('#pjSupDist');
+    if (supDist) {
+      const dist = PJ_SUP_DIST;
+      D.barChart(supDist, {
+        categories: dist.map(function (x) { return x.name; }),
+        series: [{ name: '履约额', data: dist.map(function (x) { return x.value; }), color: '#0093E5' }]
+      }, { height: 220, yDigits: 0, yUnit: '万元', dataLabels: false });
+    }
+
+    /* 各列表分页：独立页码 / 每页条数 */
+    root.querySelectorAll('[data-pjf-pager]').forEach(function (box) {
+      const key = box.getAttribute('data-pjf-pager');
+      D.bindPager(box, function (o) {
+        const pg = pjPageOf(key);
+        if (o.size) { pg.size = o.size; pg.page = 1; } else { pg.page = o.page; }
+        D.render();
+      });
     });
 
     page.addEventListener('click', function (e) {
@@ -1007,7 +1461,50 @@
         return;
       }
       const pk = t.closest('[data-pk]');
-      if (pk) { PS.planKind = pk.getAttribute('data-pk'); D.render(); return; }
+      if (pk) { PS.planKind = pk.getAttribute('data-pk'); pjPageOf('pj-plan').page = 1; D.render(); return; }
+      /* 资产调拨 / 资产处置：同一区块内切换一张表（Axure 是页签 + 宽表） */
+      const pdoc = t.closest('[data-pdoc]');
+      if (pdoc) {
+        PS.assetDoc = pdoc.getAttribute('data-pdoc');
+        pjPageOf('pj-atrans').page = 1; pjPageOf('pj-adisp').page = 1;
+        D.render(); return;
+      }
+      /* 各列表的查询：只过滤本列表，命中数写回卡片与就地反馈（P0-2） */
+      const fq = t.closest('[data-pjf-query]');
+      if (fq) {
+        const key = fq.getAttribute('data-pjf-query');
+        const box = fq.closest('.ck-filter');
+        if (box && key) {
+          const conds = {};
+          box.querySelectorAll('[data-ck-field]').forEach(function (f) {
+            const v = (f.value || '').trim();
+            if (v) conds[f.getAttribute('data-ck-field')] = v;
+          });
+          PJ_FILTERS[key] = conds;
+          pjPageOf(key).page = 1;
+          const n = Object.keys(conds).length;
+          const total = (PJ_ROWS[key] || []).length;
+          const hits = pjFilterRows(key, PJ_ROWS[key] || []).length;
+          PJ_HINTS[key] = n ? '已按 ' + n + ' 个条件筛选 · 命中 ' + hits + ' 条' : '';
+          D.render();
+          D.toast(n ? '已按 ' + n + ' 个条件筛选，命中 ' + hits + ' 条' : '未设置筛选条件，显示全部 ' + total + ' 条');
+        }
+        return;
+      }
+      const fcl = t.closest('[data-pjf-clear]');
+      if (fcl) {
+        const key = fcl.getAttribute('data-pjf-clear');
+        PJ_FILTERS[key] = {}; PJ_HINTS[key] = ''; pjPageOf(key).page = 1;
+        D.render(); D.toast('已清空筛选条件');
+        return;
+      }
+      const frs = t.closest('[data-pjf-reset]');
+      if (frs) {
+        const key = frs.getAttribute('data-pjf-reset');
+        PJ_FILTERS[key] = {}; PJ_HINTS[key] = ''; pjPageOf(key).page = 1;
+        D.render(); D.toast('已重置为默认条件');
+        return;
+      }
       if (t.closest('[data-pj-query]')) { D.toast('查询完成（' + D.defaultRange[0] + ' 至 ' + D.defaultRange[1] + '）'); return; }
       if (t.closest('[data-pj-reset]')) { PS.planKind = 'month'; PS.matBig = PS.matMid = PS.matSmall = ''; D.toast('已重置查询条件'); D.render(); return; }
       if (t.closest('[data-pj-export]')) { D.toast('导出任务已提交'); return; }

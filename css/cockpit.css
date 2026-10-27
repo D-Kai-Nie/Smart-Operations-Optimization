@@ -189,6 +189,13 @@ input.ck-field { display: inline-block; min-width: 190px; }
 .ck-metrics--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 /* 资产管理看板：5 指标卡一行 */
 .ck-metrics--5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+/* 闲废物资：全局合计 2 卡 */
+.ck-metrics--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+/* 闲废物资：两张宽表按列定义收口，长文本省略——auto 布局会把金额 / 时间挤出可视区 */
+.mb-idle-table .dsc-table { table-layout: fixed; }
+.mb-idle-table .dsc-table th,
+.mb-idle-table .dsc-table td { overflow: hidden; text-overflow: ellipsis; }
 .ck-metriccard--kpi { text-align: left; padding: var(--sp-lg); }
 .ck-kpi__head { display: flex; align-items: center; gap: var(--sp-sm); }
 .ck-kpi__name { font-size: 13px; color: #4A5568; }
@@ -488,6 +495,13 @@ input.ck-field { display: inline-block; min-width: 190px; }
 .ck-metrics--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 /* 资产管理看板：5 指标卡一行 */
 .ck-metrics--5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+/* 闲废物资：全局合计 2 卡 */
+.ck-metrics--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+/* 闲废物资：两张宽表按列定义收口，长文本省略——auto 布局会把金额 / 时间挤出可视区 */
+.mb-idle-table .dsc-table { table-layout: fixed; }
+.mb-idle-table .dsc-table th,
+.mb-idle-table .dsc-table td { overflow: hidden; text-overflow: ellipsis; }
 .ck-metriccard--kpi { text-align: left; padding: var(--sp-lg); }
 .ck-kpi__head { display: flex; align-items: center; gap: var(--sp-sm); }
 .ck-kpi__name { font-size: 13px; color: #4A5568; }

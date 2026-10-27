@@ -35,7 +35,9 @@ window.APP = window.APP || {};
   function axisTicks(min, max, count) {
     count = count || 5;
     if (max === min) max = min + 1;
-    const span = niceNum((max - min) / count);
+    let span = niceNum((max - min) / count);
+    /* 整数值域不切 0.5 步长：按 0 位小数格式化会出现重复刻度（0,1,1,2,2） */
+    if (span < 1 && Number.isInteger(min) && Number.isInteger(max)) span = 1;
     const lo = Math.floor(min / span) * span;
     const hi = Math.ceil(max / span) * span;
     const out = [];

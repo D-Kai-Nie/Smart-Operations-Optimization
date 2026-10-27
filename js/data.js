@@ -468,9 +468,11 @@ window.APP = window.APP || {};
   const CONTRACT_NAME_SEED = ['塔吊租赁（二标段）', '钢筋采购', '商品混凝土采购', '模板及方木采购',
     '电线电缆采购', '幕墙工程专业分包', '消防工程', '临建精装修工程', '机电安装工程', '土方开挖工程',
     '桩基工程', '钢结构加工制作', '市政道路工程', '园区景观绿化', '智能化系统工程', '二次结构及粗装修'];
-  D.genContractRows = function (n, filter) {
+  D.genContractRows = function (n, filter, project) {
     return genRows(n || 60, function (i, rnd) {
-      const p = pick(rnd, D.projects);
+      /* project：项目驾驶舱传入当前项目，所有合同行都落在该项目上；
+         不传时保持原行为（报表页跨项目样本） */
+      const p = project || pick(rnd, D.projects);
       const sm = pick(rnd, D.material.small);
       const qty = between(rnd, 12, 8600, 2);
       const price = between(rnd, 6.5, 4800, 2);
@@ -493,7 +495,7 @@ window.APP = window.APP || {};
         source: pick(rnd, ['招标', '询比价', '单一来源', '框架协议']),
         sourceCode: 'ZB-' + (20260000 + i * 29),
         tpl: pick(rnd, ['物资采购标准模板A', '分包合同标准模板', '设备采购模板B', '租赁合同模板']),
-        owner: p.org + '项目部',
+        owner: (p.subOrg || p.org) + '项目部',
         priceType: pick(rnd, ['固定价', '浮动价', '暂估价']),
         isStandard: rnd() > 0.4 ? '是' : '否',
         partyA: '中国建筑第八工程局有限公司',
@@ -624,7 +626,10 @@ window.APP = window.APP || {};
         org: p.org + '|' + (p.subOrg || ''),
         pType: p.type, pFormat: p.format, pStatus: p.status, pMode: p.mode,
         pArea: p.area + '|' + p.city,
-        date: '2026-0' + (1 + Math.floor(rnd() * 9)) + '-' + String(1 + Math.floor(rnd() * 15)).padStart(2, '0')
+        date: '2026-0' + (1 + Math.floor(rnd() * 9)) + '-' + String(1 + Math.floor(rnd() * 15)).padStart(2, '0'),
+        /* 资产台账筛选用的状态字段（原先只有是否验收/盘点/调拨，没有「资产状态」「是否处置」） */
+        assetStatus: pick(rnd, ['在用', '在用', '在用', '闲置', '闲置', '维保', '报废']),
+        disposed: pick(rnd, ['是', '否', '否'])
       };
     }).filter(function (r) { return filter ? filter(r) : true; });
   };
@@ -637,7 +642,10 @@ window.APP = window.APP || {};
       const winAmt = between(rnd, 120, 26000, 1);
       return {
         org2: p.org, org3: p.subOrg, project: p.name, format: p.format,
-        name: s.name, code: s.code, cat: s.cat, grade: s.grade,
+        name: s.name, code: s.code,
+        /* 分类按行序轮转：D.suppliers 的 cat 是 seedRand 首个输出，连续种子几乎同值，
+           30 行会全部落到「设计服务类」，导致分类筛选与履约分布图只有一根柱 */
+        cat: D.supplierCats[i % D.supplierCats.length], grade: s.grade,
         bidCode: 'ZB-' + (20260000 + i * 11),
         winCount: Math.floor(between(rnd, 1, 28, 0)), winAmt: winAmt,
         contractCount: Math.floor(between(rnd, 1, 42, 0)), contractAmt: between(rnd, 120, 26000, 1),
@@ -655,7 +663,13 @@ window.APP = window.APP || {};
         claimCount: Math.floor(between(rnd, 0, 5, 0)),
         badReturnCount: Math.floor(between(rnd, 0, 4, 0))
       };
-    }).filter(function (r) { return filter ? filter(r) : true; });
+    }).filter(function (r) { return filter ? filter(r) : true; }).map(function (r) {
+      /* 资源履约质量表用：支付金额 / 履约率 / 评价得分（原先列定义有这三列，行上没有字段） */
+      r.payAmt = round(r.perfAmt * (0.78 + (r.winCount % 5) * 0.04), 1);
+      r.perfRate = r.contractAmt ? D.round(Math.min(100, r.perfAmt / r.contractAmt * 100), 2) : 0;
+      r.score = r.credit != null ? r.credit : 80;
+      return r;
+    });
   };
 
   /* --- 分供商数据报表 · 资源数据明细（按项目汇总，列集对齐 Axure「资源数据明细」） --- */
