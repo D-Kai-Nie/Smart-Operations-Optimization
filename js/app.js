@@ -24,7 +24,7 @@
     ] },
     { key: 'supplier', name: '分供商管理', desc: '分供商管理看板 / 分供商数据报表', children: [
       { key: 'supplier-board', name: '分供商管理看板', page: 'supplier-board', desc: '看板内容待补充' },
-      { key: 'report-supplier', name: '分供商数据报表', page: 'report', params: { ds: 'supplier' }, desc: '资源 / 提诉 / 评价 / 黑名单' }
+      { key: 'report-supplier', name: '分供商数据报表', page: 'report', params: { ds: 'supplier' }, desc: '资源明细 / 合作分析' }
     ] },
     { key: 'asset', name: '资产管理', desc: '资产管理看板 / 资产数据报表', children: [
       { key: 'asset-board', name: '资产管理看板', page: 'asset-board', desc: '核心数据·资产 / 周转率与闲置率' },

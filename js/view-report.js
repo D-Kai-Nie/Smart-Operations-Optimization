@@ -23,7 +23,6 @@
     pageKey: '',           // 「数据集+页签」标识：只有换页签/换报表才把页码复位到 1
     condText: '',          // 就地展示的条件摘要（看板同款反馈）
     supTab: 'resource',
-    complaintView: 'targetOrg',
     sortKey: '', sortDir: 'asc'
   };
   D.reportState = RS;
@@ -31,7 +30,7 @@
   const DS = {
     material: { name: '物资数据报表', note: '局级总览：物资 6 项核心指标（二级单位，可逐级下钻到三级/项目）　·　明细：物资结算明细全量表（45+ 字段）' },
     purchase: { name: '采购数据报表', note: '总览：采购指标汇总（二级单位，含局合计，可逐级下钻到三级/项目）　·　明细：合同全量清单（70+ 字段）' },
-    supplier: { name: '分供商数据报表', note: '资源明细 / 合作分析 / 提诉报表 / 反向评价 / 集团黑名单' },
+    supplier: { name: '分供商数据报表', note: '资源明细 / 合作分析' },
     asset: { name: '资产数据报表', note: '资产明细全量表（30+ 字段）· 支持筛选、列设置与导出' }
   };
 
@@ -444,51 +443,23 @@
     const supCommon = [
       { name: 'org2', label: '二级单位', type: 'select', options: supOrgs },
       { name: 'org3', label: '三级单位', type: 'select', options: supSubs },
-      { name: 'project', label: '项目名称', type: 'text', ph: '请输入' }
+      { name: 'project', label: '项目', type: 'text', ph: '请输入' }
     ];
     if (RS.supTab === 'resource') {
-      /* Axure 页级筛选：本级库 / 项目 / 日期选择 / 物料分类 */
-      return [
-        { name: 'date', label: '日期选择', type: 'daterange', value: D.defaultRange,
-          grain: ['日', '月', '季', '年'], grainValue: RS.supGrain },
-        { name: 'level', label: '本级库', type: 'select', options: ['全局', '二级单位本级库', '三级单位本级库'] },
-        { name: 'project', label: '项目', type: 'text', ph: '请输入' },
-        { name: 'matSmall', label: '物料分类', type: 'tree', options: [
-          { label: '钢材', children: D.material.small.slice(0, 24).map(function (x) { return { value: x, label: x }; }) },
-          { label: '其他材料', children: D.material.small.slice(24).map(function (x) { return { value: x, label: x }; }) }] }
-      ];
+      /* 资源明细是项目级汇总，查询条件只保留列表里真实存在的组织字段 */
+      return supCommon;
     }
     if (RS.supTab === 'cooperation') {
       return supCommon.concat([
+        { name: 'name', label: '分供商名称', type: 'text', ph: '请输入' },
         { name: 'format', label: '项目业态', type: 'multi', options: D.FORMATS },
-        { name: 'supplier', label: '分供商', type: 'text', ph: '请输入' },
         { name: 'grade', label: '局评价等级', type: 'multi', options: D.supplierGrades },
         { name: 'bidCode', label: '招标编号', type: 'text', ph: '请输入' },
-        { name: 'contractCode', label: '合同编号', type: 'text', ph: '请输入' },
-        { name: 'bidDate', label: '招标日期', type: 'daterange' }
+        { name: 'contractCode', label: '合同编号', type: 'text', ph: '请输入' }
       ]);
     }
-    if (RS.supTab === 'complaint') {
-      const isOrg = RS.complaintView === 'targetOrg' || RS.complaintView === 'targetManager';
-      return supCommon.concat([
-        { name: isOrg ? 'unit' : 'supplier', label: COMPLAINT_VIEWS.filter(function (v) { return v[0] === RS.complaintView; })[0][1],
-          type: 'text', ph: '请输入' },
-        { name: 'date', label: '提诉日期', type: 'daterange', value: D.defaultRange }
-      ]);
-    }
-    if (RS.supTab === 'review') {
-      return supCommon.concat([
-        { name: 'format', label: '项目业态', type: 'multi', options: D.FORMATS },
-        { name: 'grade', label: '局评价等级', type: 'multi', options: D.supplierGrades },
-        { name: 'item', label: '评价项', type: 'select', options: D.REVIEW_ITEMS.map(function (x) { return x[0]; }) }
-      ]);
-    }
-    /* black */
-    return [
-      { name: 'supplier', label: '分供商', type: 'text', ph: '请输入' },
-      { name: 'org', label: '组织', type: 'select', options: ['集团', '局'].concat(supOrgs) },
-      { name: 'date', label: '列入日期', type: 'daterange', value: D.defaultRange }
-    ];
+    /* 资源数据明细的兜底条件（正常情况下 supTab 已归一为 resource / cooperation） */
+    return supCommon;
   }
 
   /* ---------- F5 总览：采购指标口径 ---------- */
@@ -703,15 +674,9 @@
     return v.length ? D.round(v.reduce(function (a, r) { return a + r[key]; }, 0) / v.length, 1) : null;
   }
 
-  /* ---------- F6 分供商 5 页签 ---------- */
+  /* ---------- F6 分供商 2 页签 ---------- */
   const SUP_TABS = [
-    ['resource', '资源数据明细'], ['cooperation', '分供商合作分析'],
-    ['complaint', '分供商提诉报表'], ['review', '分供商反向评价'],
-    ['black', '集团分供商黑名单']
-  ];
-  const COMPLAINT_VIEWS = [
-    ['targetOrg', '单位名称'], ['targetManager', '单位名称-项目经理'],
-    ['supplier', '提诉分供商'], ['supplierPerson', '提诉人']
+    ['resource', '资源数据明细'], ['cooperation', '分供商合作分析']
   ];
   /* 资源数据明细：项目级资源指标（列集对齐 Axure「资源数据明细」14 个数量列 + 3 个额度列） */
   function resCol(k, n, w, o) { return Object.assign({ key: k, name: n, width: w, num: true }, o || {}); }
@@ -726,47 +691,6 @@
     resCol('perfCnt', '履约分供商数量', 140), resCol('alt', '备选分供商数量', 140),
     resCol('perf', '分供商履约额(万元)', 160), resCol('perfQuality', '优质分供商履约额(万元)', 200),
     resCol('avgPerf', '平均履约额(万元)', 160)
-  ];
-
-  /* 分供商提诉报表：4 个视角 → 两套列集（单位口径 / 分供商口径） */
-  function complaintCols(view) {
-    const orgView = view === 'targetOrg' || view === 'targetManager';
-    const label = COMPLAINT_VIEWS.filter(function (v) { return v[0] === view; })[0][1];
-    const N = function (k, n, w) { return { key: k, name: n, width: w, num: true }; };
-    /* pct:true → 合计行按均值（占比类不可累加） */
-    const P = function (k, n, w) { return { key: k, name: n, width: w, num: true, pct: true }; };
-    const base = [
-      { key: 'idx', name: '序号', width: 56, sticky: true },
-      { key: 'name', name: label, width: 240, sticky2: true },
-      N('total', '提诉总数', 110), N('overdue', '逾期数', 100)
-    ];
-    if (orgView) {
-      return base.concat([
-        P('overduePct', '逾期占比(%)', 120), N('open', '未完结数量', 120),
-        P('openPct', '未完结比例(%)', 130), N('openHours', '未完结平均时耗(h)', 160),
-        N('done', '已完结数量', 120), P('donePct', '已完结比率(%)', 130),
-        N('doneHours', '已完结平均时耗(h)', 160),
-        N('contractAmt', '涉及合同金额(元)', 170), N('disputeAmt', '涉及争议金额(元)', 170)
-      ]);
-    }
-    return base.concat([
-      N('open', '未完结数量', 120), N('pending', '待受理数量', 120), N('handling', '处理中数量', 120),
-      N('withdrawn', '已撤回数量', 120), N('waitConfirm', '待分供商确认数量', 160),
-      N('done', '已完结数量', 120), N('appeal', '申诉次数', 110), N('urge', '督办次数', 110),
-      N('contractAmt', '合同总金额(元)', 160), N('disputeAmt', '争议总金额(元)', 160)
-    ]);
-  }
-
-  /* 分供商反向评价列集（Axure 列表字段选择-分供商口径） */
-  const REVIEW_COLS = [
-    { key: 'idx', name: '序号', width: 56, sticky: true },
-    { key: 'org2', name: '二级单位', width: 110, sticky2: true },
-    { key: 'org3', name: '三级单位', width: 130 },
-    { key: 'project', name: '项目', width: 280 },
-    { key: 'item', name: '评价项', width: 320 },
-    { key: 'score', name: '评价得分', width: 100, num: true },
-    { key: 'meaning', name: '得分释义', width: 200 },
-    { key: 'supCount', name: '供应商数量', width: 120, num: true }
   ];
 
   function supplierBody() {
@@ -785,74 +709,6 @@
           maxHeight: 520, totalRow: D.totalOf(RES_COLS, sorted), sortKey: RS.sortKey, sortDir: RS.sortDir,
           foot: D.pager({ page: RS.page, size: size, total: total }) }) + '</div>';
     }
-    if (RS.supTab === 'black') {
-      const rows = D.genBlacklistRows();
-      return '<div class="dsc-note dsc-note--info u-mb-md">集团分供商黑名单仅展示状态 = 冻结名单，只读不可编辑。</div>' +
-        '<div class="dsc-card"><div class="dsc-card__header"><div class="dsc-card__title">集团分供商黑名单</div>' +
-        '<div class="dsc-card__extra">共 ' + rows.length + ' 家</div></div>' +
-        D.table({
-          cols: [
-            { key: 'idx', name: '序号', width: 56, sticky: true },
-            { key: 'creditNo', name: '社会统一信用代码/邓氏码', width: 260, sticky2: true },
-            { key: 'name', name: '分供商名称', width: 280 },
-            { key: 'status', name: '状态', width: 100, render: function (v) {
-              return '<span class="dsc-badge dsc-badge--over">' + esc(v) + '</span>';
-            } },
-            { key: 'reason', name: '列入原因', width: 140 },
-            { key: 'date', name: '列入时间', width: 120 }
-          ], rows: rows.map(function (r, i) { return Object.assign({ idx: i + 1 }, r); }), maxHeight: 420
-        }) + '</div>';
-    }
-    if (RS.supTab === 'complaint') {
-      const rows = D.genComplaintRows(RS.complaintView);
-      const keyName = COMPLAINT_VIEWS.filter(function (v) { return v[0] === RS.complaintView; })[0][1];
-      const sum = function (k) { return rows.reduce(function (a, r) { return a + (r[k] || 0); }, 0); };
-      const orgView = RS.complaintView === 'targetOrg' || RS.complaintView === 'targetManager';
-      const topBy = function (k, fmt) {
-        const r = rows.slice().sort(function (a, b) { return (b[k] || 0) - (a[k] || 0); })[0];
-        return r ? esc(r.name) + ' · ' + fmt(r[k]) : '—';
-      };
-      /* F1：KPI 条不再与表内合计行重复，改为「结论」——最多 / 最高 / 最长 / 最大 */
-      const cards = orgView
-        ? [['提诉最多单位', topBy('total', function (v) { return D.fmtInt(v) + ' 笔'; })],
-          ['逾期占比最高', topBy('overduePct', function (v) { return D.fmtNum(v, 2) + '%'; })],
-          ['未完结时耗最长', topBy('openHours', function (v) { return D.fmtInt(v) + ' h'; })],
-          ['涉及争议金额最大', topBy('disputeAmt', function (v) { return D.fmtNum(v / 1e8, 2) + ' 亿元'; })]]
-        : [['提诉最多分供商', topBy('total', function (v) { return D.fmtInt(v) + ' 笔'; })],
-          ['申诉次数最多', topBy('appeal', function (v) { return D.fmtInt(v) + ' 次'; })],
-          ['督办次数最多', topBy('urge', function (v) { return D.fmtInt(v) + ' 次'; })],
-          ['争议金额最大', topBy('disputeAmt', function (v) { return D.fmtNum(v / 1e8, 2) + ' 亿元'; })]];
-      return '<div class="dsc-grid dsc-grid--4 u-mb-lg">' +
-        cards.map(function (kv) {
-          return '<div class="dsc-kpi"><div class="dsc-kpi__name">' + esc(kv[0]) + '</div>' +
-            '<div class="dsc-kpi__value">' + kv[1] + '</div></div>';
-        }).join('') + '</div>' +
-        '<div class="dsc-card"><div class="dsc-card__header"><div class="dsc-card__title">分供商提诉报表</div>' +
-        /* F3：说明当前口径的差异（两套列集切换后表头整块变化，需要解释为什么） */
-        '<div class="dsc-card__extra">当前口径：' + esc(keyName) + '　·　' +
-        (orgView ? '按单位汇总，含逾期占比与未完结 / 已完结平均时耗'
-          : '按分供商汇总，含待受理 / 处理中 / 已撤回 / 待确认与申诉、督办次数') +
-        D.colGear('data-rp-cols="sup-complaint-' + RS.complaintView + '"', '设置列：提诉报表的显示字段') + '</div></div>' +
-        (function () {
-          const base = complaintCols(RS.complaintView);
-          const ck = 'sup-complaint-' + RS.complaintView;
-          const ccols = D.colsOf(ck, base, base.map(function (c) { return c.key; }));
-          return D.table({
-            cols: sortableCols(ccols), rows: sortRows(rows, base).map(function (r, i) { return Object.assign({ idx: i + 1 }, r); }),
-            maxHeight: 440, totalRow: D.totalOf(base, rows), sortKey: RS.sortKey, sortDir: RS.sortDir
-          });
-        })() + '</div>';
-    }
-    if (RS.supTab === 'review') {
-      const rows = D.genReviewRows(20);
-      const rvCols = D.colsOf('sup-review', REVIEW_COLS, REVIEW_COLS.map(function (c) { return c.key; }));
-      return '<div class="dsc-card"><div class="dsc-card__header"><div class="dsc-card__title">分供商反向评价</div>' +
-        '<div class="dsc-card__extra">按「项目 × 评价项」逐条列出，得分 10 / 0 对应得分释义' +
-        D.colGear('data-rp-cols="sup-review"', '设置列：反向评价的显示字段') + '</div></div>' +
-        D.table({
-          cols: rvCols, rows: rows.map(function (r, i) { return Object.assign({ idx: i + 1 }, r); }), maxHeight: 460
-        }) + '</div>';
-    }
     /* cooperation 走通用宽表（默认列对齐 Axure「分供商合作分析」） */
     const ds = 'supplier';
     const all = applyConds(rowsOf(ds), RS.conds).filter(function (r) { return D.scope.canSeeRow(r); });
@@ -863,7 +719,7 @@
     const cols = sortableCols(colsOf(ds));
     return '<div class="dsc-card"><div class="dsc-card__header">' +
       '<div class="dsc-card__title">分供商合作分析</div>' +
-      '<div class="dsc-card__extra">共 ' + total + ' 条　·　' + esc(DS.supplier.note) + '</div></div>' +
+      '<div class="dsc-card__extra">按分供商汇总 · 共 ' + total + ' 条</div></div>' +
       D.table({ cols: cols, rows: paged.map(function (r, i) { return Object.assign({ idx: (RS.page - 1) * size + i + 1 }, r); }),
         /* 合计按「全量结果集」算：此前用 paged（当前页），合计只有第 1 页那 10 行的和 */
         maxHeight: 520, totalRow: D.totalOf(cols, sorted), sortKey: RS.sortKey, sortDir: RS.sortDir,
@@ -878,6 +734,10 @@
     const meta = DS[q.ds] || DS.purchase;
     const view = q.view || RS.view || 'overview';   // 页签在页内切换，不全页刷新
     RS.view = view;
+    /* 提诉 / 反向评价 / 黑名单页签已移除：历史会话若停在旧页签，回落到资源数据明细 */
+    if (q.ds === 'supplier' && !SUP_TABS.some(function (t) { return t[0] === RS.supTab; })) {
+      RS.supTab = 'resource';
+    }
     /* A1：页码只在「换报表 / 换页签」时复位——此前每次渲染都 RS.page = 1，
        把分页器刚写入的页码覆盖掉，导致报表分页整页失效 */
     const cfgable = q.ds === 'supplier' ? RS.supTab === 'cooperation'
@@ -924,7 +784,7 @@
       '  <div class="dsc-page__title">' + esc(meta.name) + '</div>' +
       '  <div class="dsc-page__sub">' + esc(meta.note) + '</div>' +
       '  <div class="dsc-page__actions report-page__action-bar">' +
-      /* A4：汇总 / 固定口径页签（局级总览、资源数据明细、提诉、反向评价、黑名单）的列不可增删，
+      /* A4：汇总 / 固定口径页签（局级总览、资源数据明细）的列不可增删，
          此前仍显示「列设置」且弹出的是另一个页签的字段——改成明示口径，不再给假入口 */
       '    <button class="dsc-btn" data-rp-export>导出</button>' +
       '  </div>' +
@@ -939,11 +799,6 @@
         return '<div class="dsc-tabs__item' + (RS.supTab === t[0] ? ' dsc-tabs__item--active' : '') +
           '" data-st="' + t[0] + '">' + esc(t[1]) + '</div>';
       }).join('') + '</div>' : '') +
-      (q.ds === 'supplier' && RS.supTab === 'complaint' ? '<div class="dsc-tabs dsc-tabs--pill" data-rp-cview>' +
-        COMPLAINT_VIEWS.map(function (v) {
-          return '<div class="dsc-tabs__item' + (RS.complaintView === v[0] ? ' dsc-tabs__item--active' : '') +
-            '" data-cv="' + v[0] + '">' + esc(v[1]) + '</div>';
-        }).join('') + '</div>' : '') +
       /* 组织下钻路径只属于采购 / 物资「局级总览」——资产报表是逐行明细，用筛选条里的实施单位定位 */
       ((q.ds === 'purchase' || q.ds === 'material') && view !== 'detail' ? drillPath(q.ds) : '') +
       D.filterBar({ id: 'rpFilter', cls: 'report-page__filter-bar', fields: withConds(filterFields(dsKey, view)),
@@ -1047,9 +902,12 @@
         return;
       }
       const st = t.closest('[data-st]');
-      if (st) { RS.supTab = st.getAttribute('data-st'); RS.page = 1; D.render(); return; }
-      const cv = t.closest('[data-cv]');
-      if (cv) { RS.complaintView = cv.getAttribute('data-cv'); D.render(); return; }
+      if (st) {
+        const next = st.getAttribute('data-st');
+        /* 各页签的列表字段不同：切页签时清掉上一个页签的条件，避免不可见的条件继续生效 */
+        if (next !== RS.supTab) { RS.conds = {}; RS.condText = ''; RS.sortKey = ''; }
+        RS.supTab = next; RS.page = 1; D.render(); return;
+      }
 
       /* AC25 总览逐级下钻 + 返回上一级 */
       const ov = t.closest('[data-overview]');
@@ -1104,11 +962,6 @@
             def: all.map(function (c) { return c.key; }), after: D.render });
         } else if (ck === 'sup-resource') {
           D.openColPicker({ key: ck, title: '资源数据明细', all: RES_COLS, def: RES_COLS.map(function (c) { return c.key; }), after: D.render });
-        } else if (ck.indexOf('sup-complaint-') === 0) {
-          const base = complaintCols(RS.complaintView);
-          D.openColPicker({ key: ck, title: '分供商提诉报表', all: base, def: base.map(function (c) { return c.key; }), after: D.render });
-        } else if (ck === 'sup-review') {
-          D.openColPicker({ key: ck, title: '分供商反向评价', all: REVIEW_COLS, def: REVIEW_COLS.map(function (c) { return c.key; }), after: D.render });
         }
         return;
       }

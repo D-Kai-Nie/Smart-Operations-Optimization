@@ -1932,12 +1932,12 @@
           { name: '分供商履约金额', color: '#2468F2' }, { name: '分供商履约数量', color: '#7FC4F5' }
         ]) + '</div></div>') +
 
-      /* 相关报表：纯图表页需要一个下钻出口（提诉 / 反向评价的明细在分供商数据报表里） */
+      /* 相关报表：纯图表页需要一个下钻出口（资源 / 合作明细在分供商数据报表里） */
       '<div class="dsc-card"><div class="dsc-card__body dsc-relbar">' +
       '<span class="dsc-relbar__label">相关报表</span>' +
       '<button class="dsc-btn" data-sb-go2="report" data-sb-ds="supplier">分供商数据报表</button>' +
       '<button class="dsc-btn" data-sb-go2="compliance">供应商合规分析</button>' +
-      '<span class="dsc-relbar__hint">本页为概览型看板；提诉与反向评价明细见「分供商数据报表」</span>' +
+      '<span class="dsc-relbar__hint">本页为概览型看板；分供商资源与合作明细见「分供商数据报表」</span>' +
       '</div></div>' +
       '</div>';
   }
@@ -1949,7 +1949,7 @@
 
   D.pages['supplier-board'] = function () {
     return '<div class="dsc-page cockpit-page">' +
-      pageHead('分供商管理看板', '核心数据 · 资源：分供商规模 / 使用 / 履约（提诉与反向评价见数据报表）') +
+      pageHead('分供商管理看板', '核心数据 · 资源：分供商规模 / 使用 / 履约') +
       scopeNote() + supplierBoardView() + '</div>';
   };
 
