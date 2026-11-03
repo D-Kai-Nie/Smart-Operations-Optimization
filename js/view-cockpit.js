@@ -1798,27 +1798,27 @@
   };
 
   /* ============================================================
-     分供商管理 › 分供商管理看板
+     资源管理 › 资源管理看板
      内容基准：`分供商管理看板.png`（源页面「核心数据 · 资源」）
      版式：沿用已评审优化的 ck-* 语言（指标卡带 → 筛选 → 区块 + 图表）
      ============================================================ */
   /* go = 点击卡片跳到的区块序号（页内 .ck-sec 的下标）；desc/src 供口径气泡使用 */
   const SB_IND = [
-    { name: '在库分供商数量', value: '61,854', unit: '家', trend: 12.5, good: true, last: '55,003', go: 0,
+    { name: '在库分供商数量', value: '61,854', unit: '家', last: '55,003', go: 0,
       desc: '截至统计时点在库状态的分供商数量', src: '采购管理系统分供商模块' },
-    { name: '分供商履约额', value: '489.22', unit: '亿元', trend: 7.2, good: true, last: '456.31', go: 4,
+    { name: '分供商履约额', value: '489.22', unit: '亿元', last: '456.31', go: 4,
       desc: '统计期内分供商承接合同的结算金额合计', src: '物资系统 + 采购管理系统' },
-    { name: '履约分供商数量', value: '20,645', unit: '家', trend: 12.0, good: true, last: '18,436', go: 4,
+    { name: '履约分供商数量', value: '20,645', unit: '家', last: '18,436', go: 4,
       desc: '统计期内有实际履约记录的分供商数量', src: '物资系统' },
-    { name: '不良行为分供商数量', value: '658', unit: '家', trend: -19.0, good: true, last: '812', extra: '占比 1.06%', go: 0,
+    { name: '不良行为分供商数量', value: '658', unit: '家', last: '812', extra: '占比 1.06%', go: 0,
       desc: '存在不良行为记录的分供商数量；占比 = 不良行为分供商数量 ÷ 在库分供商数量（658 ÷ 61,854）；不良行为的判定标准待确认（Q-09）', src: '采购管理系统分供商模块' },
-    { name: '活跃分供商', value: '31,855', unit: '家', trend: -16.6, good: false, last: '38,912', go: 0,
+    { name: '活跃分供商', value: '31,855', unit: '家', last: '38,912', go: 0,
       desc: '近 12 个月内有投标、报价或履约记录的分供商数量', src: '招采系统' },
-    { name: '优质分供商履约额', value: '354.57', unit: '亿元', trend: 18.6, good: true, last: '265.32', extra: '占比 72.48%', go: 4,
+    { name: '优质分供商履约额', value: '354.57', unit: '亿元', last: '265.32', extra: '占比 72.48%', go: 4,
       desc: '评价为优质的分供商所承接合同的结算金额，占比 = 优质履约额 ÷ 分供商履约额', src: '物资系统 + 采购管理系统' },
-    { name: '优质分供商数量', value: '25,793', unit: '家', trend: -18.1, good: false, last: '31,493', extra: '占比 41.70%', go: 0,
+    { name: '优质分供商数量', value: '25,793', unit: '家', last: '31,493', extra: '占比 41.70%', go: 0,
       desc: '评价等级为优质的分供商数量，占比 = 优质数量 ÷ 在库分供商数量', src: '采购管理系统分供商模块' },
-    { name: '清退分供商数量', value: '7,391', unit: '家', trend: 17.0, good: false, last: '6,315', extra: '占比 10.67%', go: 2,
+    { name: '清退分供商数量', value: '7,391', unit: '家', last: '6,315', extra: '占比 10.67%', go: 2,
       desc: '当前自然年内出库的分供商数量；占比 = 清退分供商数量 ÷（在库 + 清退）＝ 7,391 ÷ 69,245', src: '采购管理系统分供商模块' }
   ];
 
@@ -1866,12 +1866,9 @@
   function sbKpiCards() {
     return '<div class="ck-metrics ck-metrics--4">' + SB_IND.map(function (k, ki) {
       k.key = 'k' + ki;
-      const good = k.good;
       return '<div class="ck-metriccard ck-metriccard--kpi" data-sb-ind="' + k.key + '" ' +
         'data-sb-go="' + k.go + '" title="点击查看相关区块">' +
-        '<div class="ck-kpi__head"><span class="ck-kpi__name">' + esc(k.name) + '</span>' +
-        '<span class="ck-kpi__trend ck-kpi__trend--' + (good ? 'good' : 'bad') + '">' +
-        (k.trend > 0 ? '↑' : '↓') + Math.abs(k.trend).toFixed(1) + '%</span></div>' +
+        '<div class="ck-kpi__head"><span class="ck-kpi__name">' + esc(k.name) + '</span></div>' +
         '<div class="ck-metriccard__value">' + esc(k.value) + '<span>' + esc(k.unit) + '</span></div>' +
         '<div class="ck-kpi__sub">上年度 ' + esc(k.last) + ' ' + esc(k.unit) +
         (k.extra ? '　·　' + esc(k.extra) : '') + '</div></div>';
@@ -1932,12 +1929,12 @@
           { name: '分供商履约金额', color: '#2468F2' }, { name: '分供商履约数量', color: '#7FC4F5' }
         ]) + '</div></div>') +
 
-      /* 相关报表：纯图表页需要一个下钻出口（资源 / 合作明细在分供商数据报表里） */
+      /* 相关报表：纯图表页需要一个下钻出口（资源 / 合作明细在资源数据报表里） */
       '<div class="dsc-card"><div class="dsc-card__body dsc-relbar">' +
       '<span class="dsc-relbar__label">相关报表</span>' +
-      '<button class="dsc-btn" data-sb-go2="report" data-sb-ds="supplier">分供商数据报表</button>' +
+      '<button class="dsc-btn" data-sb-go2="report" data-sb-ds="supplier">资源数据报表</button>' +
       '<button class="dsc-btn" data-sb-go2="compliance">供应商合规分析</button>' +
-      '<span class="dsc-relbar__hint">本页为概览型看板；分供商资源与合作明细见「分供商数据报表」</span>' +
+      '<span class="dsc-relbar__hint">本页为概览型看板；分供商资源与合作明细见「资源数据报表」</span>' +
       '</div></div>' +
       '</div>';
   }
@@ -1949,7 +1946,7 @@
 
   D.pages['supplier-board'] = function () {
     return '<div class="dsc-page cockpit-page">' +
-      pageHead('分供商管理看板', '核心数据 · 资源：分供商规模 / 使用 / 履约') +
+      pageHead('资源管理看板', '核心数据 · 资源：分供商规模 / 使用 / 履约') +
       scopeNote() + supplierBoardView() + '</div>';
   };
 
@@ -2423,7 +2420,7 @@
     }
   }
 
-  /* ---------- 分供商管理看板 ---------- */
+  /* ---------- 资源管理看板 ---------- */
   function supplierBoardAfter(root) {
     bindMetricTips(root, SB_IND, 'data-sb-ind');
     function el(id) { return root.querySelector('#' + id); }

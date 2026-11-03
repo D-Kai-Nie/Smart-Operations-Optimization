@@ -13,7 +13,7 @@
     { key: 'screen', name: '数据大屏', page: 'screen', desc: '对外展示 / 门户' },
     { key: 'cockpit', name: '局驾驶舱', page: 'cockpit', desc: '局级全景分析' },
     { key: 'project', name: '项目驾驶舱', page: 'project', desc: '项目级业务全过程' },
-    /* 采购 / 物资 / 分供商：一级父级菜单，下挂各自的「管理看板」与原数据报表 */
+    /* 采购 / 物资 / 资源：一级父级菜单，下挂各自的「管理看板」与原数据报表 */
     { key: 'purchase', name: '采购管理', desc: '采购管理看板 / 采购数据报表', children: [
       { key: 'purchase-board', name: '采购管理看板', page: 'purchase-board', desc: '指标总览-采购 / 二级单位明细' },
       { key: 'report-purchase', name: '采购数据报表', page: 'report', params: { ds: 'purchase' }, desc: '局级总览 + 合同明细 70+ 字段' }
@@ -22,9 +22,9 @@
       { key: 'material-board', name: '物资管理看板', page: 'material-board', desc: '看板内容待补充' },
       { key: 'report-material', name: '物资数据报表', page: 'report', params: { ds: 'material' }, desc: '物资结算明细 45+ 字段' }
     ] },
-    { key: 'supplier', name: '分供商管理', desc: '分供商管理看板 / 分供商数据报表', children: [
-      { key: 'supplier-board', name: '分供商管理看板', page: 'supplier-board', desc: '看板内容待补充' },
-      { key: 'report-supplier', name: '分供商数据报表', page: 'report', params: { ds: 'supplier' }, desc: '资源明细 / 合作分析' }
+    { key: 'supplier', name: '资源管理', desc: '资源管理看板 / 资源数据报表', children: [
+      { key: 'supplier-board', name: '资源管理看板', page: 'supplier-board', desc: '看板内容待补充' },
+      { key: 'report-supplier', name: '资源数据报表', page: 'report', params: { ds: 'supplier' }, desc: '资源明细 / 合作分析' }
     ] },
     { key: 'asset', name: '资产管理', desc: '资产管理看板 / 资产数据报表', children: [
       { key: 'asset-board', name: '资产管理看板', page: 'asset-board', desc: '核心数据·资产 / 周转率与闲置率' },
@@ -388,11 +388,11 @@
       screen: ['数据大屏'], cockpit: ['局级驾驶舱'], project: ['项目驾驶舱'],
       'material-board': ['物资管理', '物资管理看板'],
       'purchase-board': ['采购管理', '采购管理看板'],
-      'supplier-board': ['分供商管理', '分供商管理看板'],
+      'supplier-board': ['资源管理', '资源管理看板'],
       'asset-board': ['资产管理', '资产管理看板'],
       /* 面包屑父级与侧边栏分组一致（原先统一写「数据报表」，与「资产管理 › 资产数据报表」对不上） */
-      report: [{ purchase: '采购管理', material: '物资管理', supplier: '分供商管理', asset: '资产管理' }[ds] || '数据报表',
-        { purchase: '采购数据报表', material: '物资数据报表', supplier: '分供商数据报表', asset: '资产数据报表' }[ds] || '采购数据报表'],
+      report: [{ purchase: '采购管理', material: '物资管理', supplier: '资源管理', asset: '资产管理' }[ds] || '数据报表',
+        { purchase: '采购数据报表', material: '物资数据报表', supplier: '资源数据报表', asset: '资产数据报表' }[ds] || '采购数据报表'],
       compliance: ['合规分析看板']
     };
     D.crumb(crumbMap[pk] || ['局级驾驶舱']);

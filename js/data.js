@@ -672,7 +672,7 @@ window.APP = window.APP || {};
     });
   };
 
-  /* --- 分供商数据报表 · 资源数据明细（按项目汇总，列集对齐 Axure「资源数据明细」） --- */
+  /* --- 资源数据报表 · 资源数据明细（按项目汇总，列集对齐 Axure「资源数据明细」） --- */
   D.genResourceRows = function (n) {
     const list = D.projects.slice(0, n || 80);
     return list.map(function (p, i) {
@@ -680,7 +680,7 @@ window.APP = window.APP || {};
       const res = (o && o.res) || D.orgs[i % D.orgs.length].res;
       const k = 0.35 + (i * 7 % 45) / 100;         // 项目占本单位资源量的比例
       const q = function (v) { return Math.max(0, Math.round(v * k)); };
-      /* 金额列：res.perf / perfQuality 以亿元计（与分供商管理看板的履约额口径一致）→ 换算为万元 */
+      /* 金额列：res.perf / perfQuality 以亿元计（与资源管理看板的履约额口径一致）→ 换算为万元 */
       const perfCnt = q(res.perfCnt);
       const perf = round(res.perf * k * 1e4, 1);
       return {
