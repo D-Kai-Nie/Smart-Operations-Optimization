@@ -673,10 +673,11 @@ input.ck-field { display: inline-block; min-width: 190px; }
 /* 使用率数值：与子标题同一行、贴左栏右缘（标题已说明含义，只显示数值） */
 .dsc-split .ck-subhead__extra--rate {
   margin-left: auto; line-height: 22px;
-  display: inline-flex; align-items: center; height: 22px;   /* 高度不超过标题行，避免把标题行撑高导致两图错位 */
+  display: inline-flex; align-items: center; gap: 6px; height: 22px;   /* 高度不超过标题行，避免把标题行撑高导致两图错位 */
 }
+.ck-subhead__extra--rate .ck-subhead__rate-label { font-size: 12px; color: #8C93A0; font-weight: 400; }
 .ck-subhead__extra--rate b {
-  font-size: 20px; font-weight: 700; color: var(--data-blue);
+  font-size: 15px; font-weight: 700; color: var(--data-blue);
   font-variant-numeric: tabular-nums;
 }
 
@@ -715,3 +716,13 @@ input.ck-field { display: inline-block; min-width: 190px; }
   border-radius: 3px; font-size: 11px; font-weight: 600; color: #B26A00;
   background: #FFF4E5; border: 1px solid #FFD8A8; vertical-align: 1px;
 }
+/* 分供商履约情况：统计横向置顶 + 全宽双轴图 */
+.ck-perfhead { display: flex; align-items: flex-start; gap: var(--sp-xxl); flex-wrap: wrap; margin: 0 0 var(--sp-lg); }
+.ck-perfhead__item { display: flex; flex-direction: column; gap: 6px; }
+.ck-perfhead__label { font-size: 13px; color: #4A5568; }
+.ck-perfhead__inputwrap { display: inline-flex; align-items: center; gap: 6px; }
+.ck-perfhead__inputwrap .ck-field { width: 120px; height: 34px; }
+.ck-perfhead__unit { font-size: 13px; color: #4A5568; }
+.ck-perfhead__value { font-size: 28px; font-weight: 700; color: var(--data-blue); line-height: 1; font-variant-numeric: tabular-nums; }
+.ck-perfhead__value span { font-size: 13px; color: #4A5568; font-weight: 400; margin-left: 4px; }
+.ck-perfhead__note { margin-left: auto; padding-top: 22px; font-size: 12px; color: #8C93A0; }

@@ -1847,10 +1847,29 @@
     { name: '合作满五年', label: '合作满 5 年 1,999 家（27.05%）', value: 1999, color: '#17B98A' },
     { name: '合作未满五年', label: '合作未满 5 年 5,392 家（72.95%）', value: 5392, color: '#2468F2' }
   ];
-  const SB_YEARS = {                                       // 合作年限分析
+  /* 合作年限分析：默认局级四档合计；点击某一档下钻到二级单位。
+     颜色按「5年以上 → 1年以内」由深到浅；各二级单位分档值之和 = 该单位原合作年限总量。 */
+  const SB_YEARS = {
+    buckets: ['5年以上', '3-5年', '1-3年', '1年以内'],
+    colors: ['#0B5CAB', '#2E86D9', '#6FB5EE', '#B7DCF6'],
     cats: ['华中公司', '总承包公司', '发展建设分公司', '东北公司', '华北公司', '投资公司', '华南公司'],
-    data: [1984, 1500, 1783, 631, 984, 798, 783]
+    total: [1984, 1500, 1783, 631, 984, 798, 783],
+    shares: [0.38, 0.27, 0.21, 0.14]
   };
+  const SB_YEARS_DATA = SB_YEARS.buckets.map(function (_, bi) {
+    return SB_YEARS.cats.map(function (_, ui) {
+      const total = SB_YEARS.total[ui];
+      if (bi < SB_YEARS.buckets.length - 1) return Math.round(total * SB_YEARS.shares[bi]);
+      const used = SB_YEARS.shares.slice(0, -1).reduce(function (a, s) {
+        return a + Math.round(total * s);
+      }, 0);
+      return total - used;
+    });
+  });
+  const SB_YEARS_TOTAL = SB_YEARS.buckets.map(function (_, bi) {
+    return SB_YEARS_DATA[bi].reduce(function (a, v) { return a + v; }, 0);
+  });
+  const SBY = { bucket: null };   // null = 局级四档；0~3 = 下钻到对应合作年限档
   /* 分供商履约情况分析（双轴）：各二级单位当前自然年内结算金额（万元）与存在履约的分供商数量。
      金额与数量的单位均值都对齐全局 236.97 万元/家（489.22 亿元 ÷ 20,645 家），
      7 个单位合计占全局 46.83%，与「二级单位数量之和 ≤ 履约分供商总数」自洽 */
@@ -1859,6 +1878,29 @@
     amt: [467818, 379311, 372182, 300010, 295816, 244046, 231866],
     cnt: [1974, 1601, 1571, 1266, 1248, 1030, 978]
   };
+  /* 履约额阈值：默认 500 万元；数量按「500 万元 = 3,146 家」的尾部曲线示意，
+     以 20,645 家履约分供商数为上限。原型无逐家履约额明细，曲线仅用于联动演示。 */
+  const SBP = { threshold: 500 };
+  const SB_PERF_TAIL = { base: 3146, baseThreshold: 500, total: 20645, alpha: 0.6 };
+  function sbPerfCount(t) {
+    if (!(t > 0)) return SB_PERF_TAIL.total;
+    return Math.min(SB_PERF_TAIL.total,
+      Math.round(SB_PERF_TAIL.base * Math.pow(SB_PERF_TAIL.baseThreshold / t, SB_PERF_TAIL.alpha)));
+  }
+  function sbPerfHead() {
+    const t = SBP.threshold;
+    return '<div class="ck-perfhead">' +
+      '<div class="ck-perfhead__item">' +
+      '<span class="ck-perfhead__label">履约额阈值</span>' +
+      '<span class="ck-perfhead__inputwrap">' +
+      '<input class="ck-field" type="number" min="0" step="10" data-sb-perf-threshold value="' + t + '"/>' +
+      '<span class="ck-perfhead__unit">万元</span></span></div>' +
+      '<div class="ck-perfhead__item">' +
+      '<span class="ck-perfhead__label">履约额超出占比数量</span>' +
+      '<span class="ck-perfhead__value">' + D.fmtInt(sbPerfCount(t)) + '<span>家</span></span></div>' +
+      '<div class="ck-perfhead__note">统计期内履约额 ≥ ' + D.fmtInt(t) + ' 万元的分供商数量</div>' +
+      '</div>';
+  }
 
   function sbChart(id, h) {
     return '<div class="dsc-chart" id="' + id + '" style="height:' + (h || 240) + 'px"></div>';
@@ -1895,7 +1937,8 @@
         /* 使用率数值属于左图：与子标题同一行、靠右对齐（标题已说明含义，不再重复「分供商使用率」） */
         '<div>' +
         '<div class="ck-subhead"><span class="ck-subhead__title">分供商使用率分析</span>' +
-        '<span class="ck-subhead__extra ck-subhead__extra--rate"><b>' + SB_RATE.rate + '%</b></span></div>' +
+        '<span class="ck-subhead__extra ck-subhead__extra--rate">' +
+        '<span class="ck-subhead__rate-label">全局使用率</span><b>' + SB_RATE.rate + '%</b></span></div>' +
         sbChart('sbRate', 260) + '</div>' +
         '<div>' + subHead('分供商评价分析', '分供商评级') + sbChart('sbEval', 260) + '</div>' +
         '</div>') +
@@ -1903,31 +1946,27 @@
       /* 转化与流失 */
       '<div class="dsc-split dsc-split--2">' +
       section('新引进分供商转化与留存分析',
-        subHead('新引进后淘汰分供商数量占比', '新增入库 9,851 家') +
+        subHead('新引进分供商转化情况占比', '新增入库 9,851 家') +
         sbChart('sbConvert', 280) + sbLegend(SB_CONVERT)) +
       section('分供商流失情况分析',
         subHead('出库分供商中合作满 5 年分供商占比', '出库 7,391 家') +
         sbChart('sbLoss', 280) + sbLegend(SB_LOSS)) +
       '</div>' +
 
-      /* 合作年限分析（7 个单位名较长，保持整行，避免半栏里横轴标签互相压字） */
+      /* 合作年限分析：默认局级四档合计，点击柱子下钻到各二级单位 */
       section('分供商合作年限分析',
-        '<div class="ck-filter"><div class="ck-filter__row">' + field('合作年限', '') +
-        '</div>' +
-        '<div class="ck-filter__more" hidden>' + field('本级库', '') + field('物料分类', '') + '</div>' +
-        /* P0-4：更多条件必须能展开（此前是 hidden 且没有「展开」入口，两个字段永远不可达） */
-        actions({ attr: 'data-ck-adv', label: '展开' }) + '</div>' +
+        '<div class="ck-subhead"><span class="ck-subhead__title">' +
+        (SBY.bucket == null ? '局级合计 · 合作年限分布'
+          : esc(SB_YEARS.buckets[SBY.bucket]) + ' · 各二级单位') +
+        '</span><span class="ck-subhead__extra">' +
+        (SBY.bucket == null ? '点击柱子查看各二级单位'
+          : '<button class="dsc-btn dsc-btn--sm" data-sb-years-back>← 返回局级</button>') +
+        '</span></div>' +
         sbChart('sbYears', 280)) +
       section('分供商履约情况分析',
-        '<div class="ck-sbsplit">' +
-        '<div class="ck-sbstat"><div class="ck-sbstat__label">履约额阈值（万元）</div>' +
-        /* P0-3：原输入框只聚焦不生效（死控件），改为明确的口径展示 + 说明 */
-        '<div class="ck-sbstat__fixed">≥ 500</div>' +
-        '<div class="ck-sbstat__big"><span>履约额超出占比数量</span><b>3,146</b> 家</div>' +
-        '<div class="ck-sbstat__note">统计期内履约额 ≥ 500 万元的分供商数量</div></div>' +
-        '<div class="ck-sbmain">' + sbChart('sbPerf', 300) + sbLegend([
+        sbPerfHead() + sbChart('sbPerf', 300) + sbLegend([
           { name: '分供商履约金额', color: '#2468F2' }, { name: '分供商履约数量', color: '#7FC4F5' }
-        ]) + '</div></div>') +
+        ])) +
 
       /* 相关报表：纯图表页需要一个下钻出口（资源 / 合作明细在资源数据报表里） */
       '<div class="dsc-card"><div class="dsc-card__body dsc-relbar">' +
@@ -2446,13 +2485,32 @@
     /* 转化与流失 */
     donut('sbConvert', SB_CONVERT, '9,851 家');
     donut('sbLoss', SB_LOSS, '7,391 家');
-    /* 合作年限 / 履约情况 */
-    bar('sbYears', SB_YEARS.cats, [{ name: '超合作年份供应商数量', data: SB_YEARS.data, color: SB_BLUE }],
-      { unit: '家', yDigits: 0, yUnit: '家' });
+    /* 合作年限：局级四档 → 点击下钻到二级单位 */
+    if (SBY.bucket == null) {
+      bar('sbYears', SB_YEARS.buckets, [{
+        name: '分供商数量', data: SB_YEARS_TOTAL, colors: SB_YEARS.colors
+      }], { unit: '家', yDigits: 0, yUnit: '家', onBarClick: function (i) {
+        SBY.bucket = i; D.render();
+      } });
+    } else {
+      bar('sbYears', SB_YEARS.cats, [{
+        name: '分供商数量', data: SB_YEARS_DATA[SBY.bucket], color: SB_YEARS.colors[SBY.bucket]
+      }], { unit: '家', yDigits: 0, yUnit: '家' });
+    }
     bar('sbPerf', SB_PERF.cats, [
       { name: '分供商履约金额', data: SB_PERF.amt, color: SB_BLUE, unit: '万元' },
       { name: '分供商履约数量', data: SB_PERF.cnt, color: '#7FC4F5', unit: '家', axis: 'right' }
     ], { height: 300, yDigits: 0, rDigits: 0, padL: 78, padR: 64, dataLabels: false, yUnit: '万元' });
+
+    /* 履约额阈值：失焦 / 回车后应用，重绘本区块与数量 */
+    const perfTh = root.querySelector('[data-sb-perf-threshold]');
+    if (perfTh) {
+      perfTh.addEventListener('change', function () {
+        const v = Math.round(parseFloat(perfTh.value));
+        SBP.threshold = isNaN(v) || v < 0 ? 0 : v;
+        D.render();
+      });
+    }
 
     D.delegate(root, [
       { sel: '[data-sb-go2]', fn: function (el2) {
@@ -2460,6 +2518,8 @@
         const ds = el2.getAttribute('data-sb-ds');
         D.nav(p2, ds ? { ds: ds } : {});
       } },
+      /* 合作年限下钻：返回局级四档 */
+      { sel: '[data-sb-years-back]', fn: function () { SBY.bucket = null; D.render(); } },
       /* 指标卡点击 → 滚到对应区块（原先卡片有手型光标但点了没反应） */
       { sel: '[data-sb-go]', fn: function (el2) {
         const secs = root.querySelectorAll('.ck-sec');

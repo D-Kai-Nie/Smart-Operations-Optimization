@@ -242,16 +242,17 @@ window.APP = window.APP || {};
             bwid = Math.max(1, bw - 3);
             hgt = pad.t + ih - y;
           }
-          let fill = se.color || PALETTE[si % PALETTE.length];
+          let fill = (se.colors && se.colors[i]) || se.color || PALETTE[si % PALETTE.length];
           if (se.color2) {
             const gid = 'bg' + i + '_' + si;
             s += '<defs><linearGradient id="' + gid + '" x1="0" y1="1" x2="0" y2="0">' +
               '<stop offset="0%" stop-color="' + fill + '"/><stop offset="100%" stop-color="' + se.color2 + '"/></linearGradient></defs>';
             fill = 'url(#' + gid + ')';
           }
+          const barAttr = opt.onBarClick ? ' data-bar-i="' + i + '"' : '';
           s += '<rect x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + bwid.toFixed(1) +
             '" height="' + Math.max(1, hgt).toFixed(1) + '" rx="2" fill="' + fill + '" opacity="' + (opt.barOpacity || 0.88) + '"' +
-            tip('<b>' + esc(c) + '</b><br/>' + esc(se.name) + '：' + fmt(v, opt.yDigits) + (se.unit != null ? se.unit : (opt.unit || ''))) + '/>';
+            barAttr + tip('<b>' + esc(c) + '</b><br/>' + esc(se.name) + '：' + fmt(v, opt.yDigits) + (se.unit != null ? se.unit : (opt.unit || ''))) + '/>';
           if (opt.dataLabels && !stack) {
             s += '<text x="' + (x + bwid / 2).toFixed(1) + '" y="' + (y - 5).toFixed(1) +
               '" text-anchor="middle" font-size="11" fill="' + (opt.labelColor || '#7FE7FF') + '">' +
@@ -286,6 +287,16 @@ window.APP = window.APP || {};
       });
       s += '</svg>';
       render(el, s);
+      if (opt.onBarClick) {
+        el.style.cursor = 'pointer';
+        el.onclick = function (e) {
+          const bar = e.target && e.target.closest ? e.target.closest('[data-bar-i]') : null;
+          if (bar) opt.onBarClick(+bar.getAttribute('data-bar-i'));
+        };
+      } else {
+        el.style.cursor = '';
+        el.onclick = null;
+      }
     });
   };
 
