@@ -1931,7 +1931,7 @@
       sbKpiCards() +
       sbFilter() +
 
-      /* 分供商使用情况分析（沿用顶部筛选条件，区块内不再重复同字段） */
+      /* 分供商使用情况分析：使用率 / 评价 + 转化 / 流失，共用同一个区块标题 */
       section('分供商使用情况分析',
         '<div class="dsc-split dsc-split--2">' +
         /* 使用率数值属于左图：与子标题同一行、靠右对齐（标题已说明含义，不再重复「分供商使用率」） */
@@ -1941,17 +1941,14 @@
         '<span class="ck-subhead__rate-label">全局使用率</span><b>' + SB_RATE.rate + '%</b></span></div>' +
         sbChart('sbRate', 260) + '</div>' +
         '<div>' + subHead('分供商评价分析', '分供商评级') + sbChart('sbEval', 260) + '</div>' +
+        '</div>' +
+        /* 第二排：转化 / 流失，图内保留各自图形名称 */
+        '<div class="dsc-split dsc-split--2 u-mt-lg">' +
+        '<div>' + subHead('新引进分供商转化情况占比', '新增入库 9,851 家') +
+        sbChart('sbConvert', 280) + sbLegend(SB_CONVERT) + '</div>' +
+        '<div>' + subHead('出库分供商中合作满 5 年分供商占比', '出库 7,391 家') +
+        sbChart('sbLoss', 280) + sbLegend(SB_LOSS) + '</div>' +
         '</div>') +
-
-      /* 转化与流失 */
-      '<div class="dsc-split dsc-split--2">' +
-      section('新引进分供商转化与留存分析',
-        subHead('新引进分供商转化情况占比', '新增入库 9,851 家') +
-        sbChart('sbConvert', 280) + sbLegend(SB_CONVERT)) +
-      section('分供商流失情况分析',
-        subHead('出库分供商中合作满 5 年分供商占比', '出库 7,391 家') +
-        sbChart('sbLoss', 280) + sbLegend(SB_LOSS)) +
-      '</div>' +
 
       /* 合作年限分析：默认局级四档合计，点击柱子下钻到各二级单位 */
       section('分供商合作年限分析',
