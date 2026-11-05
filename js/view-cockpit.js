@@ -1825,12 +1825,14 @@
   const SB_BAR = { height: 240, dataLabels: true, labelColor: '#4A5568', xColor: '#666' };
   const SB_BLUE = '#2468F2';
 
-  /* 分供商使用率分析（CSV：新增入库→活跃→中标→签约→履约，各级给「数量及转化率」；
+  /* 分供商使用率分析（CSV：新增入库→活跃→投标→中标→签约→履约，各级给「数量及转化率」；
+     活跃为包含投标 / 中标 / 签约 / 履约的活动集合，各阶段为嵌套口径；
+     投标数按活跃的 99% 估算，使「活跃→中标」整体转化率仍为 96.34%；
      转化率 = 本级 ÷ 上一级。使用率 = 履约分供商数量 ÷ 在库分供商数量 = 20,645 ÷ 61,854） */
   const SB_RATE = {
-    cats: ['新增入库', '活跃', '中标', '签约', '履约'],
-    data: [9851, 8119, 7822, 7240, 5839],
-    rates: [null, 82.42, 96.34, 92.56, 80.65], rate: '33.38'
+    cats: ['新增入库', '活跃', '投标', '中标', '签约', '履约'],
+    data: [9851, 8119, 8038, 7822, 7240, 5839],
+    rates: [null, 82.42, 99.00, 97.31, 92.56, 80.65], rate: '33.38'
   };
   const SB_EVAL = {                                        // 分供商评价分析（Axure：分供商评级）
     cats: ['优秀', '良好', '合格', '不合格'],
@@ -2473,9 +2475,8 @@
     /* 分供商使用情况 */
     bar('sbRate', SB_RATE.cats, [{ name: '分供商数量', data: SB_RATE.data, color: SB_BLUE }],
       { unit: '家', yDigits: 0, yUnit: '家', dataLabels: false,
-        categoryTopLabels: SB_RATE.data.map(function (v, i) {
-          return D.fmtInt(v) + '家' + (SB_RATE.rates[i] ? '(' + SB_RATE.rates[i].toFixed(2) + '%)' : '');
-        }) });
+        categoryTopLabels: SB_RATE.data.map(function (v) { return D.fmtInt(v) + '家'; }),
+        categorySubLabels: SB_RATE.rates.map(function (r) { return r ? r.toFixed(2) + '%' : ''; }) });
     bar('sbEval', SB_EVAL.cats, [{ name: '分供商数量', data: SB_EVAL.data, color: SB_BLUE }],
       { unit: '家', yDigits: 0, yUnit: '家', dataLabels: false,
         categoryTopLabels: SB_EVAL.data.map(function (v, i) { return D.fmtInt(v) + '家(' + SB_EVAL.pct[i].toFixed(2) + '%)'; }) });

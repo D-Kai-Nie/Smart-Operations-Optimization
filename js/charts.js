@@ -177,7 +177,8 @@ window.APP = window.APP || {};
       const w = Math.max(320, el.clientWidth || 600);
       const h = opt.height || 280;
       const rotate = opt.rotateX || 0;
-      const pad = { t: opt.padT || 22, r: opt.padR || 48, b: opt.padB || (rotate ? 92 : 38), l: opt.padL || 56 };
+      const hasSub = !!(opt.categorySubLabels && opt.categorySubLabels.length);
+      const pad = { t: opt.padT || 22, r: opt.padR || 48, b: opt.padB || (rotate ? 92 : hasSub ? 54 : 38), l: opt.padL || 56 };
       const iw = w - pad.l - pad.r, ih = h - pad.t - pad.b;
       const bars = data.series.filter(function (s) { return s.type !== 'line'; });
       const lines = data.series.filter(function (s) { return s.type === 'line'; });
@@ -272,8 +273,12 @@ window.APP = window.APP || {};
             (opt.xColor || '#666') + '" transform="rotate(-' + rotate + ' ' + cx.toFixed(1) + ' ' +
             (pad.t + ih + 12).toFixed(1) + ')">' + esc(String(c).slice(0, 14)) + '</text>';
         } else {
-          s += '<text x="' + cx.toFixed(1) + '" y="' + (h - 12) + '" text-anchor="middle" font-size="11" fill="' +
+          s += '<text x="' + cx.toFixed(1) + '" y="' + (hasSub ? h - 25 : h - 12) + '" text-anchor="middle" font-size="11" fill="' +
             (opt.xColor || '#666') + '">' + esc(String(c).slice(0, 7)) + '</text>';
+          if (hasSub && opt.categorySubLabels[i] != null) {
+            s += '<text x="' + cx.toFixed(1) + '" y="' + (h - 8) + '" text-anchor="middle" font-size="10" fill="#999">' +
+              esc(opt.categorySubLabels[i]) + '</text>';
+          }
         }
       });
       lines.forEach(function (se) {
