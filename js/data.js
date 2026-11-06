@@ -640,6 +640,8 @@ window.APP = window.APP || {};
       const p = pick(rnd, D.projects);
       const s = pick(rnd, D.suppliers);
       const winAmt = between(rnd, 120, 26000, 1);
+      const winCount = Math.floor(between(rnd, 1, 28, 0));
+      const contractCount = Math.floor(between(rnd, 1, 42, 0));
       return {
         org2: p.org, org3: p.subOrg, project: p.name, format: p.format,
         name: s.name, code: s.code,
@@ -647,10 +649,12 @@ window.APP = window.APP || {};
            30 行会全部落到「设计服务类」，导致分类筛选与履约分布图只有一根柱 */
         cat: D.supplierCats[i % D.supplierCats.length], grade: s.grade,
         bidCode: 'ZB-' + (20260000 + i * 11),
-        winCount: Math.floor(between(rnd, 1, 28, 0)), winAmt: winAmt,
-        contractCount: Math.floor(between(rnd, 1, 42, 0)), contractAmt: between(rnd, 120, 26000, 1),
+        bidCount: winCount + 2 + ((i * 5) % 13), winCount: winCount, winAmt: winAmt,
+        contractCount: contractCount, signCount: contractCount,
+        contractAmt: between(rnd, 120, 26000, 1),
         contractCode: 'HT-' + (20250000 + i * 13),
         settleCode: 'JS' + (20260000 + i * 19),
+        perfProjCount: 1,
         banCount: Math.floor(between(rnd, 0, 2, 0)), badCount: Math.floor(between(rnd, 0, 5, 0)),
         perfAmt: round(winAmt * between(rnd, 0.3, 1.05), 1),
         matMid: D.material.mid[i % D.material.mid.length],

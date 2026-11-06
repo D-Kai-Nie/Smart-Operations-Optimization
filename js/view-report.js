@@ -144,14 +144,13 @@
     supplier: [
       C('idx', '序号', 56, { sticky: true }),
       C('name', '分供商名称', 230, { sticky2: true, link: true }),
-      C('org2', '二级单位', 110), C('org3', '三级单位', 120), C('project', '项目', 220),
-      C('format', '项目业态', 110),
+      C('org2', '二级单位', 110), C('org3', '三级单位', 120),
+      C('perfProjCount', '履约合作项目数', 140, { num: true }),
+      C('bidCount', '投标次数', 100, { num: true }),
       C('winCount', '中标次数', 100, { num: true }), C('winAmt', '中标金额(万元)', 140, { num: true }),
-      C('bidCode', '招标编号', 170, { link: true }),
-      C('contractCount', '合同签订个数', 130, { num: true }), C('contractAmt', '签订合同额(万元)', 150, { num: true }),
-      C('contractCode', '合同编号', 170, { link: true }),
+      C('signCount', '签约份数', 110, { num: true }),
+      C('contractAmt', '签订合同额(万元)', 150, { num: true }),
       C('perfAmt', '履约额(万元)', 130, { num: true }),
-      C('settleCode', '结算单编号', 170, { link: true }),
       C('grade', '局评价等级', 110),
       C('badCount', '不良行为次数', 130, { num: true }), C('banCount', '禁用次数', 100, { num: true }),
       C('code', '分供商编码', 110), C('cat', '分供商分类', 120),
@@ -171,9 +170,8 @@
     asset: ['idx', 'project', 'org2', 'org3', 'assetCode', 'assetAmt', 'assetCount', 'usingCount',
       'idleCount', 'repairCount', 'scrapCount', 'buyAmt', 'disposeAmt', 'depAmt',
       'category', 'acceptStatus'],
-    supplier: ['idx', 'name', 'org2', 'org3', 'project', 'format', 'winCount', 'winAmt', 'bidCode',
-      'contractCount', 'contractAmt', 'contractCode', 'perfAmt', 'settleCode', 'grade',
-      'badCount', 'banCount']
+    supplier: ['idx', 'name', 'org2', 'org3', 'perfProjCount', 'bidCount', 'winCount', 'winAmt',
+      'signCount', 'contractAmt', 'perfAmt', 'grade', 'badCount', 'banCount']
   };
   function shownOf(ds) {
     if (!RS.shown[ds]) RS.shown[ds] = DEFAULT_SHOWN[ds].slice();
@@ -442,20 +440,16 @@
     const supSubs = D.subOrgs.map(function (o) { return o.name; });
     const supCommon = [
       { name: 'org2', label: '二级单位', type: 'select', options: supOrgs },
-      { name: 'org3', label: '三级单位', type: 'select', options: supSubs },
-      { name: 'project', label: '项目', type: 'text', ph: '请输入' }
+      { name: 'org3', label: '三级单位', type: 'select', options: supSubs }
     ];
     if (RS.supTab === 'resource') {
-      /* 资源明细是项目级汇总，查询条件只保留列表里真实存在的组织字段 */
+      /* 资源明细已移除项目列，查询条件只保留列表里真实存在的组织字段 */
       return supCommon;
     }
     if (RS.supTab === 'cooperation') {
       return supCommon.concat([
         { name: 'name', label: '分供商名称', type: 'text', ph: '请输入' },
-        { name: 'format', label: '项目业态', type: 'multi', options: D.FORMATS },
-        { name: 'grade', label: '局评价等级', type: 'multi', options: D.supplierGrades },
-        { name: 'bidCode', label: '招标编号', type: 'text', ph: '请输入' },
-        { name: 'contractCode', label: '合同编号', type: 'text', ph: '请输入' }
+        { name: 'grade', label: '局评价等级', type: 'multi', options: D.supplierGrades }
       ]);
     }
     /* 资源数据明细的兜底条件（正常情况下 supTab 已归一为 resource / cooperation） */
@@ -678,12 +672,12 @@
   const SUP_TABS = [
     ['resource', '资源数据明细'], ['cooperation', '分供商合作分析']
   ];
-  /* 资源数据明细：项目级资源指标（列集对齐 Axure「资源数据明细」14 个数量列 + 3 个额度列） */
+  /* 资源数据明细：三级单位级资源指标（项目字段已移除；10 个数量列 + 3 个额度列） */
   function resCol(k, n, w, o) { return Object.assign({ key: k, name: n, width: w, num: true }, o || {}); }
   const RES_COLS = [
     { key: 'idx', name: '序号', width: 56, sticky: true },
     { key: 'org2', name: '二级单位', width: 110, sticky2: true },
-    { key: 'org3', name: '三级单位', width: 120 }, { key: 'project', name: '项目', width: 220 },
+    { key: 'org3', name: '三级单位', width: 120 },
     resCol('onStock', '在库分供商数量', 140), resCol('quality', '优质分供商数量', 140),
     resCol('quit', '清退分供商数量', 140), resCol('bad', '不良行为分供商数量', 160),
     resCol('newIn', '新增入库分供商数量', 160), resCol('active', '活跃分供商数量', 140),
@@ -693,25 +687,71 @@
     resCol('avgPerf', '平均履约额(万元)', 160)
   ];
 
+  /* 项目行 → 三级单位行：数量、金额求和；平均履约额按「履约额 ÷ 履约分供商数」重算 */
+  const RES_SUM_KEYS = ['onStock', 'quality', 'quit', 'bad', 'newIn', 'active', 'win', 'sign',
+    'perfCnt', 'alt', 'perf', 'perfQuality'];
+  function aggregateResourceRows(rows) {
+    const map = {};
+    rows.forEach(function (r) {
+      const key = r.org2 + '|' + r.org3;
+      const t = map[key] || (map[key] = { org2: r.org2, org3: r.org3 });
+      RES_SUM_KEYS.forEach(function (k) { t[k] = (t[k] || 0) + (r[k] || 0); });
+    });
+    return Object.keys(map).map(function (k) {
+      const r = map[k];
+      RES_SUM_KEYS.forEach(function (key) { r[key] = D.round(r[key], 1); });
+      r.avgPerf = r.perfCnt ? D.round(r.perf / r.perfCnt, 1) : 0;
+      return r;
+    });
+  }
+
+  /* 供应商-项目行 → 分供商 + 三级单位汇总：次数 / 金额求和，履约合作项目数按去重项目数 */
+  const COOP_SUM_KEYS = ['bidCount', 'winCount', 'winAmt', 'signCount', 'contractAmt',
+    'perfAmt', 'badCount', 'banCount'];
+  function aggregateSupplierRows(rows) {
+    const map = {};
+    rows.forEach(function (r) {
+      /* 按分供商名称汇总：组织列取该分供商首条合作记录所属单位 */
+      const key = r.name;
+      const t = map[key] || (map[key] = {
+        name: r.name, org2: r.org2, org3: r.org3, code: r.code, cat: r.cat,
+        grade: r.grade, matMid: r.matMid, credit: r.credit, __projects: {}
+      });
+      t.__projects[r.project] = 1;
+      COOP_SUM_KEYS.forEach(function (k) { t[k] = (t[k] || 0) + (r[k] || 0); });
+    });
+    return Object.keys(map).map(function (k) {
+      const r = map[k];
+      r.perfProjCount = Object.keys(r.__projects).length;
+      delete r.__projects;
+      COOP_SUM_KEYS.forEach(function (key) { r[key] = D.round(r[key], 1); });
+      return r;
+    });
+  }
+
   function supplierBody() {
     if (RS.supTab === 'resource') {
-      const all = applyConds(D.genResourceRows(80), RS.conds).filter(function (r) { return D.scope.canSeeRow(r); });
+      const all = aggregateResourceRows(applyConds(D.genResourceRows(80), RS.conds)
+        .filter(function (r) { return D.scope.canSeeRow(r); }));
       const total = all.length;
       const size = sizeOf('supplier');
       const sorted = sortRows(all, RES_COLS);
       const paged = sorted.slice((RS.page - 1) * size, (RS.page - 1) * size + size);
       const rcols = D.colsOf('sup-resource', RES_COLS, RES_COLS.map(function (c) { return c.key; }));
+      const rtotal = D.totalOf(RES_COLS, sorted);
+      rtotal.avgPerf = rtotal.perfCnt ? D.round(rtotal.perf / rtotal.perfCnt, 1) : 0;
       return '<div class="dsc-card"><div class="dsc-card__header">' +
         '<div class="dsc-card__title">资源数据明细</div>' +
-        '<div class="dsc-card__extra">按项目汇总 · 共 ' + total + ' 条　·　数值列可点表头排序' +
+        '<div class="dsc-card__extra">按三级单位汇总 · 共 ' + total + ' 条　·　数值列可点表头排序' +
         D.colGear('data-rp-cols="sup-resource"', '设置列：资源数据明细的显示字段') + '</div></div>' +
         D.table({ cols: sortableCols(rcols), rows: paged.map(function (r, i) { return Object.assign({ idx: (RS.page - 1) * size + i + 1 }, r); }),
-          maxHeight: 520, totalRow: D.totalOf(RES_COLS, sorted), sortKey: RS.sortKey, sortDir: RS.sortDir,
+          maxHeight: 520, totalRow: rtotal, sortKey: RS.sortKey, sortDir: RS.sortDir,
           foot: D.pager({ page: RS.page, size: size, total: total }) }) + '</div>';
     }
-    /* cooperation 走通用宽表（默认列对齐 Axure「分供商合作分析」） */
+    /* cooperation：按分供商汇总；项目字段已移除，改为履约合作项目数 */
     const ds = 'supplier';
-    const all = applyConds(rowsOf(ds), RS.conds).filter(function (r) { return D.scope.canSeeRow(r); });
+    const all = aggregateSupplierRows(applyConds(rowsOf(ds), RS.conds)
+      .filter(function (r) { return D.scope.canSeeRow(r); }));
     const total = all.length;
     const size = sizeOf(ds);
     const sorted = sortRows(all, colsOf(ds));
