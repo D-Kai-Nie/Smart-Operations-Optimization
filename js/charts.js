@@ -201,16 +201,21 @@ window.APP = window.APP || {};
         return [0, hi || 1];
       };
       const exL = stack ? stackExt() : ext(barsL), exR = ext(lines.concat(barsR));
-      const tL = axisTicks.call(null, Math.min(0, exL[0]), Math.max(0, exL[1]), 5);
+      /* yMax：压缩左轴，把柱子往下压；y2Max：收紧右轴，把折线往上飘，
+         两者共同保证折线在柱顶上方留出距离 */
+      const tL = axisTicks.call(null, 0, opt.yMax != null ? opt.yMax : Math.max(0, exL[1]), 5);
       const tR = (lines.length || barsR.length)
-        ? axisTicks.call(null, Math.min(0, exR[0]), Math.max(0, exR[1]), 5) : null;
+        ? axisTicks.call(null, 0, opt.y2Max != null ? opt.y2Max : Math.max(0, exR[1]), 5) : null;
       const lmin = tL[0], lmax = tL[tL.length - 1];
       const rmin = tR ? tR[0] : 0, rmax = tR ? tR[tR.length - 1] : 1;
       const YL = function (v) { return pad.t + ih - (v - lmin) / (lmax - lmin || 1) * ih; };
       const YR = function (v) { return pad.t + ih - (v - rmin) / (rmax - rmin || 1) * ih; };
       const band = iw / data.categories.length;
-      const gw = stack ? Math.min(band * 0.5, 46) : Math.min(band * 0.62, 46 * bars.length);
+      /* barWidthScale < 1 时收窄柱子（组）宽度，柱间距随留白自然变大 */
+      const barScale = opt.barWidthScale == null ? 1 : opt.barWidthScale;
+      const gw = (stack ? Math.min(band * 0.5, 46) : Math.min(band * 0.62, 46 * bars.length)) * barScale;
       const bw = bars.length ? gw / bars.length : 0;
+      const showLine = opt.lineLabels == null ? !!opt.dataLabels : opt.lineLabels;
       let s = svgOpen(w, h);
       tL.forEach(function (t) {
         s += '<line x1="' + pad.l + '" y1="' + YL(t).toFixed(1) + '" x2="' + (w - pad.r) + '" y2="' + YL(t).toFixed(1) + '" stroke="#EEEEEE"/>';
@@ -218,7 +223,8 @@ window.APP = window.APP || {};
       });
       if (tR) {
         tR.forEach(function (t) {
-          s += '<text x="' + (w - pad.r + 8) + '" y="' + (YR(t) + 4).toFixed(1) + '" font-size="11" fill="#F59A23">' +
+          s += '<text x="' + (w - pad.r + 8) + '" y="' + (YR(t) + 4).toFixed(1) + '" font-size="11" fill="' +
+            (opt.y2Color || '#F59A23') + '">' +
             esc(fmt(t, opt.rDigits == null ? 1 : opt.rDigits)) + esc(opt.y2Unit || '') + '</text>';
         });
       }
@@ -263,8 +269,20 @@ window.APP = window.APP || {};
         /* 柱顶合计标签（如堆叠柱的「984.88万元」） */
         if (opt.categoryTopLabels && opt.categoryTopLabels[i] != null) {
           const topV = stack ? acc : barsL.reduce(function (m, se) { return Math.max(m, se.data[i] || 0); }, lmin);
-          s += '<text x="' + cx.toFixed(1) + '" y="' + (YL(topV) - 6).toFixed(1) +
-            '" text-anchor="middle" font-size="11" fill="' + (opt.labelColor || '#7FE7FF') + '">' +
+          const topGap = opt.topLabelOffset == null ? 6 : opt.topLabelOffset;
+          let topY = YL(topV);
+          /* 柱顶文字与右轴折线距离很近时，把文字抬到折线上方，避免折线穿过文字；
+             折线离柱子很远时保持柱顶位置，避免标签被带得过高 */
+          if (opt.topLabelAvoidLine) {
+            lines.forEach(function (se) {
+              const lv = se.data[i];
+              if (lv == null) return;
+              const ly = YR(lv);
+              if (ly < topY && topY - ly <= 24) topY = ly;
+            });
+          }
+          s += '<text x="' + cx.toFixed(1) + '" y="' + (topY - topGap).toFixed(1) +
+            '" text-anchor="middle" font-size="' + (opt.topLabelSize || 11) + '" fill="' + (opt.labelColor || '#7FE7FF') + '">' +
             esc(opt.categoryTopLabels[i]) + '</text>';
         }
         if (rotate) {
@@ -283,11 +301,36 @@ window.APP = window.APP || {};
       });
       lines.forEach(function (se) {
         const color = se.color || '#F59A23';
-        const pts = se.data.map(function (v, i) { return (pad.l + band * i + band / 2).toFixed(1) + ',' + YR(v).toFixed(1); }).join(' ');
-        s += '<polyline points="' + pts + '" fill="none" stroke="' + color + '" stroke-width="2"/>';
+        /* 折线允许 null（如使用率首档没有上一级，不算转化率）：断开而不是落到 0 */
+        const pts = [];
         se.data.forEach(function (v, i) {
-          s += '<circle cx="' + (pad.l + band * i + band / 2).toFixed(1) + '" cy="' + YR(v).toFixed(1) + '" r="3.5" fill="#fff" stroke="' + color + '" stroke-width="2"' +
-            tip('<b>' + esc(data.categories[i]) + '</b><br/>' + esc(se.name) + '：' + fmt(v, 2)) + '/>';
+          if (v != null) pts.push({ i: i, x: pad.l + band * i + band / 2, y: YR(v), v: v });
+        });
+        let run = [];
+        const flush = function () {
+          if (run.length > 1) {
+            s += '<polyline points="' + run.map(function (p) {
+              return p.x.toFixed(1) + ',' + p.y.toFixed(1);
+            }).join(' ') + '" fill="none" stroke="' + color + '" stroke-width="2"/>';
+          }
+          run = [];
+        };
+        pts.forEach(function (p) {
+          if (run.length && p.i !== run[run.length - 1].i + 1) flush();
+          run.push(p);
+        });
+        flush();
+        pts.forEach(function (p) {
+          s += '<circle cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="3.5" fill="#fff" stroke="' + color + '" stroke-width="2"' +
+            tip('<b>' + esc(data.categories[p.i]) + '</b><br/>' + esc(se.name) + '：' + fmt(p.v, 2) +
+              (se.unit != null ? esc(se.unit) : esc(opt.y2Unit || ''))) + '/>';
+          if (showLine && p.i % (opt.lineLabelEvery || 1) === 0) {
+            const lbl = fmt(p.v, opt.lineLabelDigits == null ? 1 : opt.lineLabelDigits) +
+              (opt.lineLabelUnit == null ? '' : opt.lineLabelUnit);
+            s += '<text x="' + p.x.toFixed(1) + '" y="' + (p.y + (opt.lineLabelOffset == null ? 15 : opt.lineLabelOffset)).toFixed(1) +
+              '" text-anchor="middle" font-size="' + (opt.lineLabelSize || 10) + '" fill="' + (opt.lineLabelColor || color) +
+              '" paint-order="stroke" stroke="#FFF" stroke-width="3" stroke-linejoin="round">' + esc(lbl) + '</text>';
+          }
         });
       });
       s += '</svg>';
@@ -783,9 +826,11 @@ window.APP = window.APP || {};
         }, []);
         return v.length ? Math.max.apply(null, v) : 1;
       }
-      const tL = axisTicks(0, ext(left.length ? left : bars), 5);
+      /* yMax：压缩左轴，把柱子往下压；y2Max：收紧右轴，把折线往上飘，
+         两者共同保证折线在柱顶上方留出距离 */
+      const tL = axisTicks(0, opt.yMax != null ? opt.yMax : ext(left.length ? left : bars), 5);
       const rightPool = right.length ? right : rightLines;
-      const tR = rightPool.length ? axisTicks(0, ext(rightPool), 5) : null;
+      const tR = rightPool.length ? axisTicks(0, opt.y2Max != null ? opt.y2Max : ext(rightPool), 5) : null;
       /* 刻度文字的预留宽度按「实际最长的一条」算：右轴刻度从 w-pad.r+8 起画、左轴刻度在 pad.l-8 处右对齐，
          pad 小于文字宽度时文字会落到 viewBox 之外（svg{overflow:visible} 会把它画到整页上） */
       const chars = function (list, digits, unit) {
@@ -808,6 +853,7 @@ window.APP = window.APP || {};
       const gw = Math.min(band * 0.6, 26 * bars.length);
       const bw = bars.length ? gw / bars.length : 0;
       const showLabel = opt.dataLabels !== false;
+      const showLineLabel = opt.lineLabels == null ? showLabel : opt.lineLabels;
       let s = svgOpen(w, h);
       tL.forEach(function (t) {
         s += '<line x1="' + pad.l + '" y1="' + YL(t).toFixed(1) + '" x2="' + (w - pad.r) + '" y2="' + YL(t).toFixed(1) +
@@ -880,9 +926,12 @@ window.APP = window.APP || {};
           const x = pad.l + band * i + band / 2, y = YL2(v);
           s += '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="3" fill="' + color + '"' +
             tip('<b>' + esc(data.categories[i]) + '</b><br/>' + esc(se.name) + '：' + fmt(v, 2)) + '/>';
-          if (showLabel && i % (opt.lineLabelEvery || 1) === 0) {
-            s += '<text x="' + x.toFixed(1) + '" y="' + (y + 15).toFixed(1) + '" text-anchor="middle" font-size="10" fill="' +
-              color + '">' + esc(fmt(v, v >= 100 ? 0 : 2)) + esc(opt.lineLabelUnit || '') + '</text>';
+          if (showLineLabel && i % (opt.lineLabelEvery || 1) === 0) {
+            const lbl = fmt(v, opt.lineLabelDigits == null ? (v >= 100 ? 0 : 2) : opt.lineLabelDigits) +
+              esc(opt.lineLabelUnit || '');
+            s += '<text x="' + x.toFixed(1) + '" y="' + (y + (opt.lineLabelOffset == null ? 15 : opt.lineLabelOffset)).toFixed(1) +
+              '" text-anchor="middle" font-size="' + (opt.lineLabelSize || 10) + '" fill="' + (opt.lineLabelColor || color) +
+              '" paint-order="stroke" stroke="#FFF" stroke-width="3" stroke-linejoin="round">' + esc(lbl) + '</text>';
           }
         });
       });
