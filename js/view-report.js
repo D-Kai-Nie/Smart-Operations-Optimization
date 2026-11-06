@@ -151,10 +151,9 @@
       C('signCount', '签约份数', 110, { num: true }),
       C('contractAmt', '签订合同额(万元)', 150, { num: true }),
       C('perfAmt', '履约额(万元)', 130, { num: true }),
-      C('grade', '局评价等级', 110),
+      C('grade', '局评价等级', 110), C('matSmall', '物料小类', 130),
       C('badCount', '不良行为次数', 130, { num: true }), C('banCount', '禁用次数', 100, { num: true }),
-      C('code', '分供商编码', 110), C('cat', '分供商分类', 120),
-      C('matMid', '物料中类', 120), C('credit', '征信评分', 100, { num: true })
+      C('code', '分供商编码', 110), C('cat', '分供商分类', 120)
     ]
   };
 
@@ -171,7 +170,7 @@
       'idleCount', 'repairCount', 'scrapCount', 'buyAmt', 'disposeAmt', 'depAmt',
       'category', 'acceptStatus'],
     supplier: ['idx', 'name', 'org2', 'org3', 'perfProjCount', 'bidCount', 'winCount', 'winAmt',
-      'signCount', 'contractAmt', 'perfAmt', 'grade', 'badCount', 'banCount']
+      'signCount', 'contractAmt', 'perfAmt', 'grade', 'matSmall', 'badCount', 'banCount']
   };
   function shownOf(ds) {
     if (!RS.shown[ds]) RS.shown[ds] = DEFAULT_SHOWN[ds].slice();
@@ -449,7 +448,12 @@
     if (RS.supTab === 'cooperation') {
       return supCommon.concat([
         { name: 'name', label: '分供商名称', type: 'text', ph: '请输入' },
-        { name: 'grade', label: '局评价等级', type: 'multi', options: D.supplierGrades }
+        { name: 'grade', label: '局评价等级', type: 'multi', options: D.supplierGrades },
+        { name: 'cat', label: '分供商分类', type: 'select', options: D.supplierCats },
+        { name: 'matSmall', label: '物料小类', type: 'tree', options: [
+          { label: '钢材', children: D.material.small.slice(0, 24).map(function (x) { return { value: x, label: x }; }) },
+          { label: '其他材料', children: D.material.small.slice(24).map(function (x) { return { value: x, label: x }; }) }] },
+        { name: 'code', label: '分供商编码', type: 'text', ph: '请输入' }
       ]);
     }
     /* 资源数据明细的兜底条件（正常情况下 supTab 已归一为 resource / cooperation） */
@@ -759,7 +763,8 @@
     const cols = sortableCols(colsOf(ds));
     return '<div class="dsc-card"><div class="dsc-card__header">' +
       '<div class="dsc-card__title">分供商合作分析</div>' +
-      '<div class="dsc-card__extra">按分供商汇总 · 共 ' + total + ' 条</div></div>' +
+      '<div class="dsc-card__extra">按分供商汇总 · 共 ' + total + ' 条' +
+      D.colGear('data-rp-columns', '设置列：分供商合作分析的显示字段') + '</div></div>' +
       D.table({ cols: cols, rows: paged.map(function (r, i) { return Object.assign({ idx: (RS.page - 1) * size + i + 1 }, r); }),
         /* 合计按「全量结果集」算：此前用 paged（当前页），合计只有第 1 页那 10 行的和 */
         maxHeight: 520, totalRow: D.totalOf(cols, sorted), sortKey: RS.sortKey, sortDir: RS.sortDir,
@@ -844,7 +849,8 @@
       D.filterBar({ id: 'rpFilter', cls: 'report-page__filter-bar', fields: withConds(filterFields(dsKey, view)),
         conds: RS.condText,
         visibleCount: (q.ds === 'purchase' || q.ds === 'material') ? 8
-          : q.ds === 'supplier' ? 4 : q.ds === 'asset' ? 3 : 6 }) +
+          : q.ds === 'supplier' ? (RS.supTab === 'resource' ? 1 : 4)
+            : q.ds === 'asset' ? 3 : 6 }) +
       body +
       '</div>';
   };
