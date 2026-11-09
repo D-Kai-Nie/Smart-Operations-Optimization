@@ -34,6 +34,22 @@
     asset: { name: '资产数据报表', note: '资产明细全量表（30+ 字段）· 支持筛选、列设置与导出' }
   };
 
+  /* 资源数据报表 › 分供商合作分析的物料小类值集（按工作目录《物料小类》图片） */
+  const SUP_MAT_SMALL = [
+    '废旧钢绞线', '钢便桥', '白铁管引出装置', '接地镀铜钢棒', '接地不锈钢',
+    '接地铜棒', '管片专用预埋套筒', '网片加工费', '铝网片', '拉条'
+  ];
+  /* 同一分供商固定映射到同一小类，避免汇总后物料小类随机跳动 */
+  function supplierMatSmall(name) {
+    const i = D.suppliers.findIndex(function (s) { return s.name === name; });
+    return SUP_MAT_SMALL[(i < 0 ? 0 : i) % SUP_MAT_SMALL.length];
+  }
+  function supplierReportRows() {
+    return rowsOf('supplier').map(function (r) {
+      return Object.assign({}, r, { matSmall: supplierMatSmall(r.name) });
+    });
+  }
+
   /* ---------- 字段集（附录 B/C/D/E/F） ---------- */
   function C(k, n, w, o) { return Object.assign({ key: k, name: n, width: w || 120 }, o || {}); }
 
@@ -267,7 +283,8 @@
     }
     if (dsKey === 'supplier') {
       if (RS.supTab === 'resource') return visible(applyConds(D.genResourceRows(80), RS.conds)).length;
-      if (RS.supTab !== 'cooperation') return 0;
+      if (RS.supTab === 'cooperation') return visible(applyConds(supplierReportRows(), RS.conds)).length;
+      return 0;
     }
     return visible(applyConds(rowsOf(dsKey), RS.conds)).length;
   }
@@ -437,27 +454,26 @@
     /* supplier：筛选字段随子页签变化（对齐 Axure 各页签的查询条件） */
     const supOrgs = D.orgs.map(function (o) { return o.name; });
     const supSubs = D.subOrgs.map(function (o) { return o.name; });
+    const supDate = { name: 'date', label: '日期选择', type: 'daterange', value: D.defaultRange, wide: true };
     const supCommon = [
       { name: 'org2', label: '二级单位', type: 'select', options: supOrgs },
       { name: 'org3', label: '三级单位', type: 'select', options: supSubs }
     ];
     if (RS.supTab === 'resource') {
-      /* 资源明细已移除项目列，查询条件只保留列表里真实存在的组织字段 */
-      return supCommon;
+      /* 资源明细：时间 + 组织维度；项目字段已移除 */
+      return [supDate].concat(supCommon);
     }
     if (RS.supTab === 'cooperation') {
-      return supCommon.concat([
+      return [supDate].concat(supCommon, [
         { name: 'name', label: '分供商名称', type: 'text', ph: '请输入' },
         { name: 'grade', label: '局评价等级', type: 'multi', options: D.supplierGrades },
         { name: 'cat', label: '分供商分类', type: 'select', options: D.supplierCats },
-        { name: 'matSmall', label: '物料小类', type: 'tree', options: [
-          { label: '钢材', children: D.material.small.slice(0, 24).map(function (x) { return { value: x, label: x }; }) },
-          { label: '其他材料', children: D.material.small.slice(24).map(function (x) { return { value: x, label: x }; }) }] },
+        { name: 'matSmall', label: '物料小类', type: 'multi', options: SUP_MAT_SMALL },
         { name: 'code', label: '分供商编码', type: 'text', ph: '请输入' }
       ]);
     }
     /* 资源数据明细的兜底条件（正常情况下 supTab 已归一为 resource / cooperation） */
-    return supCommon;
+    return [supDate].concat(supCommon);
   }
 
   /* ---------- F5 总览：采购指标口径 ---------- */
@@ -719,7 +735,7 @@
       const key = r.name;
       const t = map[key] || (map[key] = {
         name: r.name, org2: r.org2, org3: r.org3, code: r.code, cat: r.cat,
-        grade: r.grade, matMid: r.matMid, credit: r.credit, __projects: {}
+        grade: r.grade, matSmall: r.matSmall, __projects: {}
       });
       t.__projects[r.project] = 1;
       COOP_SUM_KEYS.forEach(function (k) { t[k] = (t[k] || 0) + (r[k] || 0); });
@@ -754,7 +770,7 @@
     }
     /* cooperation：按分供商汇总；项目字段已移除，改为履约合作项目数 */
     const ds = 'supplier';
-    const all = aggregateSupplierRows(applyConds(rowsOf(ds), RS.conds)
+    const all = aggregateSupplierRows(applyConds(supplierReportRows(), RS.conds)
       .filter(function (r) { return D.scope.canSeeRow(r); }));
     const total = all.length;
     const size = sizeOf(ds);
@@ -849,7 +865,7 @@
       D.filterBar({ id: 'rpFilter', cls: 'report-page__filter-bar', fields: withConds(filterFields(dsKey, view)),
         conds: RS.condText,
         visibleCount: (q.ds === 'purchase' || q.ds === 'material') ? 8
-          : q.ds === 'supplier' ? (RS.supTab === 'resource' ? 1 : 4)
+          : q.ds === 'supplier' ? (RS.supTab === 'resource' ? 2 : 4)
             : q.ds === 'asset' ? 3 : 6 }) +
       body +
       '</div>';

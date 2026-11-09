@@ -644,6 +644,9 @@ window.APP = window.APP || {};
       const contractCount = Math.floor(between(rnd, 1, 42, 0));
       return {
         org2: p.org, org3: p.subOrg, project: p.name, format: p.format,
+        /* 日期落在默认统计期 2026-01-01 ~ 2026-09-15 内，供资源报表时间筛选 */
+        date: '2026-' + String(1 + (i * 3) % 8).padStart(2, '0') + '-' +
+          String(1 + (i * 7) % 27).padStart(2, '0'),
         name: s.name, code: s.code,
         /* 分类按行序轮转：D.suppliers 的 cat 是 seedRand 首个输出，连续种子几乎同值，
            30 行会全部落到「设计服务类」，导致分类筛选与履约分布图只有一根柱 */
@@ -689,6 +692,8 @@ window.APP = window.APP || {};
       const perf = round(res.perf * k * 1e4, 1);
       return {
         org2: p.org, org3: p.subOrg, project: p.name,
+        date: '2026-' + String(1 + (i * 3) % 8).padStart(2, '0') + '-' +
+          String(1 + (i * 7) % 27).padStart(2, '0'),
         onStock: q(res.onStock), quality: q(res.quality), quit: q(res.quit),
         bad: q(res.bad), newIn: q(res.newIn), active: q(res.active),
         win: q(res.win), sign: q(res.sign), perfCnt: perfCnt, alt: q(res.alt),
