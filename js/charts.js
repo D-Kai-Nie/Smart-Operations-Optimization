@@ -261,9 +261,11 @@ window.APP = window.APP || {};
             '" height="' + Math.max(1, hgt).toFixed(1) + '" rx="2" fill="' + fill + '" opacity="' + (opt.barOpacity || 0.88) + '"' +
             barAttr + tip('<b>' + esc(c) + '</b><br/>' + esc(se.name) + '：' + fmt(v, opt.yDigits) + (se.unit != null ? se.unit : (opt.unit || ''))) + '/>';
           if (opt.dataLabels && !stack) {
+            const unitTxt = opt.dataLabelUnit === false ? ''
+              : (se.unit != null ? se.unit : (opt.unit || ''));
             s += '<text x="' + (x + bwid / 2).toFixed(1) + '" y="' + (y - 5).toFixed(1) +
               '" text-anchor="middle" font-size="11" fill="' + (opt.labelColor || '#7FE7FF') + '">' +
-              esc(fmt(v, opt.yDigits == null ? 0 : opt.yDigits)) + esc(se.unit != null ? se.unit : (opt.unit || '')) + '</text>';
+              esc(fmt(v, opt.yDigits == null ? 0 : opt.yDigits)) + esc(unitTxt) + '</text>';
           }
         });
         /* 柱顶合计标签（如堆叠柱的「984.88万元」） */
@@ -889,8 +891,11 @@ window.APP = window.APP || {};
                再折一次会出现「1.89万」（= 18,900 万元）这种反直觉读数 → barLabelRaw 关掉换算 */
             const lbl = opt.barLabelRaw ? fmt(v, opt.yDigits == null ? (v >= 100 ? 0 : 2) : opt.yDigits)
               : (v >= 10000 ? fmt(v / 10000, 2) + '万' : fmt(v, v >= 100 ? 0 : 2));
-            s += '<text x="' + (x + Math.max(3, bw - 4) / 2).toFixed(1) + '" y="' + (y - 4).toFixed(1) +
-              '" text-anchor="middle" font-size="10" fill="#333">' + esc(lbl) + '</text>';
+            /* 密集类目（如分供商分类 11 项）可缩小字号并交错上下位置，避免标签互相压住 */
+            const labDy = opt.barLabelStagger ? (i % 2 ? -16 : -4) : -4;
+            s += '<text x="' + (x + Math.max(3, bw - 4) / 2).toFixed(1) + '" y="' + (y + labDy).toFixed(1) +
+              '" text-anchor="middle" font-size="' + (opt.barLabelSize || 10) + '" fill="#333">' +
+              esc(lbl) + '</text>';
           }
         });
         if (rotate) {

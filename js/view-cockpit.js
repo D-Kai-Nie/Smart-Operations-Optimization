@@ -1876,16 +1876,16 @@
   };
   /* 引进分供商转化与留存（CSV：新引进 = 新增入库；分片 = 中标 / 未中标且未出库 / 出库，三者之和 = 新引进） */
   const SB_CONVERT = [
-    { name: '中标分供商', label: '中标 7,822 家（79.40%）', value: 7822, color: '#2468F2' },
-    { name: '未中标且未出库', label: '未中标且未出库 1,642 家（16.67%）', value: 1642, color: '#F2B04A' },
-    { name: '出库分供商', label: '出库 387 家（3.93%）', value: 387, color: '#D94A4A' }
+    { name: '中标分供商', label: '中标 7,822（79.40%）', value: 7822, color: '#2468F2' },
+    { name: '未中标且未出库', label: '未中标且未出库 1,642（16.67%）', value: 1642, color: '#F2B04A' },
+    { name: '出库分供商', label: '出库 387（3.93%）', value: 387, color: '#D94A4A' }
   ];
   /* 分供商流失情况分析（出库分供商：合作满五年 / 未满五年 / 未合作，三者之和 = 出库 7,391）
      两枚环形图统一为「蓝 → 黄 → 红」三色 */
   const SB_LOSS = [
-    { name: '合作满五年', label: '合作满 5 年 1,999 家（27.05%）', value: 1999, color: '#2468F2' },
-    { name: '合作未满五年', label: '合作未满 5 年 4,312 家（58.34%）', value: 4312, color: '#F2B04A' },
-    { name: '未合作', label: '未合作 1,080 家（14.61%）', value: 1080, color: '#D94A4A' }
+    { name: '合作满五年', label: '合作满 5 年 1,999（27.05%）', value: 1999, color: '#2468F2' },
+    { name: '合作未满五年', label: '合作未满 5 年 4,312（58.34%）', value: 4312, color: '#F2B04A' },
+    { name: '未合作', label: '未合作 1,080（14.61%）', value: 1080, color: '#D94A4A' }
   ];
   /* 合作年限分析：默认全局五档合计（含「未合作」）；点击某一档下钻到二级单位。
      颜色按「5年以上 → 1年以内」由深到浅，未合作单独用中性灰；
@@ -1959,7 +1959,7 @@
     return '<div class="ck-pielegend ck-pielegend--grid">' + SB_STOCK.types.map(function (t, i) {
       return '<span class="ck-pielegend__item"><i style="background:' + SB_STOCK.typeColors[i] + '"></i>' +
         '<span class="ck-pielegend__name">' + esc(t) + '</span>' +
-        '<b>' + D.fmtInt(SB_STOCK.typeCounts[i]) + ' 家（' + SB_STOCK.typeShares[i].toFixed(2) + '%）</b></span>';
+        '<b>' + D.fmtInt(SB_STOCK.typeCounts[i]) + '（' + SB_STOCK.typeShares[i].toFixed(2) + '%）</b></span>';
     }).join('') + '</div>';
   }
   function sbKpiCards() {
@@ -1988,22 +1988,22 @@
       sbKpiCards() +
       sbFilter() +
 
-      /* 分供商在库情况分析：横轴二级单位全宽 + 区域 / 类型 / 分类三列 */
-      section('分供商在库情况分析',
-        '<div class="ck-subhead"><span class="ck-subhead__title">二级单位在库分供商数量</span>' +
+      /* 资源在库情况分析：横轴二级单位全宽 + 区域 / 类型 / 分类三列 */
+      section('资源在库情况分析',
+        '<div class="ck-subhead"><span class="ck-subhead__title">各单位在库分供商</span>' +
         '<span class="ck-subhead__extra">前 10 个二级单位　·　单位：家 / 全局占比</span></div>' +
         sbChart('sbStockOrg', 360) +
         '<div class="dsc-split ck-stock3 u-mt-lg">' +
-        '<div>' + subHead('各经营区域分供商家数', '单位：家 / 全局占比') +
+        '<div>' + subHead('分供商区域分布', '单位：家 / 全局占比') +
         sbChart('sbStockRegion', 300) + '</div>' +
-        '<div>' + subHead('经营类型分供商家数', '单位：家 / 全局占比') +
+        '<div>' + subHead('分供商经营类型', '单位：家 / 全局占比') +
         sbChart('sbStockType', 230) + sbStockTypeLegend() + '</div>' +
-        '<div>' + subHead('分供商分类数量', '单位：家 / 全局占比') +
+        '<div>' + subHead('分供商分类', '单位：家 / 全局占比') +
         sbChart('sbStockClass', 300) + '</div>' +
         '</div>') +
 
-      /* 分供商使用情况分析：使用率 / 评价 + 转化 / 流失，共用同一个区块标题 */
-      section('分供商使用情况分析',
+      /* 资源使用情况分析：使用率 / 评价 + 转化 / 流失，共用同一个区块标题 */
+      section('资源使用情况分析',
         '<div class="dsc-split dsc-split--2">' +
         /* 使用率数值属于左图：与子标题同一行、靠右对齐（标题已说明含义，不再重复「分供商使用率」） */
         '<div>' +
@@ -2015,14 +2015,14 @@
         '</div>' +
         /* 第二排：转化 / 流失，图内保留各自图形名称 */
         '<div class="dsc-split dsc-split--2 u-mt-lg">' +
-        '<div>' + subHead('新引进分供商转化情况占比', '新增入库 9,851 家') +
+        '<div>' + subHead('新引进分供商转化情况占比', '单位：家 / 全局占比') +
         sbChart('sbConvert', 280) + sbLegend(SB_CONVERT) + '</div>' +
-        '<div>' + subHead('出库分供商中合作满 5 年分供商占比', '出库 7,391 家') +
+        '<div>' + subHead('出库分供商中合作满 5 年分供商占比', '单位：家 / 全局占比') +
         sbChart('sbLoss', 280) + sbLegend(SB_LOSS) + '</div>' +
         '</div>') +
 
       /* 合作年限分析：默认全局五档合计，点击柱子下钻到各二级单位；图全宽、柱宽收为 2/3 */
-      section('分供商合作年限分析',
+      section('资源合作年限分析',
         '<div class="ck-subhead"><span class="ck-subhead__title">' +
         (SBY.bucket == null ? '全局合计'
           : esc(SB_YEARS.buckets[SBY.bucket]) + ' · 各二级单位') +
@@ -2550,8 +2550,8 @@
           { name: '在库分供商数量', data: SB_STOCK.orgCounts, type: 'bar', color: '#2468F2', color2: '#7FC4F5', unit: '家' },
           { name: '全局占比', data: SB_STOCK.orgShares, type: 'line', axis: 'right', color: '#D98C8C' }
         ]
-      }, { height: 360, rotateX: 45, padB: 110, padT: 32, yDigits: 0, yUnit: '家', y2Unit: '%',
-        rDigits: 2, dataLabels: false, yMax: 8000, y2Max: 10, lineLabels: true,
+      }, { height: 360, rotateX: 45, padB: 110, padT: 32, yDigits: 0, y2Unit: '%',
+        rDigits: 2, dataLabels: true, barLabelRaw: true, barLabelSize: 10, yMax: 8000, y2Max: 10, lineLabels: true,
         lineLabelEvery: 1, lineLabelDigits: 1, lineLabelSize: 8, lineLabelColor: '#C0504D',
         lineLabelOffset: -8, lineLabelUnit: '%' });
     }
@@ -2563,8 +2563,8 @@
           { name: '分供商数量', data: SB_STOCK.regionCounts, type: 'bar', color: '#2468F2', color2: '#7FC4F5', unit: '家' },
           { name: '全局占比', data: SB_STOCK.regionShares, type: 'line', axis: 'right', color: '#D98C8C' }
         ]
-      }, { height: 300, rotateX: 35, padB: 80, padT: 32, yDigits: 0, yUnit: '家', y2Unit: '%',
-        rDigits: 2, dataLabels: false, yMax: 18000, y2Max: 22, lineLabels: true,
+      }, { height: 300, rotateX: 35, padB: 80, padT: 32, yDigits: 0, y2Unit: '%',
+        rDigits: 2, dataLabels: true, barLabelRaw: true, barLabelSize: 9, yMax: 18000, y2Max: 22, lineLabels: true,
         lineLabelEvery: 1, lineLabelDigits: 1, lineLabelSize: 8, lineLabelColor: '#C0504D',
         lineLabelOffset: -8, lineLabelUnit: '%' });
     }
@@ -2582,46 +2582,46 @@
           { name: '分供商数量', data: SB_STOCK.classCounts, type: 'bar', color: '#2468F2', color2: '#7FC4F5', unit: '家' },
           { name: '全局占比', data: SB_STOCK.classShares, type: 'line', axis: 'right', color: '#D98C8C' }
         ]
-      }, { height: 300, rotateX: 40, padB: 88, padT: 32, yDigits: 0, yUnit: '家', y2Unit: '%',
-        rDigits: 2, dataLabels: false, yMax: 25000, y2Max: 30, lineLabels: true,
+      }, { height: 300, rotateX: 40, padB: 88, padT: 32, yDigits: 0, y2Unit: '%',
+        rDigits: 2, dataLabels: true, barLabelRaw: true, barLabelSize: 7, yMax: 25000, y2Max: 30, lineLabels: true,
         lineLabelEvery: 1, lineLabelDigits: 1, lineLabelSize: 8, lineLabelColor: '#C0504D',
-        lineLabelOffset: -8, lineLabelUnit: '%' });
+        lineLabelOffset: -14, lineLabelUnit: '%' });
     }
 
     /* 分供商使用情况 */
     bar('sbRate', SB_RATE.cats, [
       { name: '分供商数量', data: SB_RATE.data, color: SB_BLUE, unit: '家' },
       { name: '占比', data: SB_RATE.rates, type: 'line', axis: 'right', color: '#D98C8C', unit: '%' }
-    ], { unit: '家', yDigits: 0, yUnit: '家', y2Unit: '%', rDigits: 0, y2Color: '#999',
+    ], { unit: '家', yDigits: 0, y2Unit: '%', rDigits: 0, y2Color: '#999',
       yMax: 14000, y2Max: 100, padT: 34, dataLabels: false, lineLabels: true, lineLabelEvery: 1,
       lineLabelDigits: 1, lineLabelSize: 9, lineLabelColor: '#C0504D', lineLabelOffset: -12,
       lineLabelUnit: '%', labelColor: '#334155', topLabelSize: 8, topLabelOffset: 6,
       barWidthScale: 2 / 3,
-      categoryTopLabels: SB_RATE.data.map(function (v) { return D.fmtInt(v) + '家'; }) });
+      categoryTopLabels: SB_RATE.data.map(function (v) { return D.fmtInt(v); }) });
     bar('sbEval', SB_EVAL.cats, [
       { name: '分供商数量', data: SB_EVAL.data, color: SB_BLUE, unit: '家' },
       { name: '占比', data: SB_EVAL.pct, type: 'line', axis: 'right', color: '#D98C8C', unit: '%' }
-    ], { unit: '家', yDigits: 0, yUnit: '家', y2Unit: '%', rDigits: 0, y2Color: '#999',
+    ], { unit: '家', yDigits: 0, y2Unit: '%', rDigits: 0, y2Color: '#999',
       yMax: 55000, y2Max: 45, padT: 34, dataLabels: false, lineLabels: true, lineLabelEvery: 1,
       lineLabelDigits: 1, lineLabelSize: 9, lineLabelColor: '#C0504D', lineLabelOffset: -12,
       lineLabelUnit: '%', topLabelSize: 8, topLabelOffset: 6,
       barWidthScale: 2 / 3,
-      categoryTopLabels: SB_EVAL.data.map(function (v) { return D.fmtInt(v) + '家'; }) });
+      categoryTopLabels: SB_EVAL.data.map(function (v) { return D.fmtInt(v); }) });
     /* 转化与流失 */
-    donut('sbConvert', SB_CONVERT, '9,851 家');
-    donut('sbLoss', SB_LOSS, '7,391 家');
+    donut('sbConvert', SB_CONVERT, '9,851');
+    donut('sbLoss', SB_LOSS, '7,391');
     /* 合作年限：全局五档 → 点击下钻到二级单位；柱顶统一显示「家数 + 占比」 */
     if (SBY.bucket == null) {
       bar('sbYears', SB_YEARS.buckets, [
         { name: '分供商数量', data: SB_YEARS_TOTAL, colors: SB_YEARS.colors, unit: '家' },
         { name: '占比', data: SB_YEARS_PCT, type: 'line', axis: 'right', color: '#D98C8C', unit: '%' }
       ], {
-        unit: '家', yDigits: 0, yUnit: '家', y2Unit: '%', rDigits: 0, y2Color: '#999',
+        unit: '家', yDigits: 0, y2Unit: '%', rDigits: 0, y2Color: '#999',
         yMax: 7000, y2Max: 40, padT: 34, dataLabels: false, lineLabels: true, lineLabelEvery: 1,
         lineLabelDigits: 1, lineLabelSize: 9, lineLabelColor: '#C0504D', lineLabelOffset: -12,
         lineLabelUnit: '%', labelColor: '#334155', topLabelSize: 8, topLabelOffset: 6,
         barWidthScale: 2 / 3,
-        categoryTopLabels: SB_YEARS_TOTAL.map(function (v) { return D.fmtInt(v) + '家'; }),
+        categoryTopLabels: SB_YEARS_TOTAL.map(function (v) { return D.fmtInt(v); }),
         onBarClick: function (i) {
           SBY.bucket = i; D.render();
         }
@@ -2634,19 +2634,19 @@
         { name: '分供商数量', data: vals, color: SB_YEARS.colors[SBY.bucket], unit: '家' },
         { name: '占比', data: pct, type: 'line', axis: 'right', color: '#D98C8C', unit: '%' }
       ], {
-        unit: '家', yDigits: 0, yUnit: '家', y2Unit: '%', rDigits: 0, y2Color: '#999',
+        unit: '家', yDigits: 0, y2Unit: '%', rDigits: 0, y2Color: '#999',
         yMax: Math.ceil(Math.max.apply(null, vals) * 1.35 / 100) * 100,
         y2Max: 25, padT: 34, dataLabels: false, lineLabels: true, lineLabelEvery: 1,
         lineLabelDigits: 1, lineLabelSize: 9, lineLabelColor: '#C0504D', lineLabelOffset: -12,
         lineLabelUnit: '%', labelColor: '#334155', topLabelSize: 8, topLabelOffset: 6,
         barWidthScale: 2 / 3,
-        categoryTopLabels: vals.map(function (v) { return D.fmtInt(v) + '家'; })
+        categoryTopLabels: vals.map(function (v) { return D.fmtInt(v); })
       });
     }
     bar('sbPerf', SB_PERF.cats, [
       { name: '分供商履约金额', data: SB_PERF.amt, color: SB_BLUE, unit: '万元' },
       { name: '履约分供商数量', data: SB_PERF.cnt, color: '#7FC4F5', unit: '家', axis: 'right' }
-    ], { height: 300, yDigits: 0, rDigits: 0, padL: 78, padR: 64, dataLabels: false, yUnit: '万元' });
+    ], { height: 300, yDigits: 0, rDigits: 0, padL: 78, padR: 64, dataLabels: true, dataLabelUnit: false });
 
     /* 履约额阈值：失焦 / 回车后应用，重绘本区块与数量 */
     const perfTh = root.querySelector('[data-sb-perf-threshold]');
