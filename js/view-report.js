@@ -42,7 +42,10 @@
   /* 同一分供商固定映射到同一小类，避免汇总后物料小类随机跳动 */
   function supplierMatSmall(name) {
     const i = D.suppliers.findIndex(function (s) { return s.name === name; });
-    return SUP_MAT_SMALL[(i < 0 ? 0 : i) % SUP_MAT_SMALL.length];
+    const n = 1 + (i < 0 ? 0 : i) % 5;       // 每家 1~5 个小类，便于展示多值与省略
+    const out = [];
+    for (let k = 0; k < n; k++) out.push(SUP_MAT_SMALL[((i < 0 ? 0 : i) + k * 3) % SUP_MAT_SMALL.length]);
+    return out;
   }
   function supplierReportRows() {
     return rowsOf('supplier').map(function (r) {
@@ -164,10 +167,20 @@
       C('perfProjCount', '履约合作项目数', 140, { num: true }),
       C('bidCount', '投标次数', 100, { num: true }),
       C('winCount', '中标次数', 100, { num: true }), C('winAmt', '中标金额(万元)', 140, { num: true }),
-      C('signCount', '签约份数', 110, { num: true }),
+      C('frameCount', '框架协议份数', 130, { num: true, group: '签约份数' }),
+      C('execCount', '执行合同份数', 130, { num: true, group: '签约份数' }),
+      C('signCount', '合计份数', 110, { num: true, group: '签约份数' }),
       C('contractAmt', '签订合同额(万元)', 150, { num: true }),
       C('perfAmt', '履约额(万元)', 130, { num: true }),
-      C('grade', '局评价等级', 110), C('matSmall', '物料小类', 130),
+      C('grade', '局评价等级', 110),
+      C('matSmall', '物料小类', 190, { render: function (v) {
+        const list = Array.isArray(v) ? v : (v ? String(v).split('、') : []);
+        if (!list.length) return '—';
+        const head = esc(list.slice(0, 3).join('、'));
+        if (list.length <= 3) return head;
+        return head + '<span class="dsc-more" title="全部 ' + list.length + ' 项：' +
+          esc(list.join('、')) + '">…</span>';
+      } }),
       C('badCount', '不良行为次数', 130, { num: true }), C('banCount', '禁用次数', 100, { num: true }),
       C('code', '分供商编码', 110), C('cat', '分供商分类', 120)
     ]
@@ -186,7 +199,8 @@
       'idleCount', 'repairCount', 'scrapCount', 'buyAmt', 'disposeAmt', 'depAmt',
       'category', 'acceptStatus'],
     supplier: ['idx', 'name', 'org2', 'org3', 'perfProjCount', 'bidCount', 'winCount', 'winAmt',
-      'signCount', 'contractAmt', 'perfAmt', 'grade', 'matSmall', 'badCount', 'banCount']
+      'frameCount', 'execCount', 'signCount', 'contractAmt', 'perfAmt', 'grade', 'matSmall',
+      'badCount', 'banCount']
   };
   function shownOf(ds) {
     if (!RS.shown[ds]) RS.shown[ds] = DEFAULT_SHOWN[ds].slice();
@@ -726,8 +740,8 @@
   }
 
   /* 供应商-项目行 → 分供商 + 三级单位汇总：次数 / 金额求和，履约合作项目数按去重项目数 */
-  const COOP_SUM_KEYS = ['bidCount', 'winCount', 'winAmt', 'signCount', 'contractAmt',
-    'perfAmt', 'badCount', 'banCount'];
+  const COOP_SUM_KEYS = ['bidCount', 'winCount', 'winAmt', 'frameCount', 'execCount',
+    'signCount', 'contractAmt', 'perfAmt', 'badCount', 'banCount'];
   function aggregateSupplierRows(rows) {
     const map = {};
     rows.forEach(function (r) {
@@ -735,15 +749,19 @@
       const key = r.name;
       const t = map[key] || (map[key] = {
         name: r.name, org2: r.org2, org3: r.org3, code: r.code, cat: r.cat,
-        grade: r.grade, matSmall: r.matSmall, __projects: {}
+        grade: r.grade, __projects: {}, __matSmall: {}
       });
       t.__projects[r.project] = 1;
+      (Array.isArray(r.matSmall) ? r.matSmall : [r.matSmall]).forEach(function (x) {
+        if (x) t.__matSmall[x] = 1;
+      });
       COOP_SUM_KEYS.forEach(function (k) { t[k] = (t[k] || 0) + (r[k] || 0); });
     });
     return Object.keys(map).map(function (k) {
       const r = map[k];
       r.perfProjCount = Object.keys(r.__projects).length;
-      delete r.__projects;
+      r.matSmall = SUP_MAT_SMALL.filter(function (x) { return r.__matSmall[x]; });
+      delete r.__projects; delete r.__matSmall;
       COOP_SUM_KEYS.forEach(function (key) { r[key] = D.round(r[key], 1); });
       return r;
     });

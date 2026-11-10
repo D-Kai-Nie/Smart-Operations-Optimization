@@ -642,6 +642,9 @@ window.APP = window.APP || {};
       const winAmt = between(rnd, 120, 26000, 1);
       const winCount = Math.floor(between(rnd, 1, 28, 0));
       const contractCount = Math.floor(between(rnd, 1, 42, 0));
+      /* 签约份数拆成框架协议 + 执行合同，两者之和 = 合计份数 */
+      const frameCount = Math.floor(contractCount * (0.25 + (i % 4) * 0.1));
+      const execCount = contractCount - frameCount;
       return {
         org2: p.org, org3: p.subOrg, project: p.name, format: p.format,
         /* 日期落在默认统计期 2026-01-01 ~ 2026-09-15 内，供资源报表时间筛选 */
@@ -654,6 +657,7 @@ window.APP = window.APP || {};
         bidCode: 'ZB-' + (20260000 + i * 11),
         bidCount: winCount + 2 + ((i * 5) % 13), winCount: winCount, winAmt: winAmt,
         contractCount: contractCount, signCount: contractCount,
+        frameCount: frameCount, execCount: execCount,
         contractAmt: between(rnd, 120, 26000, 1),
         contractCode: 'HT-' + (20250000 + i * 13),
         settleCode: 'JS' + (20260000 + i * 19),

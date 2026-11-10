@@ -374,6 +374,8 @@ select.dsc-field {
 /* 两级表头（采购报表总览：总采购金额 / 采购成本降低率 分组） */
 .dsc-table thead tr:nth-child(2) th { top: 40px; border-left: 1px solid var(--color-divider); }
 .dsc-table th.dsc-table__group { text-align: center; border-left: 1px solid var(--color-border); }
+/* 多值单元格：前 3 个值后接省略号，悬停 title 展示全量 */
+.dsc-table .dsc-more { margin-left: 2px; color: var(--color-primary); font-weight: 700; cursor: help; }
 .dsc-table-foot {
   display: flex; align-items: center; gap: var(--sp-md);
   padding: var(--sp-sm) var(--sp-lg); border-top: 1px solid var(--color-divider);
