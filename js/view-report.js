@@ -780,7 +780,7 @@
       rtotal.avgPerf = rtotal.perfCnt ? D.round(rtotal.perf / rtotal.perfCnt, 1) : 0;
       return '<div class="dsc-card"><div class="dsc-card__header">' +
         '<div class="dsc-card__title">资源数据明细</div>' +
-        '<div class="dsc-card__extra">按三级单位汇总 · 共 ' + total + ' 条　·　数值列可点表头排序' +
+        '<div class="dsc-card__extra">' +
         D.colGear('data-rp-cols="sup-resource"', '设置列：资源数据明细的显示字段') + '</div></div>' +
         D.table({ cols: sortableCols(rcols), rows: paged.map(function (r, i) { return Object.assign({ idx: (RS.page - 1) * size + i + 1 }, r); }),
           maxHeight: 520, totalRow: rtotal, sortKey: RS.sortKey, sortDir: RS.sortDir,
@@ -797,7 +797,7 @@
     const cols = sortableCols(colsOf(ds));
     return '<div class="dsc-card"><div class="dsc-card__header">' +
       '<div class="dsc-card__title">分供商合作分析</div>' +
-      '<div class="dsc-card__extra">按分供商汇总 · 共 ' + total + ' 条' +
+      '<div class="dsc-card__extra">' +
       D.colGear('data-rp-columns', '设置列：分供商合作分析的显示字段') + '</div></div>' +
       D.table({ cols: cols, rows: paged.map(function (r, i) { return Object.assign({ idx: (RS.page - 1) * size + i + 1 }, r); }),
         /* 合计按「全量结果集」算：此前用 paged（当前页），合计只有第 1 页那 10 行的和 */
