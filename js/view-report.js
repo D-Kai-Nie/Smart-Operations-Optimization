@@ -7,8 +7,7 @@
   const esc = D.esc;
 
   const RS = {
-    page: 1, size: 10, sizeBy: {},   // 分页大小按数据集记忆（采购明细默认 15 行/页）
-    shown: {},
+    page: 1, sizeBy: {},   // 分页大小按数据集记忆（采购明细默认 15 行/页）
     overviewLevel: 2,      // F5 总览下钻层级 2=二级 3=三级 4=项目
     overviewOrg: '',
     overviewBase: null,    // 下钻时携带的上级金额口径（保证下级合计 = 上级）
@@ -16,7 +15,6 @@
     lastRows: [],          // 总览当前行（供下钻时按索引取用）
     purGrain: '日',        // 采购总览统计粒度
     matGrain: '日',        // 物资总览统计粒度
-    supGrain: '日',        // 资源数据明细统计粒度
     assetGrain: '日',      // 资产报表统计粒度
     view: '',              // 采购 / 物资报表当前页签（overview=局级总览 / detail=明细）
     conds: {},             // 用户已提交的筛选条件（重绘后回填，不因查询 / 切页签丢失）
@@ -39,18 +37,29 @@
     '废旧钢绞线', '钢便桥', '白铁管引出装置', '接地镀铜钢棒', '接地不锈钢',
     '接地铜棒', '管片专用预埋套筒', '网片加工费', '铝网片', '拉条'
   ];
-  /* 同一分供商固定映射到同一小类，避免汇总后物料小类随机跳动 */
+  /* 同一分供商固定映射到同一小类，避免汇总后物料小类随机跳动。
+     先建名称 → 序号索引，避免每次渲染对 80 行逐行 findIndex */
+  let supplierIndex = null;
   function supplierMatSmall(name) {
-    const i = D.suppliers.findIndex(function (s) { return s.name === name; });
+    if (!supplierIndex) {
+      supplierIndex = {};
+      D.suppliers.forEach(function (s, i) { supplierIndex[s.name] = i; });
+    }
+    const i = supplierIndex[name] == null ? -1 : supplierIndex[name];
     const n = 1 + (i < 0 ? 0 : i) % 5;       // 每家 1~5 个小类，便于展示多值与省略
     const out = [];
     for (let k = 0; k < n; k++) out.push(SUP_MAT_SMALL[((i < 0 ? 0 : i) + k * 3) % SUP_MAT_SMALL.length]);
     return out;
   }
+  /* 分供商原始行是静态的：映射结果缓存一次，查询只做过滤不重复复制 */
+  let supplierRowsCache = null;
   function supplierReportRows() {
-    return rowsOf('supplier').map(function (r) {
-      return Object.assign({}, r, { matSmall: supplierMatSmall(r.name) });
-    });
+    if (!supplierRowsCache) {
+      supplierRowsCache = rowsOf('supplier').map(function (r) {
+        return Object.assign({}, r, { matSmall: supplierMatSmall(r.name) });
+      });
+    }
+    return supplierRowsCache;
   }
 
   /* ---------- 字段集（附录 B/C/D/E/F） ---------- */
@@ -202,16 +211,20 @@
       'frameCount', 'execCount', 'signCount', 'contractAmt', 'perfAmt', 'grade', 'matSmall',
       'badCount', 'banCount']
   };
+  /* 列设置统一存进 D.colStore（与看板 / 项目驾驶舱共用一套会话内状态），
+     这里只负责把「数据集」映射成稳定的 store key */
+  function colStoreKey(ds) { return 'report-' + ds; }
   function shownOf(ds) {
-    if (!RS.shown[ds]) RS.shown[ds] = DEFAULT_SHOWN[ds].slice();
-    return RS.shown[ds];
+    const key = colStoreKey(ds);
+    if (!D.colStore[key]) D.colStore[key] = DEFAULT_SHOWN[ds].slice();
+    return D.colStore[key];
   }
   function sizeOf(ds) {
     if (!RS.sizeBy[ds]) RS.sizeBy[ds] = ds === 'contract' ? 15 : 10;
     return RS.sizeBy[ds];
   }
   function colsOf(ds) {
-    return shownOf(ds).map(function (k) { return COLS[ds].filter(function (c) { return c.key === k; })[0]; }).filter(Boolean);
+    return D.colsOf(colStoreKey(ds), COLS[ds], DEFAULT_SHOWN[ds]);
   }
 
   /* ---------- 行数据 ---------- */
@@ -718,7 +731,10 @@
     resCol('win', '中标分供商数量', 140), resCol('sign', '签约分供商数量', 140),
     resCol('perfCnt', '履约分供商数量', 140), resCol('alt', '备选分供商数量', 140),
     resCol('perf', '分供商履约额(万元)', 160), resCol('perfQuality', '优质分供商履约额(万元)', 200),
-    resCol('avgPerf', '平均履约额(万元)', 160)
+    /* 平均履约额不是求和列：合计 = 履约额合计 ÷ 履约分供商数（在 D.totalOf 的基础合计之后算） */
+    resCol('avgPerf', '平均履约额(万元)', 160, {
+      total: function (rows, t) { return t.perfCnt ? D.round(t.perf / t.perfCnt, 1) : 0; }
+    })
   ];
 
   /* 项目行 → 三级单位行：数量、金额求和；平均履约额按「履约额 ÷ 履约分供商数」重算 */
@@ -777,7 +793,6 @@
       const paged = sorted.slice((RS.page - 1) * size, (RS.page - 1) * size + size);
       const rcols = D.colsOf('sup-resource', RES_COLS, RES_COLS.map(function (c) { return c.key; }));
       const rtotal = D.totalOf(RES_COLS, sorted);
-      rtotal.avgPerf = rtotal.perfCnt ? D.round(rtotal.perf / rtotal.perfCnt, 1) : 0;
       return '<div class="dsc-card"><div class="dsc-card__header">' +
         '<div class="dsc-card__title">资源数据明细</div>' +
         '<div class="dsc-card__extra">' +
@@ -819,8 +834,6 @@
     }
     /* A1：页码只在「换报表 / 换页签」时复位——此前每次渲染都 RS.page = 1，
        把分页器刚写入的页码覆盖掉，导致报表分页整页失效 */
-    const cfgable = q.ds === 'supplier' ? RS.supTab === 'cooperation'
-      : (q.ds === 'purchase' || q.ds === 'material') ? view === 'detail' : true;
     const pageKey = dsKey + '|' + view + '|' + RS.supTab;
     if (RS.pageKey !== pageKey) { RS.page = 1; RS.pageKey = pageKey; RS.sortKey = ''; }
 
@@ -911,7 +924,7 @@
       query: function (v) {
         const named = {};
         filterFields(dsKey, view).forEach(function (f) { named[f.name] = f.label; });
-        if (v.dateGrain) { RS.purGrain = v.dateGrain; RS.matGrain = v.dateGrain; RS.supGrain = v.dateGrain; RS.assetGrain = v.dateGrain; }
+        if (v.dateGrain) { RS.purGrain = v.dateGrain; RS.matGrain = v.dateGrain; RS.assetGrain = v.dateGrain; }
         /* 资产明细：实施单位是联想输入（不在 [data-f-name] 里），从控件读值作为普通筛选条件 */
         if (isAsset) {
           const orgInput = root.querySelector('#rpFilter .org-select__input');
@@ -945,7 +958,7 @@
       },
       reset: function () {
         RS.overviewOrg = ''; RS.overviewLevel = 2; RS.overviewBase = null;
-        RS.purGrain = '日'; RS.matGrain = '日'; RS.supGrain = '日'; RS.assetGrain = '日';
+        RS.purGrain = '日'; RS.matGrain = '日'; RS.assetGrain = '日';
         RS.conds = {}; RS.condText = ''; RS.page = 1; RS.sortKey = '';
         D.toast('已重置为默认条件'); D.render();
       },
@@ -1045,29 +1058,17 @@
         }
         return;
       }
-      /* 列设置（AC7） */
+      /* 列设置（AC7）：统一走 D.openColPicker / D.colStore，不再维护第二套 RS.shown 状态 */
       if (t.closest('[data-rp-columns]')) {
         const ds = q.ds === 'supplier' ? 'supplier' : dsKey;
-        const all = COLS[ds];
-        D.modal({
-          title: '列设置 · ' + esc(DS[q.ds] ? DS[q.ds].name : '数据报表'), width: 900,
-          body: D.columnDialog(all, shownOf(ds)),
-          buttons: [{ text: '恢复默认', cls: '', act: 'default' }, { text: '取消', cls: '', act: 'cancel' },
-            { text: '应用', cls: 'dsc-btn--primary', act: 'ok' }],
-          onAction: function (act, ov2) {
-            if (act === 'default') {
-              RS.shown[ds] = DEFAULT_SHOWN[ds].slice();
-              D.closeModal(); D.render(); D.toast('已恢复默认字段顺序');
-              return false;
-            }
-            const keys = D.readColumnDialog(ov2.querySelector('.dsc-column-dialog'));
-            if (!keys.length) { D.toast('请至少选择一个字段', 'warn'); return false; }
-            RS.shown[ds] = keys; RS.page = 1;
-            D.render();
-            D.toast('已应用 ' + keys.length + ' 个显示字段（会话内保持）');
-          }
+        const title = DS[q.ds] ? DS[q.ds].name : '数据报表';
+        D.openColPicker({
+          key: colStoreKey(ds), title: title, modalTitle: '列设置 · ' + title,
+          okText: '应用', defaultToast: '已恢复默认字段顺序', width: 900,
+          all: COLS[ds], def: DEFAULT_SHOWN[ds],
+          beforeRender: function () { RS.page = 1; },
+          after: D.render
         });
-        D.bindColumnDialog(document.getElementById('modalBody'));
         return;
       }
 

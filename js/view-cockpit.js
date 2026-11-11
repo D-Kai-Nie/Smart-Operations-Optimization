@@ -2,7 +2,7 @@
    F2 局驾驶舱
    版式基准：工作目录内两张页面截图（1912px 设计稿）
      view=overview 「局级驾驶舱」  采购金额 → 采购物资 → 采购榜单
-     view=metrics  「指标总览-采购」 8 指标卡 → 筛选 → 页签+趋势 → 二级单位表 → 招采分析
+     view=metrics  「核心指标」 8 指标卡 → 筛选 → 页签+趋势 → 二级单位表 → 招采分析
    交互基准：Axure 导出稿（页签互斥、四视图联动、下钻、列设置、轮播）
    ============================================================ */
 (function (D) {
@@ -444,13 +444,13 @@
   }
 
   /* ============================================================
-     视图二：指标总览-采购
+     视图二：核心指标（采购看板）
      ============================================================ */
   /* 与其余三个看板同构：用 section() 分区，而不是把指标/筛选/页签/趋势/表平铺 */
   function metricsView() {
     const m = metricDef(CS.metric);
     return '<div class="ck-view ck-view--metrics">' +
-      section('指标总览',
+      section('核心指标',
       '<div class="ck-metrics">' + METRICS.map(function (x) {
         return '<div class="ck-metriccard' + (CS.metric === x.key ? ' ck-metriccard--active' : '') +
           '" data-ck-metric="' + x.key + '">' +
@@ -478,10 +478,10 @@
         return '<div class="ck-tab' + (CS.metric === x.key ? ' ck-tab--active' : '') + '" data-ck-tab="' + x.key + '">' +
           esc(x.name) + '</div>';
       }).join('') + '</div>' +
-      '<div class="dsc-chart" id="ckTrend" style="height:280px"></div>') +
-
-      section('二级单位明细', unitTable(),
+      '<div class="dsc-chart" id="ckTrend" style="height:280px"></div>' +
+      subHead('指标明细表',
         D.colGear('data-pb-cols', '设置列：本指标的明细列表字段（基本信息 + 指标信息）')) +
+      unitTable()) +
       procSection() +
       '</div>';
   }
@@ -714,11 +714,11 @@
       scopeNote() + overviewView() + '</div>';
   };
 
-  /* 采购管理 › 采购管理看板：指标总览-采购（截图 `采购管理看板.png`） */
+  /* 采购管理 › 采购管理看板：核心指标（截图 `采购管理看板.png`） */
   D.pages['purchase-board'] = function () {
     CS.view = 'metrics';
     return '<div class="dsc-page cockpit-page">' +
-      pageHead('采购管理看板', '指标总览-采购：指标卡与页签联动，含二级单位明细与招采分析') +
+      pageHead('采购管理看板', '核心指标：指标卡与页签联动，含指标明细表与招采分析') +
       scopeNote() + metricsView() + '</div>';
   };
 
@@ -1207,6 +1207,16 @@
     return own.indexOf(p) === 0 ? own : p + own;
   }
 
+  /* 率值列的合计策略：始终「分子合计 ÷ 分母合计」，不是各行百分比的平均 */
+  function mbRateTotal(numKey, denKey) {
+    return function (rows) {
+      const sum = function (k) {
+        return rows.reduce(function (a, r) { return a + (typeof r[k] === 'number' ? r[k] : 0); }, 0);
+      };
+      const den = sum(denKey);
+      return den ? D.round(sum(numKey) / den * 100, 2) : null;
+    };
+  }
   /* 列模型：合计降本 = 组织链（固定）+ 9 列默认 + 18 小项等隐藏项；单口径 = 组织链 + 该口径小项 + 降本额 / 占比 */
   function mbSaveCols(key) {
     const isTotal = key === 'total';
@@ -1227,10 +1237,12 @@
       });
       metric.push({ key: 'saveAmt', name: '降本额合计(万元)', width: 150, num: true });
       metric.push({ key: 'entAmt', name: '项目确权产值金额(万元)', width: 180, num: true });
-      metric.push({ key: 'saveRate', name: '降低额占比', width: 120, pct: true });
+      metric.push({ key: 'saveRate', name: '降低额占比', width: 120, pct: true,
+        total: mbRateTotal('saveAmt', 'entAmt') });
       /* 过程降本小计（验收 + 消耗 + 闲废）与占比：列头 ⓘ 说明构成 / 来源 / 分母 */
       metric.push({ key: 'procAmt', name: '过程降本小计(万元)', width: 170, num: true, info: true });
-      metric.push({ key: 'procRate', name: '过程降本占比', width: 150, pct: true, info: true });
+      metric.push({ key: 'procRate', name: '过程降本占比', width: 150, pct: true, info: true,
+        total: mbRateTotal('procAmt', 'saveAmt') });
       const rest = MB_SAVE_BASIC.filter(function (b) { return MB_ORG_COLS.indexOf(b[0]) < 0; })
         .map(function (b) { return { key: b[0], name: b[1], width: b[2] }; })
         .filter(function (c) { return ['code', 'docStatus'].indexOf(c.key) < 0; });
@@ -1248,7 +1260,8 @@
       });
     metric.push({ key: 'saveAmt', name: (itemKey ? mbItemName(itemKey) : mbSave(k).name) + '（万元）',
       width: 150, num: true });
-    metric.push({ key: 'saveRate', name: '降本占比率', width: 110, pct: true });
+    metric.push({ key: 'saveRate', name: '降本占比率', width: 110, pct: true,
+      total: mbRateTotal('saveAmt', 'entAmt') });
     const rest = MB_SAVE_BASIC.filter(function (b) { return MB_ORG_COLS.indexOf(b[0]) < 0; })
       .map(function (b) { return { key: b[0], name: b[1], width: b[2] }; });
     return ident.concat(metric).concat(rest);
@@ -1401,24 +1414,10 @@
     });
     return out;
   }
-  /* 明细清单的合计行：金额 / 项目数列加总；率值列按「分子 ÷ 分母」聚合，
-     不是各行的平均（降低额占比 = 合计降本 ÷ 合计产值；过程议价降本占比 = 过程降本 ÷ 合计降本） */
+  /* 明细清单的合计行：金额 / 项目数列加总；率值列的「分子 ÷ 分母」口径由列上的 total 策略执行 */
   function mbTotalRow(cols, rows) {
     if (!cols.some(function (c) { return c.num; })) return null;
-    const t = D.totalOf(cols, rows);
-    const sumOf = function (k) {
-      return D.round(rows.reduce(function (a, r) { return a + (typeof r[k] === 'number' ? r[k] : 0); }, 0), 2);
-    };
-    if (cols.some(function (c) { return c.key === 'saveRate'; })) {
-      const ent = sumOf('entAmt');
-      t.saveRate = ent ? D.round(sumOf('saveAmt') / ent * 100, 2) : null;
-    }
-    if (cols.some(function (c) { return c.key === 'procRate'; })) {
-      const all = sumOf('saveAmt');
-      t.procAmt = sumOf('procAmt');
-      t.procRate = all ? D.round(t.procAmt / all * 100, 2) : null;
-    }
-    return t;
+    return D.totalOf(cols, rows);
   }
 
   /* 本页内下钻：点单位名 / 项目名就地过滤本表（不跳数据报表） */
@@ -1480,7 +1479,7 @@
       page: MS.rankPage, size: MS.size, totalName: '全部 ' + MB_TOTAL_N + ' 个单位' });
   }
 
-  /* 物资管理看板主体：指标卡带 → 主筛选 → 指标页签 + 红色趋势 → 二级单位排行 → 六项降本 → 废旧物资处理 */
+  /* 物资管理看板主体：指标卡带 → 主筛选 → 指标页签 + 红色趋势 → 指标明细表 → 六项降本 → 废旧物资处理 */
   /* 列表首行全局合计：只汇总金额列（数量列含吨 / 台 / 平方米 / 米等不同单位，
      跨物料相加没有业务意义），其余列显示「—」；合计口径为全部二级单位，不随筛选变化 */
   const MB_IDLE_SUM_KEYS = {
@@ -1597,6 +1596,8 @@
   function materialBoardView() {
     const m = mbMetric(MS.metric);
     return '<div class="ck-view ck-view--metrics">' +
+      /* 核心指标：指标卡 / 页签 / 趋势 / 指标明细表统一放在一个区块内 */
+      section('核心指标',
       /* 6 指标卡（与页签双向联动） */
       '<div class="ck-metrics ck-metrics--6">' + MB_METRICS.map(function (x) {
         return '<div class="ck-metriccard' + (MS.metric === x.key ? ' ck-metriccard--active' : '') +
@@ -1630,11 +1631,11 @@
       subHead(m.name + '随时间变化的趋势') +
       '<div class="dsc-chart" id="mbTrend" style="height:280px"></div>' +
 
-      /* 二级单位排行 */
-      subHead('二级单位排行', '共 ' + MB_RANK.length + ' 个二级单位' +
+      /* 指标明细表：同一「核心指标」区块内的明细列表 */
+      subHead('指标明细表', '共 ' + MB_RANK.length + ' 个二级单位' +
         D.colGear('data-mb-rank-cols', '设置列：本指标的明细列表字段（基本信息 + 指标信息）')) +
       mbRankTable() +
-      '<div data-mb-pager="rankPage">' + D.pager({ page: MS.rankPage, size: MS.size, total: MB_RANK.length }) + '</div>' +
+      '<div data-mb-pager="rankPage">' + D.pager({ page: MS.rankPage, size: MS.size, total: MB_RANK.length }) + '</div>') +
 
       /* 六项降本（含降本明细清单：卡片 → 统一查询 → 趋势 → 清单） */
       saveSection() +
@@ -1858,6 +1859,22 @@
 
   const SB_BAR = { height: 240, dataLabels: true, labelColor: '#4A5568', xColor: '#666' };
   const SB_BLUE = '#2468F2';
+  /* 资源看板柱线图公共配置：三张在库图 + 使用率/评价/合作年限共用，差异项由调用方覆盖 */
+  const SB_STOCK_OPT = {
+    padT: 32, yDigits: 0, y2Unit: '%', rDigits: 2,
+    dataLabels: true, barLabelRaw: true, lineLabels: true,
+    lineLabelDigits: 1, lineLabelSize: 8, lineLabelColor: '#C0504D',
+    lineLabelOffset: -8, lineLabelUnit: '%'
+  };
+  const SB_BARLINE_OPT = {
+    unit: '家', yDigits: 0, y2Unit: '%', rDigits: 0, y2Color: '#999',
+    padT: 34, dataLabels: false, lineLabels: true,
+    lineLabelDigits: 1, lineLabelSize: 9, lineLabelColor: '#C0504D',
+    lineLabelOffset: -12, lineLabelUnit: '%',
+    topLabelSize: 8, topLabelOffset: 6, barWidthScale: 2 / 3
+  };
+  function sbStockOpt(extra) { return Object.assign({}, SB_STOCK_OPT, extra || {}); }
+  function sbBarLineOpt(extra) { return Object.assign({}, SB_BARLINE_OPT, extra || {}); }
 
   /* 分供商使用率分析（CSV：新增入库→活跃→投标→中标→签约→履约，各级给「数量及转化率」；
      活跃为包含投标 / 中标 / 签约 / 履约的活动集合，各阶段为嵌套口径；
@@ -2064,10 +2081,12 @@
      ============================================================ */
   const ASB = {
     metric: 'turnover', page: 1, size: 10,
-    /* 统计区间（真日期控件）+ 两条筛选条各自的条件与反馈；看板/明细的筛选都落到同一张明细表 */
+    /* 统计区间（真日期控件）+ 顶部核心指标共用的一套查询条件与反馈；
+       指标明细表直接复用这套条件，不再维护独立的明细筛选 */
     period: ['2025-06-01', '2026-05-31'],
-    conds: { board: {}, detail: {} },
-    hint: { board: '', detail: '' }
+    conds: { board: {} },
+    hint: { board: '' },
+    advanced: false
   };
 
   /* 卡片值不写死：由下方 AB_RANK 的二级单位率值按资产金额加权汇总（见 abAggRate），
@@ -2150,10 +2169,10 @@
   }
   AB_IND.forEach(function (m) { m.value = abAggRate(m.key); });
 
-  /* ---------- 明细筛选：让两条筛选条的「查询」真的改变明细表 ----------
+  /* ---------- 明细筛选：顶部核心指标查询直接驱动指标明细表 ----------
      21 个二级单位行没有项目级维度字段，按单位名做确定性派生（同一单位每次都得同一值），
-     使「项目类型 / 状态 / 业态 / 承包模式 / 地区 / 物料分类 / 物料小类」都能落到行上。
-     组织 / 实施单位是同一维度的两个入口，明细筛选优先。 */
+     使「项目类型 / 状态 / 业态 / 承包模式 / 地区 / 物料分类」都能落到行上；
+     「组织」按二级单位名称精确匹配。 */
   const AB_ATTRS = {
     '地区': function () { return D.AREAS; },
     '物料分类': function () { return D.material.mid; },
@@ -2173,12 +2192,8 @@
     return list && list.length ? list[abHash(name + '#' + key) % list.length] : '';
   }
   function abUnitConds() {
-    const b = ASB.conds.board, d = ASB.conds.detail;
-    const conds = Object.assign({}, b, d);
-    /* 组织 / 实施单位指向同一行维度：明细筛选优先，避免「一公司 AND 二公司 = 0 行」 */
-    if (d['实施单位']) delete conds['组织'];
-    else if (b['组织']) delete conds['实施单位'];
-    return conds;
+    /* 指标明细表与顶部核心指标共用同一套查询条件 */
+    return ASB.conds.board;
   }
   function abMatchUnit(r, conds) {
     return Object.keys(conds).every(function (k) {
@@ -2204,15 +2219,16 @@
       '<input class="ck-field ck-field--date" type="date" data-ab-period="end" value="' + esc(ASB.period[1]) + '"/>' +
       '</span></div>';
   }
-  /* 筛选条底栏：作用域徽标 + 就地反馈 + 查询/清空/重置（与通用 actions 同款样式） */
-  function abActions(scope, chip) {
+  /* 筛选条底栏：展开 / 收起 + 就地反馈 + 查询 / 清空 / 重置（与通用 actions 同款样式） */
+  function abActions() {
     return '<div class="ck-filter__foot">' +
-      '<span class="ck-filter__scope">' + esc(chip) + '</span>' +
-      '<span class="ck-filter__hint"' + (ASB.hint[scope] ? '' : ' hidden') + '>' + esc(ASB.hint[scope] || '') + '</span>' +
+      '<span class="ck-link ck-link--adv' + (ASB.advanced ? ' ck-link--on' : '') + '" data-ab-adv>' +
+      (ASB.advanced ? '收起' : '展开') + CARET + '</span>' +
+      '<span class="ck-filter__hint"' + (ASB.hint.board ? '' : ' hidden') + '>' + esc(ASB.hint.board || '') + '</span>' +
       '<span class="ck-filter__foot-right">' +
-      '<button class="ck-btn ck-btn--primary" data-ab-query="' + scope + '">查询</button>' +
-      '<button class="ck-link" data-ab-clear="' + scope + '">清空</button>' +
-      '<button class="ck-link" data-ab-reset="' + scope + '">重置</button>' +
+      '<button class="ck-btn ck-btn--primary" data-ab-query>查询</button>' +
+      '<button class="ck-link" data-ab-clear>清空</button>' +
+      '<button class="ck-link" data-ab-reset>重置</button>' +
       '</span></div>';
   }
   function abReadConds(box) {
@@ -2269,7 +2285,7 @@
   function abRankTable() {
     const all = abFilteredUnits();
     if (!all.length) {
-      return '<div class="ck-table__empty">没有符合筛选条件的二级单位，请调整「明细筛选」后重新查询</div>';
+      return '<div class="ck-table__empty">没有符合筛选条件的二级单位，请调整上方查询条件后重新查询</div>';
     }
     const pages = Math.max(1, Math.ceil(all.length / ASB.size));
     if (ASB.page > pages) ASB.page = pages;
@@ -2298,34 +2314,30 @@
   function assetBoardView() {
     const m = abMetric(ASB.metric);
     const unitN = abFilteredUnits().length;
-    const bc = ASB.conds.board, dc = ASB.conds.detail;
+    const bc = ASB.conds.board;
     return '<div class="ck-view ck-view--metrics">' +
-      /* 5 指标卡（与页签双向联动；名称在上 + 同比徽标 + 数值 + 环比/内控目标，与其它看板同一套卡片结构） */
+      /* 核心指标：指标卡 / 页签 / 趋势 / 指标明细表统一放在一个区块内 */
+      section('核心指标',
+      /* 5 指标卡（与采购 / 物资看板同款：数值在上、名称在下） */
       '<div class="ck-metrics ck-metrics--5">' + AB_IND.map(function (x) {
-        const yoy = D.round(x.value - x.ly, 2);
-        const mom = D.round(x.value - x.lm, 2);
-        const good = x.better === 'low' ? yoy <= 0 : yoy >= 0;
-        const ok = x.better === 'low' ? x.value <= x.target : x.value >= x.target;
-        return '<div class="ck-metriccard ck-metriccard--kpi' + (ASB.metric === x.key ? ' ck-metriccard--active' : '') +
+        return '<div class="ck-metriccard' + (ASB.metric === x.key ? ' ck-metriccard--active' : '') +
           '" data-ab-metric="' + x.key + '">' +
-          '<div class="ck-kpi__head"><span class="ck-kpi__name">' + esc(x.name) + '</span>' +
-          '<span class="ck-kpi__trend ck-kpi__trend--' + (good ? 'good' : 'bad') + '">同比 ' +
-          (yoy >= 0 ? '↑' : '↓') + Math.abs(yoy).toFixed(2) + 'pp</span></div>' +
           '<div class="ck-metriccard__value">' + D.fmtNum(x.value, x.dec) +
           '<span>' + esc(x.unit) + '</span></div>' +
-          '<div class="ck-kpi__sub">环比 ' + (mom >= 0 ? '+' : '') + mom.toFixed(2) + 'pp　·　目标 ' +
-          x.target.toFixed(2) + '%，' + (ok ? '已达标' : '未达标') + '</div></div>';
+          '<div class="ck-metriccard__label">' + esc(x.name) + '</div></div>';
       }).join('') + '</div>' +
 
-      /* 筛选条（看板作用域）：查询结果落到下方明细表 */
+      /* 筛选条（与采购 / 物资同款折叠展开）：查询结果落到下方指标明细表 */
       '<div class="ck-filter ck-filter--panel" data-ab-scope="board">' +
       '<div class="ck-filter__row">' +
-      field('项目类型', bc['项目类型'] || '') + field('项目业态', bc['项目业态'] || '') +
-      field('项目状态', bc['项目状态'] || '') + field('承包模式', bc['承包模式'] || '') +
-      '</div><div class="ck-filter__row">' +
       abDateRange() +
-      field('地区', bc['地区'] || '') + field('组织', bc['组织'] || '') + field('物料分类', bc['物料分类'] || '') +
-      '</div>' + abActions('board', '看板筛选') + '</div>' +
+      field('项目类型', bc['项目类型'] || '') + field('项目状态', bc['项目状态'] || '') +
+      field('组织', bc['组织'] || '') +
+      '</div>' +
+      '<div class="ck-filter__more" ' + (ASB.advanced ? '' : 'hidden') + '>' +
+      field('项目业态', bc['项目业态'] || '') + field('承包模式', bc['承包模式'] || '') +
+      field('地区', bc['地区'] || '') + field('物料分类', bc['物料分类'] || '') +
+      '</div>' + abActions() + '</div>' +
 
       /* 指标页签 + 红色趋势 */
       '<div class="ck-tabsrow">' + AB_IND.map(function (x) {
@@ -2335,23 +2347,11 @@
       subHead(m.name + '随时间变化的趋势') +
       '<div class="dsc-chart" id="abTrend" style="height:280px"></div>' +
 
-      /* 二级单位明细（标题跟随当前指标；明细筛选只作用于这张表） */
-      section('二级单位' + m.name,
-        '<div class="ck-filter" data-ab-scope="detail">' +
-        '<div class="ck-filter__row">' +
-        abDateRange() +
-        field('实施单位', dc['实施单位'] || '') + field('物料小类', dc['物料小类'] || '') +
-        '</div><div class="ck-filter__row">' +
-        field('项目类型', dc['项目类型'] || '') + field('项目状态', dc['项目状态'] || '') +
-        field('项目业态', dc['项目业态'] || '') + field('承包模式', dc['承包模式'] || '') +
-        '</div>' + abActions('detail', '明细筛选') + '</div>' +
-        '<div class="dsc-card u-mb-lg"><div class="dsc-card__header">' +
-        '<div class="dsc-card__title">二级单位' + esc(m.name) + '明细</div>' +
-        '<div class="dsc-card__extra">共 ' + unitN + ' 个二级单位　' +
-        D.colGear('data-ab-columns', '设置列：本指标的明细列表字段（基本信息 + 指标信息）') + '</div></div>' +
-        abRankTable() +
-        '<div data-ab-pager>' + D.pager({ page: ASB.page, size: ASB.size, total: unitN }) + '</div>' +
-        '</div>') +
+      /* 指标明细表：与顶部核心指标共用查询条件，不再单独设查询区 */
+      subHead('指标明细表', '共 ' + unitN + ' 个二级单位　' +
+        D.colGear('data-ab-columns', '设置列：本指标的明细列表字段（基本信息 + 指标信息）')) +
+      abRankTable() +
+      '<div data-ab-pager>' + D.pager({ page: ASB.page, size: ASB.size, total: unitN }) + '</div>') +
 
       /* 项目资产类别资产周转率 */
       section('项目资产类别资产周转率',
@@ -2387,7 +2387,7 @@
 
   D.pages['asset-board'] = function () {
     return '<div class="dsc-page cockpit-page">' +
-      pageHead('资产管理看板', '核心数据 · 资产：资产周转率 / 闲置率 / 折旧率与二级单位明细') +
+      pageHead('资产管理看板', '核心数据 · 资产：资产周转率 / 闲置率 / 折旧率与指标明细表') +
       scopeNote() + assetBoardView() + '</div>';
   };
 
@@ -2401,7 +2401,7 @@
   D.pages['purchase-board'].after = function (root) {
     metricsAfter(root);
     commonAfter(root);
-    /* 二级单位明细：设置列（齿轮）——真正改变表格字段，不只是弹提示 */
+    /* 指标明细表：设置列（齿轮）——真正改变表格字段，不只是弹提示 */
     D.delegate(root, [
       { sel: '[data-pb-cols]', fn: function () {
         metricColPicker(CS.metric, METRICS.filter(function (x) { return x.key === CS.metric; })[0].name +
@@ -2458,43 +2458,46 @@
     }
 
     D.delegate(root, [
+      { sel: '[data-ab-adv]', fn: function (el) {
+        ASB.advanced = !ASB.advanced;
+        const more = el.closest('.ck-filter').querySelector('.ck-filter__more');
+        if (more) more.hidden = !ASB.advanced;
+        el.classList.toggle('ck-link--on', ASB.advanced);
+        if (el.firstChild && el.firstChild.nodeType === 3) {
+          el.firstChild.nodeValue = ASB.advanced ? '收起' : '展开';
+        }
+      } },
       { sel: '[data-ab-metric]', fn: function (el) { ASB.metric = el.getAttribute('data-ab-metric'); D.render(); } },
       { sel: '[data-ab-tab]', fn: function (el) { ASB.metric = el.getAttribute('data-ab-tab'); D.render(); } },
       { sel: '[data-ab-columns]', fn: function () {
         const k = AB_METRIC_MAP[ASB.metric] || 'assetTurnover';
         metricColPicker(k, abMetric(ASB.metric).name + ' · 指标明细列表');
       } },
-      /* 查询：两条筛选条都落到明细表（此前只弹一行「已记录条件」，数字不动） */
+      /* 查询：顶部核心指标条件直接落到指标明细表 */
       { sel: '[data-ab-query]', fn: function (el) {
-        const scope = el.getAttribute('data-ab-query');
         const box = el.closest('.ck-filter');
         if (!box) return;
-        ASB.conds[scope] = abReadConds(box);
+        ASB.conds.board = abReadConds(box);
         abReadPeriod(box);
         ASB.page = 1;
-        /* 命中数按两条筛选条的并集算：另一条已生效的条件也要在反馈里说清楚 */
-        const mine = Object.keys(ASB.conds[scope]).length;
-        const other = Object.keys(ASB.conds[scope === 'board' ? 'detail' : 'board']).length;
-        const total = Object.keys(abUnitConds()).length;
+        const total = Object.keys(ASB.conds.board).length;
         const hits = abFilteredUnits().length;
-        ASB.hint[scope] = (mine || other)
-          ? '已按 ' + total + ' 项条件筛选' + (other ? '（含另一筛选条 ' + other + ' 项）' : '') +
-            ' · 命中 ' + hits + ' 个单位' + (scope === 'board' ? '（明细见下方）' : '')
+        ASB.hint.board = total
+          ? '已按 ' + total + ' 项条件筛选 · 命中 ' + hits + ' 个单位（明细见下方）'
           : '未设置筛选条件，显示全部 ' + abVisibleUnits().length + ' 个单位';
         D.render();
-        D.toast(ASB.hint[scope]);
+        D.toast(ASB.hint.board);
       } },
-      { sel: '[data-ab-clear]', fn: function (el) {
-        const scope = el.getAttribute('data-ab-clear');
-        ASB.conds[scope] = {};
-        ASB.hint[scope] = '';
+      { sel: '[data-ab-clear]', fn: function () {
+        ASB.conds.board = {};
+        ASB.hint.board = '';
         ASB.page = 1;
         D.render();
-        D.toast('已清空' + (scope === 'board' ? '看板' : '明细') + '筛选条件');
+        D.toast('已清空筛选条件');
       } },
       { sel: '[data-ab-reset]', fn: function () {
-        ASB.conds = { board: {}, detail: {} };
-        ASB.hint = { board: '', detail: '' };
+        ASB.conds = { board: {} };
+        ASB.hint = { board: '' };
         ASB.period = ['2025-06-01', '2026-05-31'];
         ASB.page = 1;
         D.render();
@@ -2550,10 +2553,10 @@
           { name: '在库分供商数量', data: SB_STOCK.orgCounts, type: 'bar', color: '#2468F2', color2: '#7FC4F5', unit: '家' },
           { name: '全局占比', data: SB_STOCK.orgShares, type: 'line', axis: 'right', color: '#D98C8C' }
         ]
-      }, { height: 360, rotateX: 45, padB: 110, padT: 32, yDigits: 0, y2Unit: '%',
-        rDigits: 2, dataLabels: true, barLabelRaw: true, barLabelSize: 10, yMax: 8000, y2Max: 10, lineLabels: true,
-        lineLabelEvery: 1, lineLabelDigits: 1, lineLabelSize: 8, lineLabelColor: '#C0504D',
-        lineLabelOffset: -8, lineLabelUnit: '%' });
+      }, sbStockOpt({
+        height: 360, rotateX: 45, padB: 110,
+        barLabelSize: 10, yMax: 8000, y2Max: 10
+      }));
     }
     const stockRegion = el('sbStockRegion');
     if (stockRegion) {
@@ -2563,10 +2566,10 @@
           { name: '分供商数量', data: SB_STOCK.regionCounts, type: 'bar', color: '#2468F2', color2: '#7FC4F5', unit: '家' },
           { name: '全局占比', data: SB_STOCK.regionShares, type: 'line', axis: 'right', color: '#D98C8C' }
         ]
-      }, { height: 300, rotateX: 35, padB: 80, padT: 32, yDigits: 0, y2Unit: '%',
-        rDigits: 2, dataLabels: true, barLabelRaw: true, barLabelSize: 9, yMax: 18000, y2Max: 22, lineLabels: true,
-        lineLabelEvery: 1, lineLabelDigits: 1, lineLabelSize: 8, lineLabelColor: '#C0504D',
-        lineLabelOffset: -8, lineLabelUnit: '%' });
+      }, sbStockOpt({
+        height: 300, rotateX: 35, padB: 80,
+        barLabelSize: 9, yMax: 18000, y2Max: 22
+      }));
     }
     const stockType = el('sbStockType');
     if (stockType) {
@@ -2582,31 +2585,27 @@
           { name: '分供商数量', data: SB_STOCK.classCounts, type: 'bar', color: '#2468F2', color2: '#7FC4F5', unit: '家' },
           { name: '全局占比', data: SB_STOCK.classShares, type: 'line', axis: 'right', color: '#D98C8C' }
         ]
-      }, { height: 300, rotateX: 40, padB: 88, padT: 32, yDigits: 0, y2Unit: '%',
-        rDigits: 2, dataLabels: true, barLabelRaw: true, barLabelSize: 7, yMax: 25000, y2Max: 30, lineLabels: true,
-        lineLabelEvery: 1, lineLabelDigits: 1, lineLabelSize: 8, lineLabelColor: '#C0504D',
-        lineLabelOffset: -14, lineLabelUnit: '%' });
+      }, sbStockOpt({
+        height: 300, rotateX: 40, padB: 88,
+        barLabelSize: 7, lineLabelOffset: -14, yMax: 25000, y2Max: 30
+      }));
     }
 
     /* 分供商使用情况 */
     bar('sbRate', SB_RATE.cats, [
       { name: '分供商数量', data: SB_RATE.data, color: SB_BLUE, unit: '家' },
       { name: '占比', data: SB_RATE.rates, type: 'line', axis: 'right', color: '#D98C8C', unit: '%' }
-    ], { unit: '家', yDigits: 0, y2Unit: '%', rDigits: 0, y2Color: '#999',
-      yMax: 14000, y2Max: 100, padT: 34, dataLabels: false, lineLabels: true, lineLabelEvery: 1,
-      lineLabelDigits: 1, lineLabelSize: 9, lineLabelColor: '#C0504D', lineLabelOffset: -12,
-      lineLabelUnit: '%', labelColor: '#334155', topLabelSize: 8, topLabelOffset: 6,
-      barWidthScale: 2 / 3,
-      categoryTopLabels: SB_RATE.data.map(function (v) { return D.fmtInt(v); }) });
+    ], sbBarLineOpt({
+      yMax: 14000, y2Max: 100, labelColor: '#334155',
+      categoryTopLabels: SB_RATE.data.map(function (v) { return D.fmtInt(v); })
+    }));
     bar('sbEval', SB_EVAL.cats, [
       { name: '分供商数量', data: SB_EVAL.data, color: SB_BLUE, unit: '家' },
       { name: '占比', data: SB_EVAL.pct, type: 'line', axis: 'right', color: '#D98C8C', unit: '%' }
-    ], { unit: '家', yDigits: 0, y2Unit: '%', rDigits: 0, y2Color: '#999',
-      yMax: 55000, y2Max: 45, padT: 34, dataLabels: false, lineLabels: true, lineLabelEvery: 1,
-      lineLabelDigits: 1, lineLabelSize: 9, lineLabelColor: '#C0504D', lineLabelOffset: -12,
-      lineLabelUnit: '%', topLabelSize: 8, topLabelOffset: 6,
-      barWidthScale: 2 / 3,
-      categoryTopLabels: SB_EVAL.data.map(function (v) { return D.fmtInt(v); }) });
+    ], sbBarLineOpt({
+      yMax: 55000, y2Max: 45,
+      categoryTopLabels: SB_EVAL.data.map(function (v) { return D.fmtInt(v); })
+    }));
     /* 转化与流失 */
     donut('sbConvert', SB_CONVERT, '9,851');
     donut('sbLoss', SB_LOSS, '7,391');
@@ -2615,17 +2614,13 @@
       bar('sbYears', SB_YEARS.buckets, [
         { name: '分供商数量', data: SB_YEARS_TOTAL, colors: SB_YEARS.colors, unit: '家' },
         { name: '占比', data: SB_YEARS_PCT, type: 'line', axis: 'right', color: '#D98C8C', unit: '%' }
-      ], {
-        unit: '家', yDigits: 0, y2Unit: '%', rDigits: 0, y2Color: '#999',
-        yMax: 7000, y2Max: 40, padT: 34, dataLabels: false, lineLabels: true, lineLabelEvery: 1,
-        lineLabelDigits: 1, lineLabelSize: 9, lineLabelColor: '#C0504D', lineLabelOffset: -12,
-        lineLabelUnit: '%', labelColor: '#334155', topLabelSize: 8, topLabelOffset: 6,
-        barWidthScale: 2 / 3,
+      ], sbBarLineOpt({
+        yMax: 7000, y2Max: 40, labelColor: '#334155',
         categoryTopLabels: SB_YEARS_TOTAL.map(function (v) { return D.fmtInt(v); }),
         onBarClick: function (i) {
           SBY.bucket = i; D.render();
         }
-      });
+      }));
     } else {
       const vals = SB_YEARS_DATA[SBY.bucket];
       const total = vals.reduce(function (a, v) { return a + v; }, 0);
@@ -2633,15 +2628,11 @@
       bar('sbYears', SB_YEARS.cats, [
         { name: '分供商数量', data: vals, color: SB_YEARS.colors[SBY.bucket], unit: '家' },
         { name: '占比', data: pct, type: 'line', axis: 'right', color: '#D98C8C', unit: '%' }
-      ], {
-        unit: '家', yDigits: 0, y2Unit: '%', rDigits: 0, y2Color: '#999',
+      ], sbBarLineOpt({
         yMax: Math.ceil(Math.max.apply(null, vals) * 1.35 / 100) * 100,
-        y2Max: 25, padT: 34, dataLabels: false, lineLabels: true, lineLabelEvery: 1,
-        lineLabelDigits: 1, lineLabelSize: 9, lineLabelColor: '#C0504D', lineLabelOffset: -12,
-        lineLabelUnit: '%', labelColor: '#334155', topLabelSize: 8, topLabelOffset: 6,
-        barWidthScale: 2 / 3,
+        y2Max: 25, labelColor: '#334155',
         categoryTopLabels: vals.map(function (v) { return D.fmtInt(v); })
-      });
+      }));
     }
     bar('sbPerf', SB_PERF.cats, [
       { name: '分供商履约金额', data: SB_PERF.amt, color: SB_BLUE, unit: '万元' },

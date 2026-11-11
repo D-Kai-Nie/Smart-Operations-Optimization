@@ -646,7 +646,7 @@ window.APP = window.APP || {};
       const frameCount = Math.floor(contractCount * (0.25 + (i % 4) * 0.1));
       const execCount = contractCount - frameCount;
       return {
-        org2: p.org, org3: p.subOrg, project: p.name, format: p.format,
+        org2: p.org, org3: p.subOrg, project: p.name,
         /* 日期落在默认统计期 2026-01-01 ~ 2026-09-15 内，供资源报表时间筛选 */
         date: '2026-' + String(1 + (i * 3) % 8).padStart(2, '0') + '-' +
           String(1 + (i * 7) % 27).padStart(2, '0'),
@@ -654,18 +654,15 @@ window.APP = window.APP || {};
         /* 分类按行序轮转：D.suppliers 的 cat 是 seedRand 首个输出，连续种子几乎同值，
            30 行会全部落到「设计服务类」，导致分类筛选与履约分布图只有一根柱 */
         cat: D.supplierCats[i % D.supplierCats.length], grade: s.grade,
-        bidCode: 'ZB-' + (20260000 + i * 11),
+        score: s.credit != null ? s.credit : 80,
         bidCount: winCount + 2 + ((i * 5) % 13), winCount: winCount, winAmt: winAmt,
-        contractCount: contractCount, signCount: contractCount,
+        signCount: contractCount,
         frameCount: frameCount, execCount: execCount,
         contractAmt: between(rnd, 120, 26000, 1),
-        contractCode: 'HT-' + (20250000 + i * 13),
-        settleCode: 'JS' + (20260000 + i * 19),
         perfProjCount: 1,
         banCount: Math.floor(between(rnd, 0, 2, 0)), badCount: Math.floor(between(rnd, 0, 5, 0)),
         perfAmt: round(winAmt * between(rnd, 0.3, 1.05), 1),
         matMid: D.material.mid[i % D.material.mid.length],
-        credit: s.credit,
         /* Axure「资源+资产 › 分供商履约」的其余字段 */
         matBig: D.material.big[i % D.material.big.length],
         matSmall: D.material.small[(i * 3) % D.material.small.length],
@@ -678,7 +675,6 @@ window.APP = window.APP || {};
       /* 资源履约质量表用：支付金额 / 履约率 / 评价得分（原先列定义有这三列，行上没有字段） */
       r.payAmt = round(r.perfAmt * (0.78 + (r.winCount % 5) * 0.04), 1);
       r.perfRate = r.contractAmt ? D.round(Math.min(100, r.perfAmt / r.contractAmt * 100), 2) : 0;
-      r.score = r.credit != null ? r.credit : 80;
       return r;
     });
   };

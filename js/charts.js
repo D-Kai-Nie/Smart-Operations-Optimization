@@ -272,17 +272,7 @@ window.APP = window.APP || {};
         if (opt.categoryTopLabels && opt.categoryTopLabels[i] != null) {
           const topV = stack ? acc : barsL.reduce(function (m, se) { return Math.max(m, se.data[i] || 0); }, lmin);
           const topGap = opt.topLabelOffset == null ? 6 : opt.topLabelOffset;
-          let topY = YL(topV);
-          /* 柱顶文字与右轴折线距离很近时，把文字抬到折线上方，避免折线穿过文字；
-             折线离柱子很远时保持柱顶位置，避免标签被带得过高 */
-          if (opt.topLabelAvoidLine) {
-            lines.forEach(function (se) {
-              const lv = se.data[i];
-              if (lv == null) return;
-              const ly = YR(lv);
-              if (ly < topY && topY - ly <= 24) topY = ly;
-            });
-          }
+          const topY = YL(topV);
           s += '<text x="' + cx.toFixed(1) + '" y="' + (topY - topGap).toFixed(1) +
             '" text-anchor="middle" font-size="' + (opt.topLabelSize || 11) + '" fill="' + (opt.labelColor || '#7FE7FF') + '">' +
             esc(opt.categoryTopLabels[i]) + '</text>';
@@ -891,9 +881,7 @@ window.APP = window.APP || {};
                再折一次会出现「1.89万」（= 18,900 万元）这种反直觉读数 → barLabelRaw 关掉换算 */
             const lbl = opt.barLabelRaw ? fmt(v, opt.yDigits == null ? (v >= 100 ? 0 : 2) : opt.yDigits)
               : (v >= 10000 ? fmt(v / 10000, 2) + '万' : fmt(v, v >= 100 ? 0 : 2));
-            /* 密集类目（如分供商分类 11 项）可缩小字号并交错上下位置，避免标签互相压住 */
-            const labDy = opt.barLabelStagger ? (i % 2 ? -16 : -4) : -4;
-            s += '<text x="' + (x + Math.max(3, bw - 4) / 2).toFixed(1) + '" y="' + (y + labDy).toFixed(1) +
+            s += '<text x="' + (x + Math.max(3, bw - 4) / 2).toFixed(1) + '" y="' + (y - 4).toFixed(1) +
               '" text-anchor="middle" font-size="' + (opt.barLabelSize || 10) + '" fill="#333">' +
               esc(lbl) + '</text>';
           }

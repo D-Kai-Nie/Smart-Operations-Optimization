@@ -288,7 +288,7 @@ window.APP = window.APP || {};
            字形用 CSS 画（::after），不进 th 的文本，避免影响表头文字检索 */
         (c.info ? '<i class="ck-info dsc-thinfo" data-col-info="' + esc(c.key) + '" title="悬停查看口径说明"></i>' : '');
       /* fixed：固定表格布局下 min-width 不生效，列宽改用 width（长文本由使用方做省略） */
-      return '<th class="' + cls + '" style="' + (opt.fixed ? 'width:' : 'min-width:') +
+      return '<th class="' + cls + '" data-key="' + esc(c.key) + '" style="' + (opt.fixed ? 'width:' : 'min-width:') +
         (c.width || 120) + 'px"' + (extra || '') +
         (c.tip ? ' title="' + esc(c.tip) + '"' : '') +
         (c.sortable ? ' data-sort="' + esc(c.key) + '"' : '') + '>' + inner + '</th>';
@@ -329,7 +329,7 @@ window.APP = window.APP || {};
           } else if (c.num) html = c.fmt ? c.fmt(v) : D.fmtNum(v, typeof v === 'number' && v % 1 !== 0 ? 2 : 0);
           else html = esc(v);
           if (c.link && v && v !== '—') html = '<span class="dsc-table__link" data-link="' + esc(v) + '">' + esc(v) + '</span>';
-          return '<td class="' + cls + '">' + html + '</td>';
+          return '<td class="' + cls + '" data-key="' + esc(c.key) + '">' + html + '</td>';
         }).join('') + '</tr>';
       }).join('');
       if (opt.totalRow) {
@@ -341,7 +341,7 @@ window.APP = window.APP || {};
           else if (v == null) v = '';
           else if (c.pct) v = D.fmtNum(v, 2) + '%';
           else if (c.num) v = c.fmt ? c.fmt(v) : D.fmtNum(v, typeof v === 'number' && v % 1 !== 0 ? 2 : 0);
-          return '<td class="' + cls + '">' + esc(v) + '</td>';
+          return '<td class="' + cls + '" data-key="' + esc(c.key) + '">' + esc(v) + '</td>';
         }).join('') + '</tr>';
         /* totalRowTop：合计行放在数据行之前（长清单滚动区里不至于"看不见合计"，与排行表一致） */
         body = opt.totalRowTop ? totalHtml + body : body + totalHtml;
@@ -352,13 +352,25 @@ window.APP = window.APP || {};
       '</tbody></table></div>' + (opt.foot || '') + '</div>';
   };
 
-  /* 合计行工具 */
+  /* 合计行工具：默认数值列求和、pct 列取均值（保持既有口径）。
+     c.total 可覆盖：'sum' / 'avg' / 'none'，或 function (rows, t)（在基础合计之后执行，
+     便于算「分子 ÷ 分母」型比率、去重项目数等非求和列）。 */
   D.totalOf = function (cols, rows) {
     const t = {};
+    const deferred = [];
     cols.forEach(function (c) {
+      if (c.total === 'none') return;
+      /* 自定义合计函数是显式口径，pct 等非 num 列也可以使用（如率值「分子 ÷ 分母」） */
+      if (typeof c.total === 'function') { deferred.push(c); return; }
       if (!c.num) return;
       const s = rows.reduce(function (a, r) { return a + (typeof r[c.key] === 'number' ? r[c.key] : 0); }, 0);
-      t[c.key] = c.pct ? +(s / (rows.length || 1)).toFixed(2) : +s.toFixed(2);
+      if (c.total === 'sum') t[c.key] = +s.toFixed(2);
+      else if (c.total === 'avg' || (c.total == null && c.pct)) t[c.key] = +(s / (rows.length || 1)).toFixed(2);
+      else t[c.key] = +s.toFixed(2);
+    });
+    deferred.forEach(function (c) {
+      const v = c.total(rows, t);
+      if (v !== undefined) t[c.key] = v;
     });
     return t;
   };
@@ -409,25 +421,26 @@ window.APP = window.APP || {};
       return o.all.some(function (c) { return c.key === k; });
     });
     D.modal({
-      title: '设置列 · ' + o.title, width: o.width || (o.groups ? 1080 : 900),
+      title: o.modalTitle || ('设置列 · ' + o.title), width: o.width || (o.groups ? 1080 : 900),
       body: o.groups
         ? D.groupedColumnDialog(o.groups, shownKeys)
         : D.columnDialog(o.all.map(function (c) { return { key: c.key, name: c.name }; }), shownKeys),
       buttons: [{ text: '恢复默认', cls: '', act: 'default' },
         { text: '取消', cls: '', act: 'cancel' },
-        { text: '确定', cls: 'dsc-btn--primary', act: 'ok' }],
+        { text: o.okText || '确定', cls: 'dsc-btn--primary', act: 'ok' }],
       onAction: function (act, root) {
         if (act === 'default') {
           D.resetCols(o.key);
           D.closeModal();
           if (o.after) o.after();
-          D.toast('已恢复默认字段');
+          D.toast(o.defaultToast || '已恢复默认字段');
           return false;
         }
         const box = root.querySelector('.dsc-column-dialog');
         const keys = o.groups ? D.readGroupedDialog(box) : D.readColumnDialog(box);
         if (!keys.length) { D.toast('请至少选择一个字段', 'warn'); return false; }
         D.colStore[o.key] = fixed.concat(keys);
+        if (o.beforeRender) o.beforeRender();
         if (o.after) o.after();
         D.toast('已应用 ' + keys.length + ' 个显示字段（会话内保持）');
       }

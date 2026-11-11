@@ -90,7 +90,12 @@
     P_NUM('contractAmt', '合同金额', 130), P_NUM('perfAmt', '履约金额', 130),
     P_NUM('claimCount', '索赔次数', 110), P_NUM('badReturnCount', '不合格退货次数', 150),
     P_NUM('winAmt', '中标金额', 130), P_NUM('perfRate', '履约率', 100, { pct: true }),
-    P_NUM('score', '评价得分', 100)
+    /* 评价得分是均值型指标：合计行取全部行平均，不随金额求和 */
+    P_NUM('score', '评价得分', 100, {
+      total: function (rows) {
+        return D.round(rows.reduce(function (a, r) { return a + (r.score || 0); }, 0) / (rows.length || 1), 2);
+      }
+    })
   ];
   /* 资源履约质量表默认列：分供商 → 分类/等级 → 物料三级 → 合同/履约/履约率/评价得分 */
   const PJ_SUP_DEF = ['idx', 'name', 'cat', 'grade', 'matBig', 'matMid', 'matSmall',
@@ -1039,12 +1044,8 @@
     const rows = pjFilterRows('pj-supplier', rowsAll);
     const view = pjPageRows('pj-supplier', rows);
     const cols = D.colsOf('pj-supplier', PJ_SUP_COLS, PJ_SUP_DEF);
-    /* 合计行：金额求和、履约率/得分取平均 */
+    /* 合计行：金额列求和；履约率 / 评价得分等均值列由列上的 total 策略处理 */
     const tot = D.totalOf(cols, rows);
-    const scoreCol = cols.filter(function (c) { return c.key === 'score'; })[0];
-    if (scoreCol && rows.length) {
-      tot.score = D.round(rows.reduce(function (a, r) { return a + (r.score || 0); }, 0) / rows.length, 2);
-    }
     return section('分供商履约',
       pjSupKpis(rowsAll) +
       '<div class="pj-ranks u-mb-lg">' +
