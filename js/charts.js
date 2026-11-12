@@ -700,12 +700,6 @@ window.APP = window.APP || {};
     });
   };
 
-  D.barHTML = function (pct, variant) {
-    const p = Math.max(0, Math.min(100, pct));
-    return '<div class="dsc-progress"><div class="dsc-progress__bar' + (variant ? ' dsc-progress__bar--' + variant : '') +
-      '" style="width:' + p.toFixed(1) + '%"></div></div>';
-  };
-
   /* ============================================================
      截图基准配色（局驾驶舱）
      ============================================================ */

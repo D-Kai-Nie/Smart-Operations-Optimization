@@ -33,7 +33,6 @@
 .ck-filter { margin-bottom: var(--sp-md); }
 .ck-filter__row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px var(--sp-xl); margin-bottom: 10px; }
 .ck-filter__item { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
-.ck-filter__item--blank { flex: 1 1 200px; }
 .ck-filter__label { font-size: 14px; color: #333; white-space: nowrap; }
 .ck-req { color: var(--color-danger); margin-left: 2px; font-weight: 400; }
 /* 筛选条底栏：展开/收起在左，条件反馈居中偏左，查询/清空/重置贴右下角
@@ -45,8 +44,6 @@
 .ck-filter__foot-right { margin-left: auto; display: inline-flex; align-items: center; gap: var(--sp-lg); }
 .ck-link--adv svg { transition: transform var(--transition-fast); }
 .ck-link--on svg { transform: rotate(180deg); }
-.ck-filter__note { font-size: 12px; color: #4A5568; }
-.ck-filter__actions { margin-left: auto; display: inline-flex; align-items: center; gap: var(--sp-lg); }
 .ck-filter__more { display: flex; flex-wrap: wrap; gap: 10px var(--sp-xl); padding-top: 4px; }
 .ck-filter__more[hidden] { display: none; }
 
@@ -56,7 +53,6 @@
   background: #FFF; font-size: 13px; color: #333; white-space: nowrap;
   overflow: hidden; text-overflow: ellipsis;
 }
-.ck-field--ph { color: #BFBFBF; }
 .ck-field--date { min-width: 230px; }
 /* 真控件版筛选字段：与静态框同尺寸同外观，但可点可选 */
 select.ck-field {
@@ -189,8 +185,6 @@ input.ck-field { display: inline-block; min-width: 190px; }
 .ck-metrics--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 /* 资产管理看板：5 指标卡一行 */
 .ck-metrics--5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
-/* 闲废物资：全局合计 2 卡 */
-.ck-metrics--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
 /* 闲废物资：两张宽表按列定义收口，长文本省略——auto 布局会把金额 / 时间挤出可视区 */
 .mb-idle-table .dsc-table { table-layout: fixed; }
@@ -199,9 +193,6 @@ input.ck-field { display: inline-block; min-width: 190px; }
 .ck-metriccard--kpi { text-align: left; padding: var(--sp-lg); }
 .ck-kpi__head { display: flex; align-items: center; gap: var(--sp-sm); }
 .ck-kpi__name { font-size: 13px; color: #4A5568; }
-.ck-kpi__trend { flex: 0 0 auto; padding: 0 7px; line-height: 18px; border-radius: 9px; font-size: 12px; font-weight: 700; }
-.ck-kpi__trend--good { color: #00A870; background: #E8F8F1; }
-.ck-kpi__trend--bad { color: #D0021B; background: #FDECEE; }
 .ck-metriccard--kpi .ck-metriccard__value { margin-top: 10px; font-size: 28px; text-align: left; }
 .ck-metriccard--kpi .ck-metriccard__value span { font-size: 13px; }
 .ck-kpi__sub { margin-top: 8px; font-size: 12px; color: #8C93A0; }
@@ -212,9 +203,6 @@ input.ck-field { display: inline-block; min-width: 190px; }
 /* 卡片点击跳转后的目标区块闪一下，让用户确认落点 */
 @keyframes ckSecFlash { 0%,100% { box-shadow: none; } 30% { box-shadow: 0 0 0 2px rgba(36,104,242,.45); } }
 .ck-sec--flash { animation: ckSecFlash 1.2s ease; }
-/* 居中结论行（如「分供商使用率：30.7%」） */
-.ck-statline { margin: var(--sp-sm) 0 var(--sp-md); text-align: center; font-size: 15px; color: #4A5568; }
-.ck-statline b { font-size: 20px; color: var(--data-blue); font-weight: 700; }
 .ck-metriccard {
   padding: var(--sp-lg) var(--sp-md); text-align: center; cursor: pointer;
   background: linear-gradient(180deg, #F0F6FF 0%, #E7F1FF 100%);
@@ -234,7 +222,6 @@ input.ck-field { display: inline-block; min-width: 190px; }
 .ck-metriccard--stat .ck-metriccard__label { margin: 0 0 10px; font-size: 13px; color: #4A5568; }
 .ck-metriccard--stat .ck-metriccard__value { font-size: 24px; }
 .ck-metriccard--stat .ck-metriccard__value span { font-size: 12px; }   /* 值:单位 保持 2:1 */
-.ck-metriccard__sub { margin-top: 8px; font-size: 13px; color: #4A5568; }
 
 /* ---------- 指标页签 ---------- */
 .ck-tabsrow {

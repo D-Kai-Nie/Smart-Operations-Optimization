@@ -97,6 +97,39 @@
   }
   const CARET = '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 6.5l4 4 4-4"/></svg>';
 
+  /* 标准指标卡：数值 + 单位在上、名称在下；采购 / 物资 / 资产看板共用 */
+  function metricCard(o) {
+    return '<div class="ck-metriccard' + (o.active ? ' ck-metriccard--active' : '') + '" ' +
+      o.attr + '="' + esc(o.key) + '">' +
+      '<div class="ck-metriccard__value">' + (o.disp || D.fmtNum(o.value, o.dec)) +
+      '<span>' + esc(o.unit) + '</span></div>' +
+      '<div class="ck-metriccard__label">' + esc(o.name) + '</div></div>';
+  }
+  /* 指标卡带：list + 数据属性 + 当前选中 key + 列数修饰类 */
+  function metricCards(list, attr, activeKey, cls) {
+    return '<div class="ck-metrics' + (cls ? ' ' + cls : '') + '">' +
+      list.map(function (x) {
+        return metricCard({
+          attr: attr, key: x.key, active: activeKey === x.key,
+          disp: x.disp, value: x.value, dec: x.dec, unit: x.unit, name: x.name
+        });
+      }).join('') + '</div>';
+  }
+  /* 指标页签：与指标卡联动，采购 / 物资 / 资产看板共用 */
+  function metricTabs(list, attr, activeKey) {
+    return '<div class="ck-tabsrow">' + list.map(function (x) {
+      return '<div class="ck-tab' + (activeKey === x.key ? ' ck-tab--active' : '') +
+        '" ' + attr + '="' + esc(x.key) + '">' + esc(x.name) + '</div>';
+    }).join('') + '</div>';
+  }
+  /* 指标明细表标题 + 单位数 + 设置列齿轮（三看板共用） */
+  function detailListHead(o) {
+    o = o || {};
+    const count = o.count == null ? '' : '共 ' + o.count + ' 个二级单位' + (o.gap ? '　' : '');
+    return subHead('指标明细表', count + D.colGear(o.gear,
+      o.tip || '设置列：本指标的明细列表字段（基本信息 + 指标信息）'));
+  }
+
   /* 筛选字段候选值：按字段名给出可选项，供真下拉使用 */
   function optList(label) {
     switch (label) {
@@ -201,19 +234,39 @@
   }
   D.ckField = field;   // 供项目驾驶舱等页面复用同一套筛选字段
   D.ckActions = actions;   // 供合规看板等页面复用同一套筛选条底栏（展开 + 查询/清空/重置）
-  /* 底栏：展开（左，与 Axure 筛选条一致）+ 条件反馈 + 查询/清空/重置（右下角）。
-     此前按钮塞在最后一行字段中间，展开后还会被「更多条件」挤开，操作位不固定。
-     adv：true → 展开/收起开关（data-ck-adv）；{ attr, label } → 自定义属性与文案 */
+  /* 筛选条底栏：展开（左）+ 条件反馈 + 查询/清空/重置（右下角）。
+     默认属性为 data-ck-*；资产看板等使用 data-ab-* 时传入自定义属性名即可复用同一套样式。 */
+  function filterFoot(o) {
+    o = o || {};
+    const adv = o.advAttr
+      ? '<span class="ck-link ck-link--adv' + (o.advOn ? ' ck-link--on' : '') + '" ' + o.advAttr + '>' +
+        (o.advLabel || '展开') + CARET + '</span>'
+      : '';
+    return '<div class="ck-filter__foot">' + adv +
+      '<span class="ck-filter__hint"' + (o.hint ? '' : ' hidden') + '>' + esc(o.hint || '') + '</span>' +
+      '<span class="ck-filter__foot-right">' +
+      '<button class="ck-btn ck-btn--primary" ' + (o.queryAttr || 'data-ck-query') + '>查询</button>' +
+      '<button class="ck-link" ' + (o.clearAttr || 'data-ck-clear') + '>清空</button>' +
+      '<button class="ck-link" ' + (o.resetAttr || 'data-ck-reset') + '>重置</button>' +
+      '</span></div>';
+  }
+  /* 展开 / 收起按钮：DOM 显隐、状态类与文案一起切换，避免各页面各写一套 */
+  function setFilterMore(el, open) {
+    const more = el.closest('.ck-filter').querySelector('.ck-filter__more');
+    if (more) more.hidden = !open;
+    el.classList.toggle('ck-link--on', open);
+    if (el.firstChild && el.firstChild.nodeType === 3) {
+      el.firstChild.nodeValue = open ? '收起' : '展开';
+    }
+  }
+  /* adv：true → 展开/收起开关（data-ck-adv）；{ attr, label } → 自定义属性与文案 */
   function actions(adv) {
     const a = adv === true ? { attr: 'data-ck-adv', label: '展开' } : (adv || null);
-    return '<div class="ck-filter__foot">' +
-      (a && a.attr ? '<span class="ck-link ck-link--adv" ' + a.attr + '>' + (a.label || '展开') + CARET + '</span>' : '') +
-      '<span class="ck-filter__hint" hidden></span>' +
-      '<span class="ck-filter__foot-right">' +
-      '<button class="ck-btn ck-btn--primary" data-ck-query>查询</button>' +
-      '<button class="ck-link" data-ck-clear>清空</button>' +
-      '<button class="ck-link" data-ck-reset>重置</button>' +
-      '</span></div>';
+    return filterFoot({
+      advAttr: a && a.attr ? a.attr : '',
+      advLabel: a && a.label,
+      advOn: !!(a && a.on)
+    });
   }
   /* 带状态的「展开 / 收起」入口：重绘后文案必须与 CS.advanced 的实际显隐一致，
      否则会出现「文案=展开 但更多条件已铺开」的状态分叉 */
@@ -451,13 +504,7 @@
     const m = metricDef(CS.metric);
     return '<div class="ck-view ck-view--metrics">' +
       section('核心指标',
-      '<div class="ck-metrics">' + METRICS.map(function (x) {
-        return '<div class="ck-metriccard' + (CS.metric === x.key ? ' ck-metriccard--active' : '') +
-          '" data-ck-metric="' + x.key + '">' +
-          '<div class="ck-metriccard__value">' + (x.disp || D.fmtNum(x.value, x.dec)) +
-          '<span>' + esc(x.unit) + '</span></div>' +
-          '<div class="ck-metriccard__label">' + esc(x.name) + '</div></div>';
-      }).join('') + '</div>' +
+      metricCards(METRICS, 'data-ck-metric', CS.metric) +
 
       '<div class="ck-filter ck-filter--panel">' +
       '<div class="ck-filter__row">' +
@@ -474,13 +521,9 @@
       '</div>' +
       advActions() + '</div>' +
 
-      '<div class="ck-tabsrow">' + METRICS.map(function (x) {
-        return '<div class="ck-tab' + (CS.metric === x.key ? ' ck-tab--active' : '') + '" data-ck-tab="' + x.key + '">' +
-          esc(x.name) + '</div>';
-      }).join('') + '</div>' +
+      metricTabs(METRICS, 'data-ck-tab', CS.metric) +
       '<div class="dsc-chart" id="ckTrend" style="height:280px"></div>' +
-      subHead('指标明细表',
-        D.colGear('data-pb-cols', '设置列：本指标的明细列表字段（基本信息 + 指标信息）')) +
+      detailListHead({ gear: 'data-pb-cols' }) +
       unitTable()) +
       procSection() +
       '</div>';
@@ -1599,13 +1642,7 @@
       /* 核心指标：指标卡 / 页签 / 趋势 / 指标明细表统一放在一个区块内 */
       section('核心指标',
       /* 6 指标卡（与页签双向联动） */
-      '<div class="ck-metrics ck-metrics--6">' + MB_METRICS.map(function (x) {
-        return '<div class="ck-metriccard' + (MS.metric === x.key ? ' ck-metriccard--active' : '') +
-          '" data-mb-metric="' + x.key + '">' +
-          '<div class="ck-metriccard__value">' + D.fmtNum(x.value, x.dec) +
-          '<span>' + esc(x.unit) + '</span></div>' +
-          '<div class="ck-metriccard__label">' + esc(x.name) + '</div></div>';
-      }).join('') + '</div>' +
+      metricCards(MB_METRICS, 'data-mb-metric', MS.metric, 'ck-metrics--6') +
 
       /* 主筛选条 */
       '<div class="ck-filter ck-filter--panel">' +
@@ -1624,16 +1661,12 @@
       advActions() + '</div>' +
 
       /* 指标页签 + 红色趋势 */
-      '<div class="ck-tabsrow">' + MB_METRICS.map(function (x) {
-        return '<div class="ck-tab' + (MS.metric === x.key ? ' ck-tab--active' : '') +
-          '" data-mb-tab="' + x.key + '">' + esc(x.name) + '</div>';
-      }).join('') + '</div>' +
+      metricTabs(MB_METRICS, 'data-mb-tab', MS.metric) +
       subHead(m.name + '随时间变化的趋势') +
       '<div class="dsc-chart" id="mbTrend" style="height:280px"></div>' +
 
       /* 指标明细表：同一「核心指标」区块内的明细列表 */
-      subHead('指标明细表', '共 ' + MB_RANK.length + ' 个二级单位' +
-        D.colGear('data-mb-rank-cols', '设置列：本指标的明细列表字段（基本信息 + 指标信息）')) +
+      detailListHead({ count: MB_RANK.length, gear: 'data-mb-rank-cols' }) +
       mbRankTable() +
       '<div data-mb-pager="rankPage">' + D.pager({ page: MS.rankPage, size: MS.size, total: MB_RANK.length }) + '</div>') +
 
@@ -1822,6 +1855,8 @@
     { name: '清退分供商数量', value: '7,391', unit: '家', last: '6,315', extra: '占比 10.67%', go: 2,
       desc: '当前自然年内出库的分供商数量；占比 = 清退分供商数量 ÷（在库 + 清退）＝ 7,391 ÷ 69,245', src: '采购管理系统分供商模块' }
   ];
+  /* 指标卡 key 在初始化时绑定一次，供渲染与口径气泡共用（不要每次 render 改写静态数组） */
+  SB_IND.forEach(function (k, ki) { k.key = 'k' + ki; });
 
   /* 分供商在库情况：27 个二级单位 / 经营区域 / 经营类型 / 分供商分类，四组合计均 = 61,854 家 */
   const SB_STOCK_TOTAL = 61854;
@@ -1980,8 +2015,7 @@
     }).join('') + '</div>';
   }
   function sbKpiCards() {
-    return '<div class="ck-metrics ck-metrics--4">' + SB_IND.map(function (k, ki) {
-      k.key = 'k' + ki;
+    return '<div class="ck-metrics ck-metrics--4">' + SB_IND.map(function (k) {
       return '<div class="ck-metriccard ck-metriccard--kpi" data-sb-ind="' + k.key + '" ' +
         'data-sb-go="' + k.go + '" title="点击查看相关区块">' +
         '<div class="ck-kpi__head"><span class="ck-kpi__name">' + esc(k.name) + '</span></div>' +
@@ -2084,29 +2118,23 @@
     /* 统计区间（真日期控件）+ 顶部核心指标共用的一套查询条件与反馈；
        指标明细表直接复用这套条件，不再维护独立的明细筛选 */
     period: ['2025-06-01', '2026-05-31'],
-    conds: { board: {} },
-    hint: { board: '' },
+    conds: {},
+    hint: '',
     advanced: false
   };
 
   /* 卡片值不写死：由下方 AB_RANK 的二级单位率值按资产金额加权汇总（见 abAggRate），
-     与「二级单位明细表 · 合计行」同一个口径——卡片与列表不会再出现 73.53% / 6.46% 这种两套数。
-     ly/lm/target 是卡片上的同比（上年同期）/ 环比（上月）/ 内控目标，量级随列表口径校准 */
+     与「指标明细表 · 合计行」同一个口径——卡片与列表不会再出现 73.53% / 6.46% 这种两套数 */
   const AB_IND = [
     { key: 'turnover', name: '资产周转率', value: 0, unit: '%', dec: 2,
-      ly: 4.76, lm: 5.12, target: 5.00, better: 'high',
       desc: '资产周转额 ÷ 资产平均原值 × 100%', src: '物管系统资产模块' },
     { key: 'idle', name: '资产闲置率', value: 0, unit: '%', dec: 2,
-      ly: 4.05, lm: 3.78, target: 4.00, better: 'low',
       desc: '闲置资产原值 ÷ 资产总原值 × 100%', src: '物管系统资产模块' },
     { key: 'doneTurnover', name: '竣工项目资产周转率', value: 0, unit: '%', dec: 2,
-      ly: 58.40, lm: 63.45, target: 65.00, better: 'high',
       desc: '竣工项目资产周转额 ÷ 竣工项目资产平均原值 × 100%（口径待确认 Q-08）', src: '物管系统资产模块' },
     { key: 'doneIdle', name: '竣工项目资产闲置率', value: 0, unit: '%', dec: 2,
-      ly: 3.55, lm: 3.28, target: 3.40, better: 'low',
       desc: '竣工项目闲置资产原值 ÷ 竣工项目资产总原值 × 100%（口径待确认 Q-08）', src: '物管系统资产模块' },
     { key: 'depRate', name: '资产折旧率', value: 0, unit: '%', dec: 2,
-      ly: 5.38, lm: 5.48, target: 5.60, better: 'low',
       desc: '当期折旧额 ÷ 资产原值 × 100%', src: '财务系统' }
   ];
   function abMetric(key) {
@@ -2176,7 +2204,6 @@
   const AB_ATTRS = {
     '地区': function () { return D.AREAS; },
     '物料分类': function () { return D.material.mid; },
-    '物料小类': function () { return D.material.small; },
     '项目类型': function () { return D.TYPES; },
     '项目状态': function () { return D.STATUS; },
     '项目业态': function () { return D.FORMATS; },
@@ -2191,25 +2218,37 @@
     const list = AB_ATTRS[key] ? AB_ATTRS[key]() : null;
     return list && list.length ? list[abHash(name + '#' + key) % list.length] : '';
   }
-  function abUnitConds() {
-    /* 指标明细表与顶部核心指标共用同一套查询条件 */
-    return ASB.conds.board;
+  /* 每个单位派生一个可用日期，默认区间内覆盖全部单位；
+     用户收窄日期后，指标明细表会真实过滤 */
+  const AB_PERIOD_START = Date.UTC(2025, 5, 1);
+  function abUnitDate(name) {
+    const day = abHash(name + '#period') % 365;
+    return new Date(AB_PERIOD_START + day * 86400000).toISOString().slice(0, 10);
+  }
+  function abInPeriod(name) {
+    const start = ASB.period[0], end = ASB.period[1];
+    if (!start && !end) return true;
+    const d = abUnitDate(name);
+    if (start && d < start) return false;
+    if (end && d > end) return false;
+    return true;
   }
   function abMatchUnit(r, conds) {
     return Object.keys(conds).every(function (k) {
       const v = conds[k];
       if (!v) return true;
-      if (k === '组织' || k === '实施单位') {
+      if (k === '组织') {
         return v.indexOf('中国建筑第八工程局') === 0 || r[0] === v;
       }
       return abUnitAttr(r[0], k) === v;
     });
   }
   function abFilteredUnits() {
-    const conds = abUnitConds();
-    return abVisibleUnits().filter(function (r) { return abMatchUnit(r, conds); });
+    return abVisibleUnits().filter(function (r) {
+      return abInPeriod(r[0]) && abMatchUnit(r, ASB.conds);
+    });
   }
-  /* 统计区间：真日期控件（P1-7），两处筛选条共用同一区间 */
+  /* 统计区间：真日期控件，顶部核心指标与指标明细表共用 */
   function abDateRange() {
     return '<div class="ck-filter__item"><span class="ck-filter__label">日期选择</span>' +
       '<span class="ck-grain" data-ck-grain="日期选择">' + esc(CS.settleGrain) + CARET + '</span>' +
@@ -2219,17 +2258,13 @@
       '<input class="ck-field ck-field--date" type="date" data-ab-period="end" value="' + esc(ASB.period[1]) + '"/>' +
       '</span></div>';
   }
-  /* 筛选条底栏：展开 / 收起 + 就地反馈 + 查询 / 清空 / 重置（与通用 actions 同款样式） */
+  /* 资产筛选底栏：复用通用 filterFoot，只替换为 data-ab-* 属性 */
   function abActions() {
-    return '<div class="ck-filter__foot">' +
-      '<span class="ck-link ck-link--adv' + (ASB.advanced ? ' ck-link--on' : '') + '" data-ab-adv>' +
-      (ASB.advanced ? '收起' : '展开') + CARET + '</span>' +
-      '<span class="ck-filter__hint"' + (ASB.hint.board ? '' : ' hidden') + '>' + esc(ASB.hint.board || '') + '</span>' +
-      '<span class="ck-filter__foot-right">' +
-      '<button class="ck-btn ck-btn--primary" data-ab-query>查询</button>' +
-      '<button class="ck-link" data-ab-clear>清空</button>' +
-      '<button class="ck-link" data-ab-reset>重置</button>' +
-      '</span></div>';
+    return filterFoot({
+      advAttr: 'data-ab-adv', advLabel: ASB.advanced ? '收起' : '展开', advOn: ASB.advanced,
+      hint: ASB.hint,
+      queryAttr: 'data-ab-query', clearAttr: 'data-ab-clear', resetAttr: 'data-ab-reset'
+    });
   }
   function abReadConds(box) {
     const conds = {};
@@ -2242,8 +2277,8 @@
   function abReadPeriod(box) {
     const s = box.querySelector('[data-ab-period="start"]');
     const e = box.querySelector('[data-ab-period="end"]');
-    if (s && s.value) ASB.period[0] = s.value;
-    if (e && e.value) ASB.period[1] = e.value;
+    if (s) ASB.period[0] = s.value || '';
+    if (e) ASB.period[1] = e.value || '';
   }
   /* 二级单位资产周转率明细的动态列（Axure 局驾驶舱核心数据 · 资产「设置列」口径） */
   const AB_COLS = [
@@ -2314,18 +2349,12 @@
   function assetBoardView() {
     const m = abMetric(ASB.metric);
     const unitN = abFilteredUnits().length;
-    const bc = ASB.conds.board;
+    const bc = ASB.conds;
     return '<div class="ck-view ck-view--metrics">' +
       /* 核心指标：指标卡 / 页签 / 趋势 / 指标明细表统一放在一个区块内 */
       section('核心指标',
       /* 5 指标卡（与采购 / 物资看板同款：数值在上、名称在下） */
-      '<div class="ck-metrics ck-metrics--5">' + AB_IND.map(function (x) {
-        return '<div class="ck-metriccard' + (ASB.metric === x.key ? ' ck-metriccard--active' : '') +
-          '" data-ab-metric="' + x.key + '">' +
-          '<div class="ck-metriccard__value">' + D.fmtNum(x.value, x.dec) +
-          '<span>' + esc(x.unit) + '</span></div>' +
-          '<div class="ck-metriccard__label">' + esc(x.name) + '</div></div>';
-      }).join('') + '</div>' +
+      metricCards(AB_IND, 'data-ab-metric', ASB.metric, 'ck-metrics--5') +
 
       /* 筛选条（与采购 / 物资同款折叠展开）：查询结果落到下方指标明细表 */
       '<div class="ck-filter ck-filter--panel" data-ab-scope="board">' +
@@ -2340,16 +2369,12 @@
       '</div>' + abActions() + '</div>' +
 
       /* 指标页签 + 红色趋势 */
-      '<div class="ck-tabsrow">' + AB_IND.map(function (x) {
-        return '<div class="ck-tab' + (ASB.metric === x.key ? ' ck-tab--active' : '') +
-          '" data-ab-tab="' + x.key + '">' + esc(x.name) + '</div>';
-      }).join('') + '</div>' +
+      metricTabs(AB_IND, 'data-ab-tab', ASB.metric) +
       subHead(m.name + '随时间变化的趋势') +
       '<div class="dsc-chart" id="abTrend" style="height:280px"></div>' +
 
       /* 指标明细表：与顶部核心指标共用查询条件，不再单独设查询区 */
-      subHead('指标明细表', '共 ' + unitN + ' 个二级单位　' +
-        D.colGear('data-ab-columns', '设置列：本指标的明细列表字段（基本信息 + 指标信息）')) +
+      detailListHead({ count: unitN, gap: true, gear: 'data-ab-columns' }) +
       abRankTable() +
       '<div data-ab-pager>' + D.pager({ page: ASB.page, size: ASB.size, total: unitN }) + '</div>') +
 
@@ -2460,12 +2485,7 @@
     D.delegate(root, [
       { sel: '[data-ab-adv]', fn: function (el) {
         ASB.advanced = !ASB.advanced;
-        const more = el.closest('.ck-filter').querySelector('.ck-filter__more');
-        if (more) more.hidden = !ASB.advanced;
-        el.classList.toggle('ck-link--on', ASB.advanced);
-        if (el.firstChild && el.firstChild.nodeType === 3) {
-          el.firstChild.nodeValue = ASB.advanced ? '收起' : '展开';
-        }
+        setFilterMore(el, ASB.advanced);
       } },
       { sel: '[data-ab-metric]', fn: function (el) { ASB.metric = el.getAttribute('data-ab-metric'); D.render(); } },
       { sel: '[data-ab-tab]', fn: function (el) { ASB.metric = el.getAttribute('data-ab-tab'); D.render(); } },
@@ -2477,27 +2497,29 @@
       { sel: '[data-ab-query]', fn: function (el) {
         const box = el.closest('.ck-filter');
         if (!box) return;
-        ASB.conds.board = abReadConds(box);
+        ASB.conds = abReadConds(box);
         abReadPeriod(box);
         ASB.page = 1;
-        const total = Object.keys(ASB.conds.board).length;
+        const periodOn = !!(ASB.period[0] || ASB.period[1]);
+        const total = Object.keys(ASB.conds).length + (periodOn ? 1 : 0);
         const hits = abFilteredUnits().length;
-        ASB.hint.board = total
+        ASB.hint = total
           ? '已按 ' + total + ' 项条件筛选 · 命中 ' + hits + ' 个单位（明细见下方）'
           : '未设置筛选条件，显示全部 ' + abVisibleUnits().length + ' 个单位';
         D.render();
-        D.toast(ASB.hint.board);
+        D.toast(ASB.hint);
       } },
       { sel: '[data-ab-clear]', fn: function () {
-        ASB.conds.board = {};
-        ASB.hint.board = '';
+        ASB.conds = {};
+        ASB.hint = '';
+        ASB.period = ['', ''];
         ASB.page = 1;
         D.render();
         D.toast('已清空筛选条件');
       } },
       { sel: '[data-ab-reset]', fn: function () {
-        ASB.conds = { board: {} };
-        ASB.hint = { board: '' };
+        ASB.conds = {};
+        ASB.hint = '';
         ASB.period = ['2025-06-01', '2026-05-31'];
         ASB.page = 1;
         D.render();
@@ -3002,20 +3024,13 @@
         /* 展开状态按「本筛选条」自己的 DOM 判定，不再用全局 CS.advanced：
            一页里有多条筛选（F3 项目驾驶舱最多 8 条）时，全局标志会让第二条的首次点击变成收起 */
         const more = el.closest('.ck-filter').querySelector('.ck-filter__more');
-        const open = more ? more.hidden : false;
-        if (more) more.hidden = !open;
-        /* 只在本筛选条内生效：不再回写全局 CS.advanced（多条筛选 / 跨页重绘会串状态） */
-        el.classList.toggle('ck-link--on', open);
-        /* 文案跟着状态走：展开 ↔ 收起（与数据报表页筛选条一致） */
-        if (el.firstChild && el.firstChild.nodeType === 3) {
-          el.firstChild.nodeValue = open ? '收起' : '展开';
-        }
+        setFilterMore(el, more ? more.hidden : false);
       } },
       { sel: '[data-ck-grain]', fn: function (el) {
         const label = el.getAttribute('data-ck-grain');
         const next = { '日': '月', '月': '季', '季': '年', '年': '日' };
         const nv = next[el.textContent.trim()] || '日';
-        if (label === '结算日期') CS.settleGrain = nv; else CS.inGrain = nv;
+        if (label === '结算日期' || label === '日期选择') CS.settleGrain = nv; else CS.inGrain = nv;
         el.innerHTML = nv + CARET;
         D.toast(label + ' 粒度切换为「' + nv + '」');
       } }
