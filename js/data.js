@@ -190,6 +190,22 @@ window.APP = window.APP || {};
   D.settleTypes = ['月度结算', '总结算', '临时结算', '退料结算'];
   D.settleStatuses = ['待提交', '审批中', '已生效', '已作废'];
   D.detailTypes = ['正常结算', '退货结算', '领料结算', '调拨结算'];
+  /* 项目资产分类：看板 / 资产数据报表共用同一份 11 类字典。
+     share 仅用于看板分类金额的示意拆分；subs 是报表「资产二级类别」的候选值。 */
+  D.ASSET_CATEGORIES = [
+    { key: 'large', name: '大型设备', share: 18.5, subs: ['电梯', '塔式起重机', '施工升降机'] },
+    { key: 'machine', name: '机械设备', share: 16, subs: ['挖掘机', '装载机', '压路机'] },
+    { key: 'office', name: '办公设施', share: 6.5, subs: ['打印机', '空调', '办公家具'] },
+    { key: 'life', name: '生活设施', share: 6, subs: ['宿舍设施', '食堂设备'] },
+    { key: 'safety', name: '安全文明施工设施', share: 9.5, subs: ['消火栓', '投光灯', '临时配电箱'] },
+    { key: 'temp', name: '临建设施', share: 15, subs: ['箱式房', '活动板房'] },
+    { key: 'tool', name: '工具用具', share: 5, subs: ['电锤', '手工具'] },
+    { key: 'turnover', name: '周转料具', share: 12, subs: ['钢管', '扣件', '模板支撑'] },
+    { key: 'nonTurnover', name: '非可周转', share: 4, subs: ['安装拆除费', '消耗性材料'] },
+    { key: 'wood', name: '木方模板', share: 5.5, subs: ['木方', '木模板'] },
+    { key: 'other', name: '其他资产', share: 2, subs: ['变压器', '其他'] }
+  ];
+  D.ASSET_CAT_NAMES = D.ASSET_CATEGORIES.map(function (c) { return c.name; });
   const CITY_BY_AREA = {
     '华东地区': ['杭州市', '宁波市', '温州市', '南京市', '苏州市', '济南市', '青岛市', '合肥市', '上海市'],
     '华北地区': ['北京市', '天津市', '石家庄市', '太原市', '呼和浩特市'],
@@ -591,6 +607,7 @@ window.APP = window.APP || {};
   D.genAssetRows = function (n, filter) {
     return genRows(n || 40, function (i, rnd) {
       const p = pick(rnd, D.projects);
+      const ac = D.ASSET_CATEGORIES[i % D.ASSET_CATEGORIES.length];
       const total = Math.floor(between(rnd, 20, 860, 0));
       const using = Math.floor(total * between(rnd, 0.4, 0.9));
       const idle = Math.floor((total - using) * between(rnd, 0.2, 0.8));
@@ -629,7 +646,10 @@ window.APP = window.APP || {};
         date: '2026-0' + (1 + Math.floor(rnd() * 9)) + '-' + String(1 + Math.floor(rnd() * 15)).padStart(2, '0'),
         /* 资产台账筛选用的状态字段（原先只有是否验收/盘点/调拨，没有「资产状态」「是否处置」） */
         assetStatus: pick(rnd, ['在用', '在用', '在用', '闲置', '闲置', '维保', '报废']),
-        disposed: pick(rnd, ['是', '否', '否'])
+        disposed: pick(rnd, ['是', '否', '否']),
+        /* 资产数据报表 / 看板共用的 11 类口径；category / subCategory 保留给项目驾驶舱资产台账 */
+        assetCat: ac.name,
+        assetSubCat: ac.subs[(i * 3 + 1) % ac.subs.length]
       };
     }).filter(function (r) { return filter ? filter(r) : true; });
   };

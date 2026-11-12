@@ -263,8 +263,12 @@ window.APP = window.APP || {};
           if (opt.dataLabels && !stack) {
             const unitTxt = opt.dataLabelUnit === false ? ''
               : (se.unit != null ? se.unit : (opt.unit || ''));
-            s += '<text x="' + (x + bwid / 2).toFixed(1) + '" y="' + (y - 5).toFixed(1) +
-              '" text-anchor="middle" font-size="11" fill="' + (opt.labelColor || '#7FE7FF') + '">' +
+            /* 柱顶标签默认画在柱子上方；需要同时显示折线标签时可切到柱内顶部，
+               避免金额与百分比在柱顶附近互相压字。柱子太矮时仍回落到柱顶上方。 */
+            const inside = !!opt.barLabelInside && hgt >= (opt.barLabelInsideMin || 26);
+            s += '<text x="' + (x + bwid / 2).toFixed(1) + '" y="' + (inside ? y + 15 : y - 5).toFixed(1) +
+              '" text-anchor="middle" font-size="' + (inside ? (opt.barLabelSize || 10) : 11) + '" fill="' +
+              (inside ? (opt.barLabelInsideColor || '#FFFFFF') : (opt.labelColor || '#7FE7FF')) + '">' +
               esc(fmt(v, opt.yDigits == null ? 0 : opt.yDigits)) + esc(unitTxt) + '</text>';
           }
         });

@@ -27,6 +27,7 @@
 /* 副标题比区块标题（20px）低两档，避免两级混成一片 */
 .ck-subhead__title { font-size: 15px; font-weight: 700; color: #334155; }
 /* 副标题右端的补充说明：弱化处理，避免与下一栏标题连读成一串 */
+.ck-subhead__unit { font-size: 12px; color: #8C93A0; font-weight: 400; white-space: nowrap; }
 .ck-subhead__extra { margin-left: auto; font-size: 12px; color: #8C93A0; font-weight: 400; }
 
 /* ---------- 筛选条 ---------- */
@@ -125,9 +126,11 @@ input.ck-field { display: inline-block; min-width: 190px; }
   border: 2px solid var(--action-blue); border-radius: 50%; background: #FFF;
 }
 .ck-legend__line--red { background: #D0021B; }
+.ck-legend__line--rose { background: #D98C8C; }
 .ck-legend__line--green { background: #17B98A; }
 .ck-legend__line--green::after { border-color: #17B98A; }
 .ck-legend__line--red::after { border-color: #D0021B; }
+.ck-legend__line--rose::after { border-color: #D98C8C; }
 
 /* ---------- 物资小类四卡 ---------- */
 .ck-matcards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sp-lg); margin-bottom: var(--sp-lg); }
@@ -181,8 +184,8 @@ input.ck-field { display: inline-block; min-width: 190px; }
 /* 物资管理看板：6 指标卡 / 六项降本 7 卡 */
 .ck-metrics--6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 .ck-metrics--7 { grid-template-columns: repeat(7, minmax(0, 1fr)); }
-/* 分供商管理看板：8 张指标卡排成 2 行 × 4 列 */
-.ck-metrics--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+/* 资源管理看板：8 张指标卡一行 */
+.ck-metrics--8 { grid-template-columns: repeat(8, minmax(0, 1fr)); }
 /* 资产管理看板：5 指标卡一行 */
 .ck-metrics--5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 
@@ -190,12 +193,23 @@ input.ck-field { display: inline-block; min-width: 190px; }
 .mb-idle-table .dsc-table { table-layout: fixed; }
 .mb-idle-table .dsc-table th,
 .mb-idle-table .dsc-table td { overflow: hidden; text-overflow: ellipsis; }
-.ck-metriccard--kpi { text-align: left; padding: var(--sp-lg); }
-.ck-kpi__head { display: flex; align-items: center; gap: var(--sp-sm); }
-.ck-kpi__name { font-size: 13px; color: #4A5568; }
-.ck-metriccard--kpi .ck-metriccard__value { margin-top: 10px; font-size: 28px; text-align: left; }
-.ck-metriccard--kpi .ck-metriccard__value span { font-size: 13px; }
-.ck-kpi__sub { margin-top: 8px; font-size: 12px; color: #8C93A0; }
+/* 资源管理看板：8 卡一行，数值在上、名称 / 上年度在下（对齐《资源管理看板卡片布局》）。
+   卡片按图片比例取「高 ≈ 宽 × 0.8」：内容竖向居中，三行之间的留白由图片的疏朗版式决定，
+   不用内边距堆高度——名称换行时靠 flex 居中仍然对齐 */
+.ck-metriccard.ck-metriccard--kpirow {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  min-height: 124px; padding: 16px 12px; text-align: center;
+}
+.ck-metriccard--kpirow .ck-metriccard__value {
+  margin-top: 0; font-size: 26px; text-align: center; line-height: 1.15; white-space: nowrap;
+}
+.ck-metriccard--kpirow .ck-metriccard__value span { font-size: 13px; margin-left: 3px; }
+.ck-metriccard--kpirow .ck-kpi__name { margin-top: 10px; font-size: 12px; color: #4A5568; line-height: 1.3; }
+.ck-metriccard--kpirow .ck-kpi__sub { margin-top: 5px; font-size: 11px; color: #8C93A0; line-height: 1.3; }
+/* 宽屏：卡宽随之变大，高度同步追上图片比例，避免拉成扁平长条 */
+@media (min-width: 1800px) {
+  .ck-metriccard.ck-metriccard--kpirow { min-height: 140px; }
+}
 /* 相关报表条 */
 .dsc-relbar { display: flex; align-items: center; gap: var(--sp-md); flex-wrap: wrap; }
 .dsc-relbar__label { font-size: 13px; font-weight: 700; color: #334155; }
@@ -288,6 +302,15 @@ input.ck-field { display: inline-block; min-width: 190px; }
   .ck-stage__value { font-size: 18px; }
   .ck-table { font-size: 13px; }
   .ck-board__title { font-size: 17px; }
+}
+
+/* 1360 最低宽度：8 卡一行时压缩字号与内边距，数值不换行 */
+@media (max-width: 1500px) {
+  .ck-metriccard.ck-metriccard--kpirow { min-height: 114px; padding: 14px 6px; }
+  .ck-metriccard--kpirow .ck-metriccard__value { font-size: 21px; }
+  .ck-metriccard--kpirow .ck-metriccard__value span { font-size: 11px; }
+  .ck-metriccard--kpirow .ck-kpi__name { margin-top: 8px; font-size: 11px; }
+  .ck-metriccard--kpirow .ck-kpi__sub { margin-top: 4px; font-size: 10px; }
 }
 
 

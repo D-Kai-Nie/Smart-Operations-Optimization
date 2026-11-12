@@ -159,7 +159,7 @@
       C('buyAmt', '资产购置金额(万元)', 160, { num: true }), C('disposeAmt', '处置金额(万元)', 140, { num: true }),
       C('depAmt', '调拨摊销折旧金额(万元)', 180, { num: true }),
       C('sourceType', '来源类型', 100), C('attr', '资产属性', 100), C('brand', '资产品牌', 100),
-      C('category', '资产类别', 130), C('subCategory', '资产二级类别', 130),
+      C('assetCat', '资产类别', 130), C('assetSubCat', '资产二级类别', 130),
       C('sourceOrg', '来源单位', 130), C('location', '存放地点', 150),
       C('origCode', '原资产编码', 140), C('batchCode', '批次编码', 110),
       C('implOrg', '实施单位', 130),
@@ -206,7 +206,7 @@
     /* 默认列对齐 Axure：项目 / 资产编码前置（原先资产编码在第 14 列，默认视口看不到） */
     asset: ['idx', 'project', 'org2', 'org3', 'assetCode', 'assetAmt', 'assetCount', 'usingCount',
       'idleCount', 'repairCount', 'scrapCount', 'buyAmt', 'disposeAmt', 'depAmt',
-      'category', 'acceptStatus'],
+      'assetCat', 'acceptStatus'],
     supplier: ['idx', 'name', 'org2', 'org3', 'perfProjCount', 'bidCount', 'winCount', 'winAmt',
       'frameCount', 'execCount', 'signCount', 'contractAmt', 'perfAmt', 'grade', 'matSmall',
       'badCount', 'banCount']
@@ -330,7 +330,7 @@
   function assetDetailHTML(r) {
     const kv = [
       ['资产编码', r.assetCode], ['项目', r.project], ['二级单位', r.org2], ['三级单位', r.org3 || '—'],
-      ['资产类别', r.category + (r.subCategory ? ' / ' + r.subCategory : '')], ['资产属性', r.attr],
+      ['资产类别', (r.assetCat || r.category) + (r.assetSubCat || r.subCategory ? ' / ' + (r.assetSubCat || r.subCategory) : '')], ['资产属性', r.attr],
       ['资产品牌', r.brand], ['资产描述', r.desc],
       ['资产总额', D.fmtNum(r.assetAmt, 2) + ' 万元'], ['资产总数', D.fmtInt(r.assetCount)],
       ['在用 / 闲置', D.fmtInt(r.usingCount) + ' / ' + D.fmtInt(r.idleCount)],
@@ -473,7 +473,7 @@
         { name: 'pMode', label: '承包模式', type: 'multi', options: D.MODES },
         { name: 'pArea', label: '项目区域(到地级市)', type: 'tree', options: D.areaTree() },
         { name: 'assetCode', label: '资产编码', type: 'text', ph: '请输入资产编码' },
-        { name: 'category', label: '资产类别', type: 'multi', options: ['项目固定资产', '项目非固定资产'] },
+        { name: 'assetCat', label: '资产类别', type: 'multi', options: D.ASSET_CAT_NAMES },
         { name: 'attr', label: '资产属性', type: 'multi', options: ['自有', '租赁', '调拨'] },
         { name: 'acceptStatus', label: '验收状态', type: 'multi', options: ['已验收', '待验收', '验收不通过'] }
       ];
