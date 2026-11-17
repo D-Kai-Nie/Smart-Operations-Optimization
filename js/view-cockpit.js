@@ -263,6 +263,8 @@
     const all = [{ key: 'name', name: o.unitHead || '二级单位', type: 'text' }].concat(fl.basic, fl.info);
     const cols = D.colsOf('metric-' + o.metric, all, o.def || metricColumnDef(o.metric));
     const tot = metricTotal(o.totalRows || o.rows, cols, o.weightKey);
+    /* 主指标合计可由调用方按局口径覆盖（卡片 / 报表总览同源），其余列仍按通用规则聚合 */
+    if (o.totalOverride) Object.assign(tot, o.totalOverride);
     const val = function (r, c) {
       if (c.key === 'name') return unitLink(r.name, o.ds);      // 单位名只保留简称，全称进 tooltip
       const v = r[c.key];

@@ -39,222 +39,6 @@
   };
 
   /* 物资需用计划 */
-  const PJ_PLAN_COLS = [
-    P_COL('idx', '序号', 56, { sticky: true }),
-    P_COL('planCode', '计划单号', 150, { sticky2: true, link: true }),
-    P_COL('planMonth', '计划月份', 110),
-    P_COL('matBig', '物料大类', 130), P_COL('matMid', '物料中类', 120), P_COL('matSmall', '物料小类', 120),
-    P_COL('matCode', '物料编码', 140), P_COL('matDesc', '物料描述', 170), P_COL('unit', '计量单位', 90),
-    P_NUM('qty', '计划数量', 110), P_NUM('checkQty', '盘点数量', 110),
-    P_COL('autoPlan', '是否生成日常计划', 150),
-    P_COL('part', '计划使用部位', 130), P_COL('pickUnit', '领用单位', 130),
-    P_COL('madeDate', '编制日期', 120), P_COL('maker', '编制人', 100),
-    P_COL('needDate', '需用时间', 120), P_COL('status', '状态', 100),
-    P_COL('quoted', '是否引用', 100, { render: function (v) {
-      return '<span class="dsc-table__link" data-plan-ref>' + esc(v) + '</span>';
-    } })
-  ];
-  const PJ_PLAN_DEF = ['idx', 'planCode', 'planMonth', 'matBig', 'matMid', 'matSmall', 'matCode', 'matDesc',
-    'unit', 'qty', 'checkQty', 'autoPlan', 'part', 'pickUnit', 'madeDate', 'maker', 'needDate', 'status', 'quoted'];
-
-  /* 收验货 / 收料 / 领料 / 退货台账 */
-  const PJ_ACCEPT_COLS = [
-    P_COL('idx', '序号', 56, { sticky: true }),
-    P_COL('acceptCode', '收验货单号', 150, { sticky2: true, link: true }),
-    P_COL('deliverCode', '发货单号', 150, { link: true }), P_COL('receiveCode', '收料单号', 150, { link: true }),
-    P_COL('pickCode', '领料单号', 150, { link: true }), P_COL('orderCode', '订单编号', 150, { link: true }),
-    P_COL('settleCode', '结算单号', 150, { link: true }),
-    P_COL('supplier', '分供商名称', 200),
-    P_COL('matBig', '物料大类', 130), P_COL('matMid', '物料中类', 120), P_COL('matSmall', '物料小类', 120),
-    P_COL('matDesc', '物料描述', 170), P_COL('brand', '品牌', 90),
-    P_COL('bizType', '业务类型', 110), P_COL('attr', '其他采购属性', 120),
-    P_COL('unit', '计量单位', 90),
-    P_NUM('qty', '数量', 100), P_NUM('acceptQty', '验收数量', 110), P_NUM('pickQty', '领用数量', 110),
-    P_COL('part', '使用部位', 120), P_COL('level1', '一级库', 130),
-    P_COL('owner', '责任人', 90), P_COL('isRecon', '是否对账', 100),
-    P_COL('settleMonth', '结算月份', 110), P_COL('settleCycle', '结算周期', 110),
-    P_COL('detailType', '结算明细类型', 120),
-    P_COL('date', '日期', 110), P_COL('status', '状态', 100)
-  ];
-  const PJ_ACCEPT_DEF = ['idx', 'acceptCode', 'deliverCode', 'receiveCode', 'pickCode', 'orderCode', 'settleCode',
-    'supplier', 'matSmall', 'unit', 'qty', 'acceptQty', 'pickQty', 'date', 'status'];
-
-  /* 分供商履约 */
-  const PJ_SUP_COLS = [
-    P_COL('idx', '序号', 56, { sticky: true }),
-    /* P0：分供商名称在行数据里的字段是 name（此前列 key 写成 supplier，整列渲染成「—」） */
-    P_COL('name', '分供商', 210, { sticky2: true, link: true }),
-    P_COL('cat', '分供商分类', 130), P_COL('grade', '局评价等级', 110),
-    P_COL('matBig', '物料大类', 130), P_COL('matMid', '物料中类', 120), P_COL('matSmall', '物料小类', 120),
-    P_COL('matCode', '物料编码', 140), P_COL('matDesc', '物料描述', 180),
-    P_NUM('contractAmt', '合同金额', 130), P_NUM('perfAmt', '履约金额', 130),
-    P_NUM('claimCount', '索赔次数', 110), P_NUM('badReturnCount', '不合格退货次数', 150),
-    P_NUM('winAmt', '中标金额', 130), P_NUM('perfRate', '履约率', 100, { pct: true }),
-    /* 评价得分是均值型指标：合计行取全部行平均，不随金额求和 */
-    P_NUM('score', '评价得分', 100, {
-      total: function (rows) {
-        return D.round(rows.reduce(function (a, r) { return a + (r.score || 0); }, 0) / (rows.length || 1), 2);
-      }
-    })
-  ];
-  /* 资源履约质量表默认列：分供商 → 分类/等级 → 物料三级 → 合同/履约/履约率/评价得分 */
-  const PJ_SUP_DEF = ['idx', 'name', 'cat', 'grade', 'matBig', 'matMid', 'matSmall',
-    'contractAmt', 'perfAmt', 'perfRate', 'score'];
-
-  /* ============================================================
-     物资页签其余列表 / 资产页签调拨·处置
-     字段逐项抄自 Axure《项目驾驶舱》的「列表字段选择-物资页签」（8 状态）与
-     「列表字段选择-资源+资产」（state1 资产调拨 / state2 资产处置）
-     ============================================================ */
-  /* state1 结算明细（两级表头：基本信息 / 明细信息） */
-  const PJ_SETTLE_COLS = [
-    P_COL('idx', '序号', 56, { sticky: true }),
-    P_COL('acceptCode', '验收单号', 150, { sticky2: true, render: P_DOC('accept'), group: '基本信息' }),
-    P_COL('settleCode', '结算单号', 160, { render: P_DOC('settle'), group: '基本信息' }),
-    P_COL('settleCycle', '结算周期', 110, { group: '基本信息' }),
-    P_COL('detailType', '结算明细类型', 130, { group: '基本信息' }),
-    P_COL('docCode', '单据编号', 140, { group: '基本信息' }),
-    P_COL('date', '日期', 110, { group: '基本信息' }),
-    P_COL('settleStatus', '结算单状态', 110, { group: '基本信息' }),
-    P_COL('settleMonth', '结算月份', 110, { group: '基本信息' }),
-    P_COL('matBig', '物料大类', 130, { group: '明细信息' }),
-    P_COL('matMid', '物料中类', 140, { group: '明细信息' }),
-    P_COL('matSmall', '物料小类', 120, { group: '明细信息' }),
-    P_COL('matCode', '物料编码', 130, { group: '明细信息' }),
-    P_COL('matDesc', '物料描述', 200, { group: '明细信息' }),
-    P_NUM('qty', '数量', 100, { group: '明细信息' }),
-    P_COL('unit', '计量单位', 90, { group: '明细信息' }),
-    P_NUM('priceTax', '含税单价', 110, { group: '明细信息' }),
-    P_NUM('amtTax', '含税金额', 120, { group: '明细信息' }),
-    P_NUM('taxRate', '税率', 90, { group: '明细信息' }),
-    P_NUM('priceNoTax', '不含税单价', 120, { group: '明细信息' }),
-    P_NUM('amtNoTax', '不含税金额', 130, { group: '明细信息' }),
-    P_NUM('taxAmt', '税额', 110, { group: '明细信息' }),
-    P_COL('contractCode', '合同单号', 150, { render: P_DOC('contract'), group: '明细信息' }),
-    P_COL('orderCode', '订单编号', 140, { render: P_DOC('order'), group: '明细信息' }),
-    P_COL('deliverCode', '发货单号', 140, { render: P_DOC('deliver'), group: '明细信息' }),
-    P_COL('pickCode', '领料单号', 140, { render: P_DOC('pick'), group: '明细信息' }),
-    P_COL('receiveCode', '收料单号', 140, { render: P_DOC('receive'), group: '明细信息' }),
-    P_COL('settleType', '结算单类型', 110, { group: '明细信息' })
-  ];
-  const PJ_SETTLE_DEF = ['idx', 'acceptCode', 'settleCode', 'settleMonth', 'settleStatus', 'matBig', 'matMid',
-    'matSmall', 'matDesc', 'qty', 'unit', 'priceTax', 'amtTax'];
-
-  /* state2 领料 */
-  const PJ_PICK_COLS = [
-    P_COL('idx', '序号', 56, { sticky: true }),
-    P_COL('pickCode', '领料单号', 160, { sticky2: true, render: P_DOC('recon') }),
-    P_COL('pickUnit', '领用单位', 190), P_COL('level1', '一级库', 130), P_COL('owner', '责任人', 100),
-    P_COL('matBig', '物料大类', 130), P_COL('matMid', '物料中类', 140), P_COL('matSmall', '物料小类', 120),
-    P_COL('matDesc', '物料描述', 200), P_COL('brand', '品牌', 100),
-    P_COL('bizType', '业务类型', 110), P_COL('unit', '计量单位', 90),
-    P_COL('otherAttr', '其他采购属性', 120), P_COL('part', '使用部位', 120),
-    P_NUM('qty', '领用数量', 110), P_NUM('acceptQty', '验收数量', 110),
-    P_COL('isRecon', '是否对账', 110, { render: P_DOC('recon') })
-  ];
-  const PJ_PICK_DEF = ['idx', 'pickCode', 'pickUnit', 'level1', 'matBig', 'matMid', 'matSmall', 'matDesc',
-    'unit', 'qty', 'acceptQty', 'isRecon'];
-
-  /* state3 退货 */
-  const PJ_RETURN_COLS = [
-    P_COL('idx', '序号', 56, { sticky: true }),
-    P_COL('returnCode', '退货单号', 160, { sticky2: true, render: P_DOC('returnSettle') }),
-    P_COL('supplier', '分供商名称', 220),
-    P_COL('matBig', '物料大类', 130), P_COL('matMid', '物料中类', 140), P_COL('matSmall', '物料小类', 120),
-    P_COL('matDesc', '物料描述', 200), P_COL('unit', '计量单位', 90),
-    P_NUM('qty', '退货数量', 110),
-    P_COL('receiveCode', '关联收货单号', 150, { render: P_DOC('receive') }),
-    P_NUM('returnAmt', '退货金额', 120), P_NUM('receiveQty', '收货数量', 110), P_NUM('returnPrice', '退货单价', 110),
-    P_COL('isSettled', '是否结算', 110, { render: P_DOC('returnSettle') }), P_COL('returnType', '退货类型', 130)
-  ];
-  const PJ_RETURN_DEF = ['idx', 'returnCode', 'supplier', 'matBig', 'matMid', 'matSmall', 'matDesc', 'unit',
-    'qty', 'returnAmt', 'returnType', 'isSettled'];
-
-  /* state4 盘点 */
-  const PJ_INV_COLS = [
-    P_COL('idx', '序号', 56, { sticky: true }),
-    P_COL('invCode', '盘点方案编号', 160, { sticky2: true, render: P_DOC('inv') }),
-    P_COL('implOrg', '实施单位', 190), P_COL('invType', '盘点类型', 110), P_COL('scope', '盘点范围', 130),
-    P_COL('warehouse', '库房名称', 130), P_COL('supplier', '分供商名称', 200),
-    P_COL('matBig', '物料大类', 130), P_COL('matMid', '物料中类', 140), P_COL('matSmall', '物料小类', 120),
-    P_COL('matDesc', '物料描述', 200), P_COL('brand', '品牌', 100),
-    P_NUM('bookQty', '账面数量', 110), P_COL('otherAttr', '其他采购属性', 120), P_COL('unit', '计量单位', 90)
-  ];
-  const PJ_INV_DEF = ['idx', 'invCode', 'implOrg', 'invType', 'scope', 'warehouse', 'matBig', 'matMid',
-    'matSmall', 'matDesc', 'unit', 'bookQty'];
-
-  /* state5 调拨 */
-  const PJ_TRANSFER_COLS = [
-    P_COL('idx', '序号', 56, { sticky: true }),
-    P_COL('transferCode', '调拨单号', 160, { sticky2: true, render: P_DOC('transfer') }),
-    P_COL('transferType', '调拨类型', 110),
-    P_COL('outOrg', '调出公司', 190), P_COL('outImpl', '调出项目实施单位', 200),
-    P_COL('outProject', '调出项目', 220), P_COL('inOrg', '调入公司', 190),
-    P_COL('inImpl', '调入项目实施单位', 200), P_COL('inProject', '调入项目', 220),
-    P_COL('matBig', '物料大类', 130), P_COL('matMid', '物料中类', 140), P_COL('matSmall', '物料小类', 120),
-    P_COL('matDesc', '物料描述', 200), P_COL('brand', '品牌', 100), P_COL('unit', '计量单位', 90),
-    P_NUM('applyQty', '申请数量', 110), P_NUM('outQty', '调出发货数量', 130), P_NUM('inQty', '调入验收数量', 130),
-    P_NUM('priceNoTax', '不含税单价', 120), P_NUM('amtNoTax', '不含税金额', 120), P_NUM('taxRate', '税率', 90),
-    P_NUM('amtTax', '含税金额', 120), P_COL('fromOrgType', '发起单位类型', 120),
-    P_COL('contractCode', '调拨合同号', 160)
-  ];
-  const PJ_TRANSFER_DEF = ['idx', 'transferCode', 'transferType', 'outOrg', 'outProject', 'inOrg', 'inProject',
-    'matBig', 'matMid', 'matSmall', 'matDesc', 'unit', 'applyQty', 'inQty'];
-
-  /* state6/7 闲置废旧物资处理 */
-  const PJ_SCRAP_COLS = [
-    P_COL('idx', '序号', 56, { sticky: true }),
-    P_COL('applyCode', '处理申请编号', 160, { sticky2: true, render: P_DOC('scrap') }),
-    P_COL('assetCode', '资产编号', 150, { render: P_DOC('asset') }), P_COL('batchCode', '批次编码', 160),
-    P_COL('scrapType', '废宝类型', 110),
-    P_COL('matBig', '物料大类', 130), P_COL('matMid', '物料中类', 140), P_COL('matSmall', '物料小类', 120),
-    P_COL('matDesc', '物料描述', 200), P_COL('unit', '计量单位', 90),
-    P_NUM('qty', '处理数量', 110), P_NUM('amt', '销售金额', 120),
-    P_COL('way', '处理方式', 110), P_NUM('price', '销售单价', 120),
-    P_COL('buyer', '收购方', 180), P_COL('date', '处理时间', 120),
-    P_NUM('estQty', '暂估数量', 110), P_COL('handler', '处理人', 100)
-  ];
-  const PJ_SCRAP_DEF = ['idx', 'applyCode', 'scrapType', 'matBig', 'matMid', 'matSmall', 'matDesc', 'unit',
-    'qty', 'way', 'amt', 'buyer', 'date', 'handler'];
-
-  /* 资产调拨（列表字段选择-资源+资产 state1） */
-  const PJ_ATRANS_COLS = [
-    P_COL('idx', '序号', 56, { sticky: true }),
-    P_COL('transferCode', '资产调拨单号', 160, { sticky2: true, render: P_DOC('assetTransfer') }),
-    P_COL('assetCode', '资产编号', 150), P_COL('batchCode', '批次编号', 160),
-    P_COL('desc', '资产描述', 220), P_COL('brand', '品牌', 100),
-    P_COL('otherAttr', '其他采购属性', 120), P_COL('assetStatus', '资产状态', 110),
-    P_COL('attr', '资产属性', 110), P_COL('category', '资产类别', 130),
-    P_COL('fromOrgType', '发起单位类型', 120),
-    P_COL('outOrg', '调出公司', 180), P_COL('outImpl', '调出项目实施单位', 200), P_COL('outProject', '调出项目', 220),
-    P_COL('inOrg', '调入公司', 180), P_COL('inImpl', '调入项目实施单位', 200), P_COL('inProject', '调入项目', 220),
-    P_NUM('applyQty', '调出申请数量', 130), P_NUM('outQty', '调出发货数量', 130),
-    P_NUM('priceNoTax', '调拨不含税单价', 140), P_NUM('origPriceNoTax', '原值不含税单价', 140),
-    P_NUM('amtNoTax', '调拨总额(不含税)', 150), P_NUM('origAmt', '原值总额(不含税)', 150),
-    P_NUM('taxRate', '税率', 90), P_COL('location', '存放地点', 150)
-  ];
-  const PJ_ATRANS_DEF = ['idx', 'transferCode', 'assetCode', 'desc', 'assetStatus', 'outOrg', 'outProject',
-    'inOrg', 'inProject', 'applyQty', 'outQty', 'amtNoTax'];
-
-  /* 资产处置（列表字段选择-资源+资产 state2） */
-  const PJ_ADISP_COLS = [
-    P_COL('idx', '序号', 56, { sticky: true }),
-    P_COL('disposeCode', '资产处置单号', 160, { sticky2: true, render: P_DOC('assetDispose') }),
-    P_COL('assetCode', '资产编号', 150), P_COL('batchCode', '批次编号', 160),
-    P_COL('desc', '资产描述', 220), P_COL('brand', '品牌', 100),
-    P_COL('otherAttr', '其他采购属性', 120), P_COL('assetStatus', '资产状态', 110),
-    P_COL('attr', '资产属性', 110), P_COL('category', '资产类别', 130),
-    P_NUM('actualQty', '实有数量', 110), P_NUM('turnedTimes', '已周转次数', 120),
-    P_COL('condition', '达处置条件', 120), P_NUM('origAmt', '原值(万元)', 120),
-    P_NUM('disposeQty', '处置数量', 110), P_NUM('usedYears', '已使用年限', 120),
-    P_COL('countType', '计数类型', 110), P_NUM('residual', '残值(万元)', 120),
-    P_COL('keeper', '保管信息', 180), P_COL('keeperUser', '保管人', 100),
-    P_NUM('netAmt', '净值(万元)', 120)
-  ];
-  const PJ_ADISP_DEF = ['idx', 'disposeCode', 'assetCode', 'desc', 'assetStatus', 'attr', 'category',
-    'actualQty', 'disposeQty', 'usedYears', 'origAmt', 'netAmt'];
-
-  /* ---------- 筛选控件（与数据报表页同构件：真下拉 / 真日期，不是静态文字） ---------- */
   function sel(label, options, ph) {
     return '<select class="dsc-field" data-pj-field="' + esc(label) + '"><option value="">' +
       esc(ph || '请选择') + '</option>' + (options || []).map(function (o) {
@@ -419,232 +203,6 @@
   }
 
   /* ---------- 招采分析 ---------- */
-  const STATUS_DIST = [['已完成', 4], ['已下达', 5], ['编制中', 2], ['已关闭', 1], ['待下达', 3], ['待审批', 2], ['已作废', 0]];
-
-  function procSection(p) {
-    const matDist = D.material.mid.map(function (m, i) {
-      return { name: m, value: D.round(45.16 - i * 5.2, 2) };
-    }).sort(function (a, b) { return b.value - a.value; });
-    return section('招采分析',
-      '<div class="dsc-card u-mb-lg"><div class="dsc-card__body">' +
-      '  <div class="ck-filter pj-proc-filter"><div class="ck-filter__row">' +
-      '    <div class="ck-filter__item"><span class="ck-filter__label">招标开始日期</span>' +
-      '      <span class="ck-grain" data-pj-grain>日' + GRAIN_CARET + '</span>' +
-      '      <span class="ck-field ck-field--date">' + esc(D.defaultRange[0]) + ' ~ 结束时间</span></div>' +
-      '    ' + D.ckField('采购类别', '') +
-      '    ' + D.ckField('采购方式', '') +
-      '    ' + D.ckField('采购模式', '') +
-      '  </div>' +
-      '  <div class="ck-filter__foot"><span class="ck-filter__hint" hidden></span>' +
-      '  <span class="ck-filter__foot-right">' +
-      '    <button class="ck-btn ck-btn--primary" data-pj-query>查询</button>' +
-      '    <button class="ck-link" data-pj-clear>清空</button>' +
-      '    <button class="ck-link" data-pj-reset>重置</button>' +
-      '  </span></div>' +
-      '  </div>' +
-      '  <div class="dsc-split dsc-split--2">' +
-      '    <div>' + subHead('项目采购计划状态分布') +
-      '      <div class="dsc-chart" id="pjPlanStatus" style="height:200px"></div></div>' +
-      '    <div>' + subHead('项目采购计划物料分类分布') +
-      '      <div class="dsc-chart" id="pjPlanMat" style="height:200px"></div></div>' +
-      '  </div>' +
-      '  <div class="dsc-subhead u-mt-xl"><span class="dsc-subhead__title">采购发起 → 响应 → 评审 → 成交</span>' +
-      '    <span class="dsc-subhead__extra">本项目全过程</span></div>' +
-      '  <div class="cockpit-proc">' + [
-        ['采购发起', [['招标笔数', 46, '笔'], ['计划金额', 1382.6, '万元']]],
-        ['采购响应', [['投标单位数', 132, '家'], ['响应率', 92.4, '%']]],
-        ['采购评审', [['在线评标率', 96.8, '%'], ['平均评标时长', 6.2, '天']]],
-        ['采购成交', [['成交笔数', 41, '笔'], ['平均招采时效', 25.1, '天']]]
-      ].map(function (s) {
-        return '<div class="cockpit-proc__col"><div class="dsc-subhead__title u-mb-md">' + esc(s[0]) + '</div>' +
-          s[1].map(function (kv) {
-            return '<div class="cockpit-proc__kv"><span>' + esc(kv[0]) + '</span><b>' +
-              D.fmtNum(kv[1], kv[1] % 1 === 0 ? 0 : 1) + '<i>' + esc(kv[2]) + '</i></b></div>';
-          }).join('') + '</div>';
-      }).join('') + '</div>' +
-      '</div></div>');
-  }
-
-  /* ---------- 合同分析 ---------- */
-  /* 合同明细分析的动态列：与「采购报表 › 明细」同一套 70+ 字段（Axure 列表字段选择-合同明细） */
-  const PJ_CONTRACT_COLS = [
-    P_COL('idx', '序号', 56, { sticky: true }),
-    P_COL('code', '合同编号', 160, { sticky2: true, link: true }),
-    P_COL('name', '合同名称', 260),
-    P_COL('category', '合同分类', 110), P_COL('type', '合同类型', 130), P_COL('tpl', '合同模板', 150),
-    P_COL('status', '合同状态', 100), P_COL('source', '合同来源', 100),
-    P_COL('sourceCode', '来源单号', 140, { link: true }), P_COL('owner', '使用主体', 190),
-    P_COL('dept', '合同承办部门', 140), P_COL('partyA', '甲方', 180), P_COL('partyB', '乙方', 200),
-    P_COL('belong', '所属机构', 130), P_COL('area', '项目区域', 100), P_COL('addr', '项目所在地址', 160),
-    P_COL('signDate', '合同签订日期', 130), P_COL('reconDate', '对账日期', 110),
-    P_COL('trade', '国际贸易条款', 120), P_COL('transport', '运输条款', 110), P_COL('settleCycle', '结算周期', 110),
-    P_COL('creator', '创建人', 90), P_COL('agent', '经办人', 90), P_COL('isStandard', '是否制式', 100),
-    P_COL('rowType', '物料行类型', 110), P_COL('matBig', '物料大类', 130), P_COL('matMid', '物料中类', 120),
-    P_COL('matSmall', '物料小类', 120), P_COL('matCode', '物料编码', 140), P_COL('matDesc', '物料描述', 170),
-    P_COL('brand', '品牌名称', 100), P_COL('otherAttr', '其他采购属性', 130),
-    P_NUM('qty', '数量', 100), P_COL('unit', '计量单位', 90), P_COL('priceType', '价格类型', 100),
-    P_COL('floatType', '浮动价浮动类型', 130), P_COL('floatLink', '浮动价确价环节', 130),
-    P_COL('floatSys', '浮动价外部系统', 130), P_COL('floatArea', '浮动价外部区域', 130),
-    P_COL('floatTime', '浮动价时间标准', 130), P_NUM('floatVal', '浮动值(不含税)', 130),
-    P_NUM('floatPct', '浮动比例', 110), P_NUM('estPrice', '暂估价(不含税)', 130),
-    P_NUM('priceTax', '含税单价', 110), P_NUM('amtTax', '含税金额', 120), P_NUM('taxRate', '税率', 80),
-    P_NUM('priceNoTax', '不含税单价', 110), P_NUM('amtNoTax', '不含税金额', 120), P_NUM('taxAmt', '税额', 100),
-    P_NUM('inPriceTax', '收入价含税单价', 130), P_NUM('inAmtTax', '收入价含税金额', 130),
-    P_NUM('inTaxRate', '收入价税率', 110), P_NUM('inPriceNoTax', '收入价不含税单价', 140),
-    P_NUM('inAmtNoTax', '收入价不含税金额', 140),
-    P_NUM('costPriceTax', '成本价含税单价', 130), P_NUM('costAmtTax', '成本价含税金额', 130),
-    P_NUM('costTaxRate', '成本价税率', 110), P_NUM('costPriceNoTax', '成本价不含税单价', 140),
-    P_NUM('costAmtNoTax', '成本价不含税金额', 140),
-    P_NUM('orderAmt', '下单金额', 120), P_NUM('orderPct', '下单比例', 100),
-    P_NUM('acceptAmt', '验收金额', 120), P_NUM('acceptPct', '验收比例', 100),
-    P_NUM('settleAmt', '结算金额', 120), P_NUM('settlePct', '结算比例', 100),
-    P_NUM('payPct', '付款比例', 100), P_NUM('shouldPay', '合同应支付金额', 140),
-    P_NUM('paidAmt', '合同已支付金额', 140), P_NUM('unpaidAmt', '合同累计应付未付金额', 170),
-    P_COL('treasuryCode', '司库一体化合同编号', 160)
-  ];
-  const PJ_CONTRACT_DEF = ['idx', 'code', 'name', 'type', 'status', 'partyB', 'signDate',
-    'matSmall', 'qty', 'priceTax', 'amtTax', 'orderAmt', 'settleAmt'];
-  /* 设置列分组（Axure：合同信息 / 合同明细信息） */
-  const PJ_CONTRACT_GROUPS = function () {
-    const basicKeys = ['code', 'name', 'category', 'type', 'tpl', 'status', 'source', 'sourceCode', 'owner',
-      'dept', 'partyA', 'partyB', 'belong', 'area', 'addr', 'signDate', 'reconDate', 'trade', 'transport',
-      'settleCycle', 'creator', 'agent', 'isStandard'];
-    const infoKeys = PJ_CONTRACT_COLS.map(function (c) { return c.key; })
-      .filter(function (k) { return k !== 'idx' && basicKeys.indexOf(k) < 0; });
-    const pick = function (ks) {
-      return ks.map(function (k) { return PJ_CONTRACT_COLS.filter(function (c) { return c.key === k; })[0]; }).filter(Boolean);
-    };
-    return [{ title: '合同信息', items: pick(basicKeys) }, { title: '合同明细信息', items: pick(infoKeys) }];
-  };
-
-  let PJ_PURCHASE_ROWS = [];
-  /* 合同金额按项目规模缩放（合同总额 ≈ 项目总采购金额 × 1.15）：
-     生成器里的单价是全局样本量级，不缩放会得到比项目采购额大一个数量级的「项目合同总额」 */
-  function pjScaleContracts(rows, purchase) {
-    const sum = rows.reduce(function (a, r) { return a + (r.amtTax || 0); }, 0) || 1;
-    /* amtTax 单位为元，purchase 单位为万元：目标合同总额 = 项目采购额 × 1.15（万元） */
-    const k = (purchase || 4000) * 1e4 * 1.15 / sum;
-    const money = ['amtTax', 'amtNoTax', 'taxAmt', 'inAmtTax', 'inAmtNoTax', 'costAmtTax',
-      'costAmtNoTax', 'orderAmt', 'acceptAmt', 'settleAmt', 'shouldPay', 'paidAmt', 'unpaidAmt'];
-    return rows.map(function (r) {
-      const o = Object.assign({}, r);
-      o.qty = D.round(r.qty * k, 2);
-      money.forEach(function (key) { if (typeof o[key] === 'number') o[key] = D.round(o[key] * k, 2); });
-      return o;
-    });
-  }
-  function contractSection(p) {
-    /* 只取当前项目的合同：生成器直接注入项目上下文，不再用「按二级单位过滤」的近似口径 */
-    const rows = pjScaleContracts(D.genContractRows(40, null, p), p.purchase);
-    PJ_PURCHASE_ROWS = rows;
-    const cols = D.colsOf('pj-contract', PJ_CONTRACT_COLS, PJ_CONTRACT_DEF);
-    const size = 10;
-    const pages = Math.max(1, Math.ceil(rows.length / size));
-    if (PS.contractPage > pages) PS.contractPage = pages;
-    const paged = rows.slice((PS.contractPage - 1) * size, (PS.contractPage - 1) * size + size);
-    const sumOf = function (k) {
-      return D.round(rows.reduce(function (a, r) { return a + (r[k] || 0); }, 0) / 1e4, 2);
-    };
-    return section('合同分析',
-      '<div class="dsc-card u-mb-lg"><div class="dsc-card__body">' +
-      '  <div class="project-cockpit-page__kpis">' +
-      stat('项目合同数量', rows.length, '个', 0) + stat('项目合同总额', sumOf('amtTax'), '万元') +
-      stat('合同已下单金额', sumOf('orderAmt'), '万元') + stat('合同已结算金额', sumOf('settleAmt'), '万元') +
-      '  </div>' +
-      '  <div class="dsc-filter-inline u-mt-lg">' +
-      '    <div class="dsc-filter-inline__item"><span class="dsc-filter-inline__label">合同签订日期</span>' +
-      '      ' + dateInputs('日期范围') + '</div>' +
-      '    <div class="dsc-filter-inline__item"><span class="dsc-filter-inline__label">合同类型</span>' +
-      '      <select class="dsc-field" data-pj-field="合同类型"><option value="">请选择合同类型</option>' +
-      ['物资采购合同', '设备采购合同', '劳务分包合同', '专业分包合同', '专业服务合同',
-        '物资租赁合同', '机械设备租赁合同', '运输类合同', '调拨采购合同', '废旧物资销售合同']
-        .map(function (t) { return '<option value="' + esc(t) + '">' + esc(t) + '</option>'; }).join('') +
-      '</select></div>' +
-      '    <div class="dsc-filter-inline__item"><span class="dsc-filter-inline__label">乙方</span>' +
-      '      <input class="dsc-field" type="text" data-pj-field="乙方" placeholder="请输入乙方名称"/></div>' +
-      '  </div>' +
-      '</div></div>' +
-      '<div class="dsc-card">' +
-      '<div class="dsc-card__header"><div class="dsc-card__title">合同明细分析</div>' +
-      '<div class="dsc-card__extra">共 ' + rows.length + ' 条　·　' +
-      PJ_CONTRACT_COLS.length + ' 个可选字段' +
-      D.colGear('data-pj-columns', '设置列：合同明细分析（合同信息 / 合同明细信息，共 ' +
-        PJ_CONTRACT_COLS.length + ' 个字段）') + '</div></div>' +
-      D.table({
-        cols: cols, rows: paged.map(function (r, i) { return Object.assign({ idx: i + 1 }, r); }),
-        maxHeight: 460, foot: D.pager({ page: PS.contractPage, size: size, total: rows.length })
-      }) + '</div>');
-  }
-
-  /* ---------- 履约分析 ---------- */
-  /* 集采情况按当前项目的合同物料分类汇总（此前误用 genMaterialMarket，
-     类目是各二级单位 / 三级单位 / 项目名称——项目页不应出现其它单位的数据） */
-  function pjFulfillMix(level) {
-    const key = level === 1 ? 'matBig' : level === 2 ? 'matMid' : 'matSmall';
-    const m = {};
-    PJ_PURCHASE_ROWS.forEach(function (r) {
-      const k = r[key];
-      if (k) m[k] = (m[k] || 0) + (r.amtTax || 0) / 1e4;
-    });
-    return Object.keys(m).map(function (k) { return { name: k, amt: D.round(m[k], 2) }; })
-      .sort(function (a, b) { return b.amt - a.amt; }).slice(0, 8);
-  }
-  function fulfillSection(p) {
-    const rows = D.genSettlePriceRows();
-    const rateM = projMetrics(p).filter(function (m) { return m.name === '集中采购率'; })[0] || { value: 0 };
-    const rate = rateM.value;
-    const central = D.round(p.purchase * rate / 100, 2);
-    const contractAmt = D.round(PJ_PURCHASE_ROWS.reduce(function (a, r) {
-      return a + (r.amtTax || 0);
-    }, 0) / 1e4, 2);
-    return section('履约分析',
-      '<div class="dsc-card u-mb-lg"><div class="dsc-card__body">' +
-      '  <div class="dsc-filter-inline u-mb-lg">' +
-      '    <div class="dsc-filter-inline__item"><span class="dsc-filter-inline__label">结算创建日期</span>' +
-      '      ' + dateInputs('日期范围') + '</div>' +
-      '    <div class="dsc-filter-inline__item"><span class="dsc-filter-inline__label">物料大分类</span>' +
-      sel('物料大分类', D.material.big) + '</div>' +
-      '    <div class="dsc-filter-inline__item"><span class="dsc-filter-inline__label">物料中分类</span>' +
-      sel('物料中分类', D.material.mid) + '</div>' +
-      '    <div class="dsc-filter-inline__item"><span class="dsc-filter-inline__label">物料小分类</span>' +
-      sel('物料小分类', D.material.small) + '</div>' +
-      '  </div>' +
-      '  <div class="project-cockpit-page__kpis">' +
-      stat('总采购金额', p.purchase, '万元') + stat('集中采购金额', central, '万元') +
-      stat('采购签约金额', contractAmt, '万元') + stat('集中采购率', rate, '%') +
-      '  </div>' +
-      '</div></div>' +
-      '<div class="cockpit-rank3">' +
-      '</div>' +
-      '<div class="dsc-split dsc-split--2 u-mb-lg">' +
-      '  <div class="dsc-card"><div class="dsc-card__header">' +
-      '    <div class="dsc-card__title">物料大分类履约集采情况</div></div>' +
-      '    <div class="dsc-card__body"><div class="dsc-chart" id="pjBig" style="height:200px"></div></div></div>' +
-      '  <div class="dsc-card"><div class="dsc-card__header">' +
-      '    <div class="dsc-card__title">物料中分类履约集采情况</div></div>' +
-      '    <div class="dsc-card__body"><div class="dsc-chart" id="pjMid" style="height:200px"></div></div></div>' +
-      '</div>' +
-      '<div class="dsc-split dsc-split--2">' +
-      '  <div class="dsc-card"><div class="dsc-card__header">' +
-      '    <div class="dsc-card__title">物料小分类履约集采情况</div>' +
-      '    <div class="dsc-card__extra">TOP 10</div></div>' +
-      '    <div class="dsc-card__body"><div class="dsc-chart" id="pjSmall" style="height:200px"></div></div></div>' +
-      '  <div class="dsc-card"><div class="dsc-card__header">' +
-      '    <div class="dsc-card__title">项目核心物料结算平均价格</div></div>' +
-      '    <div class="dsc-card__body">' +
-      D.table({
-        cols: [
-          { key: 'idx', name: '序号', width: 56, sticky: true },
-          { key: 'name', name: '物料名称', width: 150 },
-          { key: 'unit', name: '计量单位', width: 100 },
-          { key: 'value', name: '结算平均价格', width: 130, num: true }
-        ], rows: rows.map(function (r, i) { return Object.assign({ idx: i + 1 }, r); }), maxHeight: 200
-      }) + '</div></div>' +
-      '</div>');
-  }
-
-  /* ---------- 物资 / 分供商 / 资产（页签切换时替换招采分析块） ----------
-     列表筛选：每个列表按自身字段真过滤（此前复用看板逻辑，只记录条件、表格不变） */
   const PJ_FILTERS = {};   // listKey → { 字段名: 值 }
   const PJ_HINTS = {};     // listKey → 就地反馈
   const PJ_ROWS = {};      // listKey → 未过滤行（查询时算命中数）
@@ -838,132 +396,6 @@
     ['普通钢筋', 211.97, 78.5], ['普通混凝土', 285.00, 65.2], ['角钢', 68.74, 72.4],
     ['圆钢', 62.25, 69.8], ['三角钢', 151.97, 58.6], ['铝板材', 18.76, 81.2], ['铜线材', 78.32, 76.9]
   ];
-  function pjPlanMixTable() {
-    const total = PJ_PLAN_MIX.reduce(function (a, x) { return a + x[1]; }, 0);
-    const rows = PJ_PLAN_MIX.map(function (x, i) {
-      return { idx: i + 1, name: x[0], amt: x[1], cAmt: D.round(x[1] * x[2] / 100, 2),
-        pct: D.round(x[1] / total * 100, 2), cRate: x[2] };
-    });
-    return D.table({ cols: [
-      { key: 'idx', name: '序号', width: 56 },
-      { key: 'name', name: '物料小类', width: 130 },
-      { key: 'amt', name: '总采购金额(万元)', width: 150, num: true },
-      { key: 'cAmt', name: '集中采购金额(万元)', width: 160, num: true },
-      { key: 'pct', name: '占比', width: 100, pct: true },
-      { key: 'cRate', name: '集中采购率', width: 120, pct: true }
-    ], rows: rows, maxHeight: 320 });
-  }
-  /* 物资验收：按物料大类统计验收单数量（笔） */
-  function pjAcceptDist() {
-    const rows = D.genAcceptRows();
-    const m = {};
-    rows.forEach(function (r) { m[r.matBig] = (m[r.matBig] || 0) + 1; });
-    return Object.keys(m).map(function (k) { return { name: k, value: m[k] }; })
-      .sort(function (a, b) { return b.value - a.value; });
-  }
-  /* 物资使用：按物料中类 / 小类汇总领用金额（万元） */
-  function pjPickDist(key) {
-    const rows = D.genPickRows();
-    const m = {};
-    rows.forEach(function (r) {
-      const k = r[key];
-      if (!k) return;
-      m[k] = (m[k] || 0) + (r.amtTax || 0);
-    });
-    return Object.keys(m).map(function (k) { return { name: k, value: D.round(m[k] / 1e4, 2) }; })
-      .sort(function (a, b) { return b.value - a.value; }).slice(0, 8);
-  }
-
-  function materialTab(p) {
-    /* 列表数据统一按当前项目收口（组织 / 项目字段改写，见 pjScopeRows） */
-    const plansAll = pjScopeRows(D.genPlanRows(PS.planKind), p);
-    PJ_ROWS['pj-plan'] = plansAll;
-    const plans = pjFilterRows('pj-plan', plansAll);
-    const planView = pjPageRows('pj-plan', plans);
-    const planCols = D.colsOf('pj-plan', PJ_PLAN_COLS, PJ_PLAN_DEF);
-    const pickRows = pjScopeRows(D.genPickRows(), p), returnRows = D.genReturnRows(),
-      invRows = pjScopeRows(D.genInventoryRows(), p), transferRows = pjScopeRows(D.genTransferRows(), p),
-      scrapRows = D.genScrapRows();
-    /* 区块名与 Axure《项目驾驶舱 › 物资页签》的区块标题（fs=20）逐字对齐：
-       物资计划情况 → 物资验收情况 → 物资使用情况 → 项目结算情况 */
-    return section('物资计划情况',
-      '<div class="dsc-card u-mb-lg"><div class="dsc-card__header">' +
-      '<div class="dsc-card__title">物料小类计划占比情况</div>' +
-      '<div class="dsc-card__extra">计划金额（万元）· 7 个物料小类</div></div>' +
-      '<div class="dsc-split dsc-split--2-3">' +
-      '<div class="dsc-card__body"><div class="dsc-chart" id="pjPlanMix" style="height:240px"></div></div>' +
-      '<div class="dsc-card__body">' + pjPlanMixTable() + '</div></div></div>' +
-      pjFilter([['计划月份'], ['物料大类'], ['物料中类'], ['物料小类']],
-        [['月度需用计划号'], ['物料描述'], ['计划使用部位'], ['领用单位'], ['领料单号'], ['编制人'],
-          ['一级库'], ['项目名称']],
-        undefined, 'pj-plan') +
-      '<div class="dsc-card u-mb-lg">' +
-      '<div class="dsc-card__header"><div class="dsc-card__title">需用计划列表</div>' +
-      '<div class="dsc-card__extra"><span class="dsc-tabs dsc-tabs--pill" style="margin:0" data-plankind>' +
-      [['month', '月度计划'], ['day', '日常计划']].map(function (k) {
-        return '<div class="dsc-tabs__item' + (PS.planKind === k[0] ? ' dsc-tabs__item--active' : '') +
-          '" data-pk="' + k[0] + '">' + k[1] + '</div>';
-      }).join('') + '</span>' +
-      D.colGear('data-pj-cols="pj-plan"', '设置列：需用计划列表（Axure 列表字段选择-物资页签）') + '</div></div>' +
-      D.table({
-        cols: planCols,
-        rows: planView.rows.map(function (r, i) { return Object.assign({ idx: planView.start + i + 1 }, r); }),
-        maxHeight: 420, foot: pjPager('pj-plan', planView)
-      }) + (plans.length ? '' : '<div class="dsc-table__footnote">没有符合筛选条件的记录，请调整条件后重新查询</div>') +
-      '</div>') +
-      section('物资验收情况',
-        '<div class="dsc-card u-mb-lg"><div class="dsc-card__header">' +
-        '<div class="dsc-card__title">物资验收单分布</div>' +
-        '<div class="dsc-card__extra">按物料大类 · 验收单数量（笔）</div></div>' +
-        '<div class="dsc-card__body"><div class="dsc-chart" id="pjAcceptDist" style="height:220px"></div></div></div>' +
-        pjListBlock({ title: '物资验收列表', key: 'pj-accept', rows: pjScopeRows(D.genAcceptRows(), p), last: true,
-          tip: '收验货 → 收料单据链路',
-          fields: [['结算月份'], ['结算周期'], ['结算明细类型'], ['分供商名称']],
-          more: [['物料大类'], ['物料中类'], ['物料小类'], ['一级库'], ['责任人'], ['是否对账']] })) +
-      section('物资使用情况',
-        '<div class="dsc-card u-mb-lg"><div class="dsc-card__header">' +
-        '<div class="dsc-card__title">物料领用金额分布</div>' +
-        '<div class="dsc-card__extra">按物料中类 / 小类 · 领用金额（万元）</div></div>' +
-        '<div class="dsc-split dsc-split--2">' +
-        '<div class="dsc-card__body">' + subHead('物料中类领用金额') +
-        '<div class="dsc-chart" id="pjPickMid" style="height:220px"></div></div>' +
-        '<div class="dsc-card__body">' + subHead('物料小类领用金额') +
-        '<div class="dsc-chart" id="pjPickSmall" style="height:220px"></div></div></div></div>' +
-        pjListBlock({ title: '物资领料列表', key: 'pj-pick', rows: pickRows,
-          tip: '点击领料单号查看关联对账单',
-          fields: [['领料单号'], ['领用单位'], ['物料大类'], ['物料中类'], ['物料小类']],
-          more: [['一级库'], ['使用部位'], ['责任人'], ['对账单号']],
-          rank: { title: '领用单位数量排名TOP8', rows: pjAggTop(pickRows, 'qty', 8, 'pickUnit'), unit: '', digits: 0 } }) +
-        pjListBlock({ title: '物资退货列表', key: 'pj-return', rows: returnRows,
-          tip: '点击退货单号 / 是否结算查看关联结算单',
-          fields: [['退货单号'], ['退货类型'], ['物料大类'], ['物料小类']],
-          more: [['收货单号'], ['物料中类'], ['分供商名称'], ['合同'], ['结算单'], ['退货日期']] }) +
-        pjListBlock({ title: '物资盘点列表', key: 'pj-inv', rows: invRows,
-          tip: '点击盘点方案编号查看盘点单',
-          rank: { title: '库房盘点数量TOP8', rows: pjAggTop(invRows, 'bookQty', 8, 'warehouse'), unit: '', digits: 0 },
-          fields: [['盘点单号'], ['实施单位'], ['盘点类型'], ['物料大类'], ['物料小类']],
-          more: [['盘点范围'], ['物料中类'], ['供应商'], ['库房名称'], ['合同'], ['订单编号'], ['发货单号'],
-            ['收料单号'], ['领料单号']] }) +
-        pjListBlock({ title: '物资调拨台账', key: 'pj-transfer', rows: transferRows,
-          tip: '调入 / 调出双视角',
-          rank: { title: '调出单位申请数量TOP8', rows: pjAggTop(transferRows, 'applyQty', 8, 'outOrg'), unit: '', digits: 0 },
-          fields: [['调拨单号'], ['调拨类型'], ['调出公司'], ['调入公司'], ['物料小类']],
-          more: [['调出项目'], ['调入项目'], ['调出项目实施单位'], ['调入项目实施单位'],
-            ['物料大类'], ['物料中类'], ['物料描述'], ['发起单位类型']] }) +
-        pjListBlock({ title: '闲置废旧物资处理台账', key: 'pj-scrap', rows: scrapRows, last: true,
-          tip: '处理方式：销售 / 销毁',
-          fields: [['处理方案编号'], ['处理方式'], ['收购方'], ['废宝类型']],
-          more: [['处理记录编号'], ['处理人'], ['供应商'], ['物料大类'], ['物料中类'], ['物料小类'],
-            ['处理日期']] })) +
-      section('项目结算情况',
-        pjListBlock({ title: '项目结算明细列表', key: 'pj-settle', rows: pjScopeRows(D.genSettleRows(30), p), last: true,
-          tip: '物料大类 → 中类 → 小类三级可下钻',
-          fields: [['结算单'], ['供应商'], ['物料大类'], ['物料小类']],
-          more: [['合同'], ['物料中类'], ['合同签订日期'], ['结算日期'], ['是否办理总结算'], ['结算单状态']],
-          height: 420 }));
-  }
-
-  /* 分供商页签：KPI / TOP10 / 中标签约转化 / 履约分布 / 资源履约质量表（对齐 Axure） */
   function pjAggTop(rows, valKey, n, nameKey) {
     const m = {};
     const nk = nameKey || 'name';
@@ -976,6 +408,7 @@
     return Object.keys(m).map(function (k) { return m[k]; })
       .sort(function (a, b) { return b.value - a.value; }).slice(0, n || 10);
   }
+  /* TOP 排名卡（物资 / 分供商页签共用） */
   function pjRankCard(title, rows, unit, digits) {
     return '<div class="pj-rank"><div class="pj-rank__title">' + esc(title) + '</div>' +
       rows.map(function (r, i) {
@@ -984,125 +417,6 @@
           '<b>' + D.fmtNum(r.value, digits == null ? 0 : digits) + '<i>' + esc(unit) + '</i></b></div>';
       }).join('') + '</div>';
   }
-  function pjSupKpis(rows) {
-    const sum = function (k) { return rows.reduce(function (a, r) { return a + (r[k] || 0); }, 0); };
-    const perf = sum('perfAmt');
-    const good = rows.filter(function (r) { return r.grade === '优秀'; })
-      .reduce(function (a, r) { return a + r.perfAmt; }, 0);
-    const avg = rows.length ? perf / rows.length : 0;
-    const rate = perf ? good / perf * 100 : 0;
-    const cards = [
-      ['分供商履约额', perf, '万元', 0.82],
-      ['优质分供商履约额', good, '万元', 0.76],
-      ['平均履约额', avg, '万元', 0.88],
-      ['优质分供商履约额占比', rate, '%', 0.96]
-    ];
-    return '<div class="dsc-grid dsc-grid--4 u-mb-lg pj-supkpis">' + cards.map(function (c) {
-      return '<div class="dsc-kpi"><div class="dsc-kpi__name">' + esc(c[0]) + '</div>' +
-        '<div class="dsc-kpi__value">' + D.fmtNum(c[1], 2) +
-        '<span class="dsc-kpi__unit">' + esc(c[2]) + '</span></div>' +
-        '<div class="dsc-kpi__foot">上年度 ' + D.fmtNum(c[1] * c[3], 2) + ' ' + esc(c[2]) + '</div></div>';
-    }).join('') + '</div>';
-  }
-  function pjConversion(rows) {
-    const names = {};
-    rows.forEach(function (r) { if (r.name) names[r.name] = 1; });
-    const win = Object.keys(names).length || rows.length || 1;
-    const sign = Math.max(1, Math.round(win * 0.78));
-    const perf = Math.max(1, Math.round(sign * 0.72));
-    const steps = [['中标分供商', win], ['签约分供商', sign], ['履约分供商', perf]];
-    const rates = [sign / win, perf / sign];
-    return '<div class="pj-conv">' + steps.map(function (s, i) {
-      return '<div class="pj-conv__step"><span>' + esc(s[0]) + '</span><b>' + s[1] + ' 个</b></div>' +
-        '<div class="pj-conv__bar"><i style="width:' + Math.max(6, Math.round(s[1] / win * 100)) + '%"></i></div>' +
-        (i < rates.length ? '<div class="pj-conv__rate">转化率 ' + D.fmtNum(rates[i] * 100, 1) + '%</div>' : '');
-    }).join('') + '</div>';
-  }
-  function pjSupplierDist(rows) {
-    const m = {};
-    (rows || []).forEach(function (r) { m[r.cat] = (m[r.cat] || 0) + r.perfAmt; });
-    return Object.keys(m).map(function (k) { return { name: k, value: D.round(m[k], 2) }; })
-      .sort(function (a, b) { return b.value - a.value; });
-  }
-  /* 分供商数据原本是「单位级」量级（履约额几十亿），落到单个项目必须压到项目采购规模：
-     履约额合计 = 项目总采购金额 × 0.9，四类金额同比例缩放，履约率/得分不受影响 */
-  function pjScaleSupplier(rows, purchase) {
-    const sum = rows.reduce(function (a, r) { return a + (r.perfAmt || 0); }, 0) || 1;
-    const k = (purchase || 4000) * 0.9 / sum;
-    return rows.map(function (r) {
-      return Object.assign({}, r, {
-        contractAmt: D.round(r.contractAmt * k, 2), perfAmt: D.round(r.perfAmt * k, 2),
-        payAmt: D.round(r.payAmt * k, 2), winAmt: D.round(r.winAmt * k, 2)
-      });
-    });
-  }
-  let PJ_SUP_DIST = [];
-  function supplierTab(p) {
-    const rowsAll = pjScaleSupplier(pjScopeRows(D.genSupplierRows(30), p), p.purchase);
-    PJ_SUP_DIST = pjSupplierDist(rowsAll);
-    PJ_ROWS['pj-supplier'] = rowsAll;
-    const rows = pjFilterRows('pj-supplier', rowsAll);
-    const view = pjPageRows('pj-supplier', rows);
-    const cols = D.colsOf('pj-supplier', PJ_SUP_COLS, PJ_SUP_DEF);
-    /* 合计行：金额列求和；履约率 / 评价得分等均值列由列上的 total 策略处理 */
-    const tot = D.totalOf(cols, rows);
-    return section('分供商履约',
-      pjSupKpis(rowsAll) +
-      '<div class="pj-ranks u-mb-lg">' +
-      pjRankCard('分供商供货次数排名TOP10', pjAggTop(rowsAll, 'winCount'), '次', 0) +
-      pjRankCard('分供商结算金额排名TOP10', pjAggTop(rowsAll, 'perfAmt'), '万元', 0) +
-      pjRankCard('分供商支付金额排名TOP10', pjAggTop(rowsAll, 'payAmt'), '万元', 0) +
-      '</div>' +
-      '<div class="dsc-split dsc-split--2 u-mb-lg">' +
-      '<div class="dsc-card"><div class="dsc-card__header">' +
-      '<div class="dsc-card__title">分供商中标签约转化</div>' +
-      '<div class="dsc-card__extra">中标 → 签约 → 履约</div></div>' +
-      '<div class="dsc-card__body">' + pjConversion(rowsAll) + '</div></div>' +
-      '<div class="dsc-card"><div class="dsc-card__header">' +
-      '<div class="dsc-card__title">分供商履约分布</div>' +
-      '<div class="dsc-card__extra">按分供商分类 · 履约额（万元）</div></div>' +
-      '<div class="dsc-card__body"><div class="dsc-chart" id="pjSupDist" style="height:220px"></div></div></div>' +
-      '</div>' +
-      pjFilter([['分供商'], ['分供商分类'], ['局评价等级'], ['物料大类']],
-        [['物料中类'], ['物料小类'], ['物料编码'], ['项目名称']], undefined, 'pj-supplier') +
-      '<div class="dsc-card"><div class="dsc-card__header">' +
-      '<div class="dsc-card__title">资源履约质量表</div>' +
-      '<div class="dsc-card__extra">' +
-      D.colGear('data-pj-cols="pj-supplier"', '设置列：资源履约质量表（Axure 列表字段选择-资源+资产）') + '</div></div>' +
-      D.table({
-        cols: cols, rows: view.rows.map(function (r, i) { return Object.assign({ idx: view.start + i + 1 }, r); }),
-        maxHeight: 460, totalRow: tot, foot: pjPager('pj-supplier', view)
-      }) + (rows.length ? '' : '<div class="dsc-table__footnote">没有符合筛选条件的记录，请调整条件后重新查询</div>') +
-      '</div>');
-  }
-
-  /* 资产台账全数据（Axure 列表字段选择-资源+资产 · 全资产明细数据） */
-  const PJ_ASSET_COLS = [
-    P_COL('idx', '序号', 56, { sticky: true }),
-    P_COL('assetCode', '资产编码', 150, { sticky2: true, link: true }),
-    P_COL('desc', '资产描述', 170), P_COL('attr', '资产属性', 100), P_COL('brand', '资产品牌', 100),
-    P_COL('sourceOrg', '来源单位', 130), P_COL('category', '资产类别', 130),
-    P_COL('subCategory', '资产二级类别', 130), P_COL('sourceType', '来源类型', 100),
-    P_COL('location', '存放地点', 130), P_COL('implOrg', '实施单位', 130),
-    P_NUM('assetAmt', '资产总额(万元)', 140), P_COL('keeper', '保管单位', 130), P_COL('user', '使用人', 90),
-    P_NUM('assetCount', '资产总数', 110), P_COL('origCode', '原资产编码', 140),
-    P_NUM('usingCount', '在用数量', 100), P_NUM('scrapCount', '报废数量', 100),
-    P_NUM('idleCount', '闲置数量', 100), P_NUM('repairCount', '维保数量', 100),
-    P_COL('acceptStatus', '是否验收', 110), P_COL('invStatus', '是否盘点', 110),
-    P_COL('transferType', '是否调拨', 110), P_NUM('disposeAmt', '是否处置', 120),
-    P_NUM('buyAmt', '资产购置金额(万元)', 160), P_NUM('depAmt', '调拨摊销折旧金额(万元)', 190),
-    P_COL('op', '操作', 100, { render: function (v, row) {
-      return '<span class="dsc-table__link" data-asset-doc="' + esc(row.assetCode) + '">查看单据</span>';
-    } })
-  ];
-  const PJ_ASSET_DEF = ['idx', 'assetCode', 'category', 'desc', 'location', 'keeper',
-    'assetAmt', 'assetCount', 'acceptStatus', 'invStatus', 'op'];
-
-  /* ============================================================
-     关联单据弹窗（Axure《项目驾驶舱》里的 7 个联动弹窗：
-       引用订单 / 领料关联对账单 / 退货关联结算 / 总结算 /
-       资产台账-是否验收·是否盘点·是否调拨·是否处置）
-     ============================================================ */
   const PJ_DOC_KINDS = {
     recon: { title: '领料关联对账单', hint: '由领料单发起的对账记录，对账后方可进入结算流程。',
       rows: function (c) { return [['对账单号', 'DZ' + c.slice(2)], ['关联领料单号', c], ['对账状态', '已对账'],
@@ -1163,23 +477,10 @@
   }
 
   /* 「列表字段选择」注册表：齿轮 → 该表的字段全集与默认列（Axure 面板逐状态对应） */
-  const PJ_LISTS = {
-    'pj-plan': { cols: PJ_PLAN_COLS, def: PJ_PLAN_DEF, title: '需用计划列表' },
-    'pj-accept': { cols: PJ_ACCEPT_COLS, def: PJ_ACCEPT_DEF, title: '物资验收列表' },
-    'pj-pick': { cols: PJ_PICK_COLS, def: PJ_PICK_DEF, title: '物资领料列表' },
-    'pj-return': { cols: PJ_RETURN_COLS, def: PJ_RETURN_DEF, title: '物资退货列表' },
-    'pj-inv': { cols: PJ_INV_COLS, def: PJ_INV_DEF, title: '物资盘点列表' },
-    'pj-transfer': { cols: PJ_TRANSFER_COLS, def: PJ_TRANSFER_DEF, title: '物资调拨台账' },
-    'pj-scrap': { cols: PJ_SCRAP_COLS, def: PJ_SCRAP_DEF, title: '闲置废旧物资处理台账' },
-    'pj-settle': { cols: PJ_SETTLE_COLS, def: PJ_SETTLE_DEF, title: '项目结算明细列表' },
-    'pj-supplier': { cols: PJ_SUP_COLS, def: PJ_SUP_DEF, title: '分供商履约台账' },
-    'pj-asset': { cols: PJ_ASSET_COLS, def: PJ_ASSET_DEF, title: '资产台账全数据' },
-    'pj-atrans': { cols: PJ_ATRANS_COLS, def: PJ_ATRANS_DEF, title: '资产调拨台账' },
-    'pj-adisp': { cols: PJ_ADISP_COLS, def: PJ_ADISP_DEF, title: '资产处置台账' }
-  };
+  /* 各页签模块把自己的列表字段注册进来（view-project-*.js） */
+  D.projectLists = D.projectLists || {};
+  const PJ_LISTS = D.projectLists;
 
-  /* 资产周转情况：Axure 用物料类别树图 + 右侧「全资产明细数据」；
-     这里用环图 + 百分比图例承载类别构成，右侧换成资产级明细（不再是 5 行类别汇总） */
   const PJ_ASSET_MIX = [
     { name: '管材', value: 55.04, color: '#4285F4' },
     { name: '电线电缆', value: 34.97, color: '#1F4E79' },
@@ -1187,90 +488,19 @@
     { name: '零星材料', value: 3.34, color: '#FB923C' },
     { name: '光源、灯具、开关', value: 2.15, color: '#EA4335' }
   ];
-  function assetTurnoverSection(p) {
-    const assetRows = pjScopeRows(D.genAssetRows(8), p).map(function (r, i) {
-      const rate = r.assetCount ? D.round(r.usingCount / r.assetCount * 100, 2) : 0;
-      return {
-        assetCode: r.assetCode, desc: r.desc, category: r.category,
-        buyAmt: D.round(r.buyAmt, 2), inAmt: D.round(r.assetAmt * 0.2, 2),
-        outAmt: D.round(r.disposeAmt, 2), rate: rate
-      };
-    });
-    return section('资产周转情况',
-      '<div class="dsc-card"><div class="dsc-card__header">' +
-      '<div class="dsc-card__title">资产类别周转率</div>' +
-      '<div class="dsc-card__extra">按物料类别占用原值占比　·　周转率口径见 PRD Q-08（待确认）</div></div>' +
-      '<div class="dsc-split dsc-split--2-3 pj-assetsplit">' +
-      '<div class="dsc-card__body"><div class="pj-assetmix">' +
-      '<div class="dsc-chart" id="pjAssetMix" style="height:220px"></div>' +
-      '<div class="pj-assetmix__legend">' + PJ_ASSET_MIX.map(function (x) {
-        return '<div class="pj-assetmix__item"><i style="background:' + x.color + '"></i>' +
-          '<span>' + esc(x.name) + '</span><b>' + D.fmtNum(x.value, 2) + '%</b></div>';
-      }).join('') + '</div></div></div>' +
-      '<div class="dsc-card__body">' +
-      '<div class="dsc-subhead"><span class="dsc-subhead__title">全资产明细数据</span>' +
-      '<span class="dsc-subhead__extra">资产采购 / 调入 / 调出 / 周转率</span></div>' +
-      D.table({
-        cols: [
-          { key: 'idx', name: '序号', width: 56, sticky: true },
-          { key: 'assetCode', name: '资产编码', width: 140, sticky2: true },
-          { key: 'desc', name: '资产描述', width: 120 },
-          { key: 'category', name: '资产类别', width: 110 },
-          { key: 'buyAmt', name: '资产采购金额(万元)', width: 140, num: true },
-          { key: 'inAmt', name: '项目调入资产金额(万元)', width: 150, num: true },
-          { key: 'outAmt', name: '项目调出资产金额(万元)', width: 150, num: true },
-          { key: 'rate', name: '资产周转率', width: 100, pct: true }
-        ], rows: assetRows.map(function (r, k) { return Object.assign({ idx: k + 1 }, r); }), maxHeight: 260
-      }) + '</div></div></div>');
-  }
-
-  function assetTab(p) {
-    const rowsAll = pjScopeRows(D.genAssetRows(30), p);
-    PJ_ROWS['pj-asset'] = rowsAll;
-    const rows = pjFilterRows('pj-asset', rowsAll);
-    const view = pjPageRows('pj-asset', rows);
-    const cols = D.colsOf('pj-asset', PJ_ASSET_COLS, PJ_ASSET_DEF);
-    const atRows = pjScopeRows(D.genAssetTransferRows(), p);
-    const docTab = PS.assetDoc === 'dispose' ? 'dispose' : 'transfer';
-    const docBar = '<div class="dsc-tabs dsc-tabs--pill u-mb-lg" data-pjadjust>' +
-      [['transfer', '资产调拨'], ['dispose', '资产处置']].map(function (d) {
-        return '<div class="dsc-tabs__item' + (docTab === d[0] ? ' dsc-tabs__item--active' : '') +
-          '" data-pdoc="' + d[0] + '">' + d[1] + '</div>';
-      }).join('') + '</div>';
-    const docBlock = docTab === 'transfer'
-      ? pjListBlock({ title: '资产调拨台账', key: 'pj-atrans', rows: atRows, last: true,
-        tip: '调拨总额 / 原值总额 双口径',
-        fields: [['资产调拨单'], ['资产编号'], ['调出公司'], ['调入公司']],
-        more: [['调出项目'], ['调出项目实施单位'], ['调入项目'], ['调入项目实施单位'], ['资产属性'],
-          ['资产类别'], ['资产状态'], ['调拨申请时间'], ['调拨完成时间']],
-        /* 排名单位是万元，源字段 amtNoTax 是元（表格列不标单位），需先换算 */
-        rank: { title: '调出单位金额排名TOP8',
-          rows: pjAggTop(atRows.map(function (r) {
-            return Object.assign({}, r, { amtWan: D.round((r.amtNoTax || 0) / 1e4, 2) });
-          }), 'amtWan', 8, 'outOrg'), unit: '万元', digits: 0 } })
-      : pjListBlock({ title: '资产处置台账', key: 'pj-adisp', rows: pjScopeRows(D.genAssetDisposeRows(), p), last: true,
-        tip: '达处置条件的资产方可发起处置',
-        fields: [['资产处置单'], ['资产编号'], ['资产状态'], ['达处置条件']],
-        more: [['资产属性'], ['资产类别'], ['品牌'], ['其他采购属性'], ['存放地点'], ['保管人'],
-          ['处置日期']] });
-    /* 区块名与 Axure《项目驾驶舱 › 资产页签》的区块标题（fs=20）逐字对齐：
-       资产周转情况 → 资产调拨与处置 → 资产台账全数据 */
-    return assetTurnoverSection(p) +
-      section('资产调拨与处置', docBar + docBlock) +
-      section('资产台账全数据',
-        pjFilter([['资产状态'], ['资产属性'], ['资产类别'], ['存放地点']],
-          [['保管单位'], ['使用人'], ['是否验收'], ['是否盘点'], ['是否调拨'], ['是否处置']],
-          undefined, 'pj-asset') +
-        '<div class="dsc-card"><div class="dsc-card__header">' +
-        '<div class="dsc-card__title">资产台账</div>' +
-        '<div class="dsc-card__extra">在用 / 闲置 / 报废 / 维保 四状态可穿透' +
-        D.colGear('data-pj-cols="pj-asset"', '设置列：资产台账全数据（Axure 列表字段选择-资源+资产）') + '</div></div>' +
-        D.table({
-          cols: cols, rows: view.rows.map(function (r, i) { return Object.assign({ idx: view.start + i + 1 }, r); }),
-          maxHeight: 460, foot: pjPager('pj-asset', view)
-        }) + (rows.length ? '' : '<div class="dsc-table__footnote">没有符合筛选条件的记录，请调整条件后重新查询</div>') +
-        '</div>');
-  }
+  /* ---------- 跨页签共享：页签模块从这里取渲染原语 ---------- */
+  D.projectTabs = {};
+  D.projectShared = {
+    PS: PS,
+    P_COL: P_COL, P_NUM: P_NUM, P_DOC: P_DOC,
+    section: section, subHead: subHead, stat: stat,
+    sel: sel, dateInputs: dateInputs, GRAIN_CARET: GRAIN_CARET, projMetrics: projMetrics,
+    pjFilter: pjFilter, pjListBlock: pjListBlock, pjPager: pjPager,
+    pjScopeRows: pjScopeRows, pjFilterRows: pjFilterRows, pjPageRows: pjPageRows,
+    pjAggTop: pjAggTop, pjRankCard: pjRankCard,
+    PJ_FILTERS: PJ_FILTERS, PJ_HINTS: PJ_HINTS, PJ_ROWS: PJ_ROWS,
+    PJ_PLAN_MIX: PJ_PLAN_MIX, PJ_ASSET_MIX: PJ_ASSET_MIX
+  };
 
   /* ============================================================
      页面
@@ -1280,9 +510,9 @@
     PJ_SCOPE_PROJECT = p;
     PS.project = p.name;
     PS.__q = q || {};
-    const body = PS.tab === 'material' ? materialTab(p)
-      : PS.tab === 'supplier' ? supplierTab(p)
-        : PS.tab === 'asset' ? assetTab(p) : '';
+    const body = PS.tab === 'material' ? D.projectTabs.material(p)
+      : PS.tab === 'supplier' ? D.projectTabs.supplier(p)
+        : PS.tab === 'asset' ? D.projectTabs.asset(p) : D.projectTabs.purchase(p);
     return '<div class="dsc-page project-cockpit-page">' +
       projectBar(p) +
       (D.scope.level === 1 ? '' : '<div class="dsc-note dsc-note--warn u-mb-lg">已按组织权限过滤（R1/R2）：' +
@@ -1291,7 +521,7 @@
       metricStrip(p) +
       tabBar() +
       '<div class="pj-tabbody">' +
-      (body || (procSection(p) + contractSection(p) + fulfillSection(p))) +
+      (body || D.projectTabs.purchase(p)) +
       '</div>' +
       '</div>';
   };
@@ -1369,7 +599,7 @@
       const el = root.querySelector('#' + id);
       if (!el) return;
       if (idx === 0) {
-        D.donutChart(el, STATUS_DIST.filter(function (s) { return s[1] > 0; }).map(function (s, i) {
+        D.donutChart(el, D.projectShared.STATUS_DIST.filter(function (s) { return s[1] > 0; }).map(function (s, i) {
           return { key: s[0], name: s[0], value: s[1], color: D.PALETTE[i % D.PALETTE.length] };
         }), { height: 200, hole: 0.6, centerText: '计划条目', centerValue: '17', legend: true });
       } else {
@@ -1392,7 +622,7 @@
     [['pjBig', 1], ['pjMid', 2], ['pjSmall', 3]].forEach(function (pair) {
       const el = root.querySelector('#' + pair[0]);
       if (!el) return;
-      const rows = pjFulfillMix(pair[1]);
+      const rows = D.projectShared.pjFulfillMix(pair[1]);
       D.hbarChart(el, rows.map(function (r) { return { name: r.name, value: r.amt }; }),
         { rowH: 22, padL: 96, padR: 58, unit: ' 万元', digits: 0, nameMax: 9 });
     });
@@ -1408,7 +638,7 @@
     /* 物资验收：按物料大类的验收单数量 */
     const accDist = root.querySelector('#pjAcceptDist');
     if (accDist) {
-      const dist = pjAcceptDist();
+      const dist = D.projectShared.pjAcceptDist();
       D.barChart(accDist, {
         categories: dist.map(function (x) { return x.name; }),
         series: [{ name: '验收单数量', data: dist.map(function (x) { return x.value; }), color: '#0093E5' }]
@@ -1418,7 +648,7 @@
     [['pjPickMid', 'matMid'], ['pjPickSmall', 'matSmall']].forEach(function (pair) {
       const el = root.querySelector('#' + pair[0]);
       if (!el) return;
-      const rows = pjPickDist(pair[1]);
+      const rows = D.projectShared.pjPickDist(pair[1]);
       D.hbarChart(el, rows.map(function (r) { return { name: r.name, value: r.value }; }),
         { rowH: 22, padL: 100, padR: 60, unit: ' 万元', digits: 0, nameMax: 10 });
     });
@@ -1426,7 +656,7 @@
     /* 分供商页签：履约分布（按分供商分类） */
     const supDist = root.querySelector('#pjSupDist');
     if (supDist) {
-      const dist = PJ_SUP_DIST;
+      const dist = PS.supDist || [];
       D.barChart(supDist, {
         categories: dist.map(function (x) { return x.name; }),
         series: [{ name: '履约额', data: dist.map(function (x) { return x.value; }), color: '#0093E5' }]
@@ -1512,9 +742,9 @@
       const cfg = t.closest('[data-pj-columns]');
       if (cfg) {
         /* 设置列：真正改变表格字段（原先只弹提示不改表） */
-        const groups = PJ_CONTRACT_GROUPS();
+        const groups = D.projectShared.PJ_CONTRACT_GROUPS();
         D.openColPicker({ key: 'pj-contract', title: '合同明细分析',
-          all: groups[0].items.concat(groups[1].items), def: PJ_CONTRACT_DEF, groups: groups, after: D.render });
+          all: groups[0].items.concat(groups[1].items), def: D.projectShared.PJ_CONTRACT_DEF, groups: groups, after: D.render });
         return;
       }
       /* 各列表右上角齿轮：按 Axure 的「列表字段选择」面板给出该表字段 */

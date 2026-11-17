@@ -55,8 +55,13 @@ prototype/
     ├── view-material-idle.js  物资管理看板「闲废物资」模块（查询 / 柱图 / 两份台账）
     ├── view-supplier-board.js 分供商（资源）管理看板
     ├── view-asset-board.js    资产管理看板
-    ├── view-project.js        F3 项目驾驶舱
-    ├── view-report.js         F4~F7 物资 / 采购 / 分供商 / 资产数据报表
+    ├── view-project.js        F3 项目驾驶舱（页壳 / 页头 / 页签 / 渲染后绑定）
+    ├── view-project-purchase.js F3 采购页签（招采 / 合同 / 履约）
+    ├── view-project-material.js F3 物资页签（计划 / 验收 / 使用 / 结算）
+    ├── view-project-supplier.js F3 分供商页签（KPI / 排名 / 履约质量）
+    ├── view-project-asset.js  F3 资产页签（周转 / 调拨处置 / 台账）
+    ├── view-report-config.js  F4~F7 报表列定义 / 默认列 / 筛选字段
+    ├── view-report.js         F4~F7 物资 / 采购 / 分供商 / 资产数据报表渲染与交互
     └── view-compliance.js     F8 合规分析看板
 ```
 
@@ -131,7 +136,7 @@ prototype/
 bash ../_verify/run_tests.sh
 ```
 
-流水线包含：JS 语法检查（bun）→ **19 个**页面/权限场景、约 **1740 条**交互断言（无头 Edge；核心 `itest.js` + 9 个 `itest-page-*.js` 页面模块）→ **17 个**场景 × **1680 / 1360 两档**布局体检（横向溢出 / **纵向越界** / 空卡片 / 组件计数；F3 的 4 个页签各自体检，`?page=project&pjtab=material`）。
+流水线包含：JS 语法检查（bun）→ **19 个**页面/权限场景、约 **1745 条**交互断言（无头 Edge；核心 `itest.js` + 9 个 `itest-page-*.js` 页面模块）→ **17 个**场景 × **1680 / 1360 两档**布局体检（横向溢出 / **纵向越界** / 空卡片 / 组件计数；F3 的 4 个页签各自体检，`?page=project&pjtab=material`）。
 场景清单统一维护在 `../_verify/pages.sh`（`ITEST_PAGES` / `LAYOUT_PAGES` / `LAYOUT_WIDTHS`）；布局失败会计入最终失败数。
 断言脚本见 `../_verify/itest.js`、`../_verify/itest-page-*.js`、`../_verify/layout_check.js`、`../_verify/layout_report.py`。
 

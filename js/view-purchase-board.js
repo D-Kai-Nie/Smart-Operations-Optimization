@@ -11,24 +11,39 @@
   const metricListTable = UI.metricListTable, metricColPicker = UI.metricColPicker;
   const bindMetricTips = UI.bindMetricTips, commonAfter = UI.commonAfter;
   const MONTHS = UI.MONTHS;
+  /* 指标卡与报表总览共用 data.js 的局口径（BUREAU_KPI），避免同一指标两处各写一个数 */
+  const B = D.REPORT_BUREAU;
   const METRICS = [
-    { key: 'costDown', name: '采购成本降低率', value: 8.2, unit: '%', dec: 2, disp: '8.2',
+    { key: 'costDown', name: '采购成本降低率', value: B.cdSum, unit: '%', dec: 2, disp: String(B.cdSum),
       desc: '采购成本降低额 ÷ 不含税标准成本金额 × 100%', src: '招采系统 + 物资系统' },
-    { key: 'benefit', name: '物资设备采购效益率', value: 15.61, unit: '%', dec: 2,
+    { key: 'benefit', name: '物资设备采购效益率', value: B.benefit, unit: '%', dec: 2,
       desc: '物资设备采购效益额 ÷ 物资设备采购金额 × 100%（效益额口径待确认 Q-07）', src: '物资系统' },
-    { key: 'central', name: '物资设备集中采购率', value: 84.46, unit: '%', dec: 2,
+    { key: 'central', name: '物资设备集中采购率', value: B.central, unit: '%', dec: 2,
       desc: '物资设备集中采购金额 ÷ 物资设备采购总金额 × 100%', src: '物资系统' },
-    { key: 'subCentral', name: '分包集中采购率', value: 27.44, unit: '%', dec: 2,
+    { key: 'subCentral', name: '分包集中采购率', value: B.subCentral, unit: '%', dec: 2,
       desc: '分包集中采购金额 ÷ 分包采购总金额 × 100%', src: '招采系统' },
-    { key: 'direct', name: '厂家直采总占比', value: 56.68, unit: '%', dec: 2,
+    { key: 'direct', name: '厂家直采总占比', value: B.direct, unit: '%', dec: 2,
       desc: '厂家直采金额 ÷ 采购总金额 × 100%', src: '物资系统' },
-    { key: 'plan', name: '采购计划执行率', value: 93.18, unit: '%', dec: 2,
+    { key: 'plan', name: '采购计划执行率', value: B.plan, unit: '%', dec: 2,
       desc: '已执行采购计划数 ÷ 采购计划总数 × 100%', src: '物资系统' },
-    { key: 'leadTime', name: '采购时效', value: 24.8, unit: '天', dec: 1,
+    { key: 'leadTime', name: '采购时效', value: B.lead, unit: '天', dec: 1,
       desc: '招标开始至定标平均天数，按自然日均值', src: '招采系统' },
-    { key: 'save', name: '降本金额占比', value: 9.25, unit: '%', dec: 2,
+    /* key 与 metric-cols.js 的列定义保持一致（此前用 save，取不到列 → 明细只剩「排名 / 二级单位」） */
+    { key: 'supplyChainDown', name: '降本金额占比', value: B.downPct, unit: '%', dec: 2,
       desc: '六项降本合计金额 ÷ 产值 × 100%（产值取数口径见 PRD Q-06）', src: '物资系统 + 财务' }
   ];
+  /* 合计行的主指标列取局口径（与卡片、报表总览同源）；
+     其余比率列仍按各行均值，避免把「天」或占比直接求和 */
+  const TOTAL_OVERRIDE = {
+    costDown: { allRate: B.cdSum },
+    benefit: { rate: B.benefit },
+    central: { rate: B.central },
+    subCentral: { rate: B.subCentral },
+    direct: { rate: B.direct },
+    plan: { rate: B.plan },
+    leadTime: { lead: B.lead },
+    supplyChainDown: { rate: B.downPct }
+  };
   function metricDef(key) {
     return METRICS.filter(function (m) { return m.key === key; })[0] || METRICS[0];
   }
@@ -42,7 +57,7 @@
     direct: [48.2, 50.1, 51.6, 52.8, 54.2, 49.6, 55.4, 57.2, 56.68],
     plan: [86.4, 88.2, 89.6, 90.4, 91.2, 87.5, 92.1, 93.4, 93.18],
     leadTime: [28.6, 28.2, 27.8, 27.1, 26.4, 28.9, 25.6, 25.1, 24.8],
-    save: [6.2, 6.8, 7.1, 7.6, 8.2, 5.9, 8.6, 9.5, 9.25]
+    supplyChainDown: [6.2, 6.8, 7.1, 7.6, 8.2, 5.9, 8.6, 9.5, 9.25]
   };
   function metricsView() {
     const m = metricDef(CS.metric);
@@ -109,7 +124,7 @@
       return (o && o.kpi && o.kpi[metric] != null) ? o.kpi[metric] : null;
     });
     return metricListTable({ metric: metric, rows: rows, ds: 'purchase', page: 1, size: rows.length,
-      totalName: '全部 ' + rows.length + ' 个单位' });
+      totalName: '全部 ' + rows.length + ' 个单位', totalOverride: TOTAL_OVERRIDE[metric] });
   }
 
   const PROC_KPIS = [
