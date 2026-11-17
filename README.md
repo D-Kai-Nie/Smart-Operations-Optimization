@@ -131,12 +131,14 @@ prototype/
 bash ../_verify/run_tests.sh
 ```
 
-流水线包含：JS 语法检查（bun）→ 16 个页面/权限场景 **1512 条**交互断言（无头 Edge；核心 `itest.js` + 9 个 `itest-page-*.js` 页面模块）→ 15 个页面的布局体检（横向溢出 / **纵向越界** / 空卡片 / 组件计数；F3 的 4 个页签各自体检，`?page=project&pjtab=material`）。
-断言脚本见 `../_verify/itest.js`、`../_verify/itest-page-*.js`、`../_verify/layout_check.js`。
+流水线包含：JS 语法检查（bun）→ **19 个**页面/权限场景、约 **1740 条**交互断言（无头 Edge；核心 `itest.js` + 9 个 `itest-page-*.js` 页面模块）→ **17 个**场景 × **1680 / 1360 两档**布局体检（横向溢出 / **纵向越界** / 空卡片 / 组件计数；F3 的 4 个页签各自体检，`?page=project&pjtab=material`）。
+场景清单统一维护在 `../_verify/pages.sh`（`ITEST_PAGES` / `LAYOUT_PAGES` / `LAYOUT_WIDTHS`）；布局失败会计入最终失败数。
+断言脚本见 `../_verify/itest.js`、`../_verify/itest-page-*.js`、`../_verify/layout_check.js`、`../_verify/layout_report.py`。
 
 > **无头 Edge 的 `--dump-dom` 失效期间的兜底**：Edge 自动更新时 `--dump-dom` 会返回 0 字节（`--screenshot` 仍可用），
 > 此时用 `bash _verify/shot_tests.sh` —— 它把每条断言画成色块（绿=通过 / 红=失败 / 黑=终止），
 > 由 `_verify/itest_shot.py` 按像素解码出通过/失败计数与失败序号（自动定位色块网格原点）。
+> 解码不到断言色块（`total=0`）时记为 `SKIP`，不再当作「0 失败 = 通过」。
 > 恢复后仍以 `run_tests.sh` 为准。
 
 **Axure 参照稿分析工具**（`../_verify/axure/`，页面改版后可复跑）：

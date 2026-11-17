@@ -5,7 +5,7 @@
   const CS = D.cockpitState;
   const UI = D.ckUI;
   const CARET = UI.CARET;
-  const section = UI.section, subHead = UI.subHead, pageHead = UI.pageHead, scopeNote = UI.scopeNote;
+  const section = UI.section, subHead = UI.subHead, pageHead = UI.pageHead, scopePartialNote = UI.scopePartialNote;
   const field = UI.field, metricCards = UI.metricCards, metricTabs = UI.metricTabs;
   const detailListHead = UI.detailListHead, filterFoot = UI.filterFoot, setFilterMore = UI.setFilterMore;
   const bindMetricTips = UI.bindMetricTips, metricColPicker = UI.metricColPicker,
@@ -281,11 +281,11 @@
     turnover: 'assetTurnover', doneTurnover: 'assetTurnover',
     idle: 'assetIdle', doneIdle: 'assetIdle', depRate: 'assetDepRate'
   };
-  /* R2：受限视角只返回本单位行 */
+  /* R2：受限视角只返回本单位行；三级单位视角下沉到父级二级单位 */
   function abVisibleUnits() {
-    const scope = D.scope.name;
+    const org2 = D.scope.secondLevel();
     return AB_RANK.filter(function (r) {
-      return D.scope.level === 1 || r[0].indexOf(scope.replace(/公司$/, '')) >= 0;
+      return D.scope.level === 1 || (!!org2 && r[0] === org2);
     });
   }
   function abRankTable() {
@@ -393,7 +393,8 @@
   D.pages['asset-board'] = function () {
     return '<div class="dsc-page cockpit-page">' +
       pageHead('资产管理看板', '核心数据 · 资产：资产周转率 / 闲置率 / 折旧率与指标明细表') +
-      scopeNote() + assetBoardView() + '</div>';
+      scopePartialNote('指标明细表已按组织权限过滤；顶部指标卡与项目资产图表为全局口径。') +
+      assetBoardView() + '</div>';
   }
   function assetBoardAfter(root) {
     bindMetricTips(root, AB_IND, 'data-ab-metric');

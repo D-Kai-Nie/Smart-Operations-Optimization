@@ -311,3 +311,8 @@
   .scr-kv__value { font-size: 19px; }
   .scr-supwrap { grid-template-columns: 104px minmax(0, 1fr); gap: 12px; }
 }
+
+/* 1360 最低宽度：右栏数值卡只有 93px 内容宽，「1,932.62亿元」在 18px 下差 5px 被省略号截断 */
+@media (max-width: 1500px) {
+  .screen-page__side .scr-kv__value { font-size: 16px; }
+}

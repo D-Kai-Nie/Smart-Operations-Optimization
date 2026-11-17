@@ -39,48 +39,85 @@
      ============================================================ */
   D.scope = {
     name: '局总部', level: 1,
+    /* 当前视角对应的二级单位：level2 = 自身，level3 = 父级，level1 / 非法组织 = 空 */
+    org2: '',
+    sub: null,
+    valid: true,
     /* R1：组织树选项按权限过滤 */
     orgOptions: function () {
       if (D.scope.level === 1) return D.orgs.concat(D.subOrgs);
       if (D.scope.level === 2) return D.subOrgs.filter(function (s) { return s.parent === D.scope.name; });
       return [];
     },
-    /* 数据范围：null 表示全局 */
+    /* 看板二级单位表的过滤依据；三级单位视角下沉到父级二级单位 */
+    secondLevel: function () {
+      return D.scope.level === 1 ? '' : (D.scope.org2 || '');
+    },
+    /* 数据范围：null 表示全局；非法组织返回空数组，避免 fail-open */
     dataOrgs: function () {
       if (D.scope.level === 1) return null;
+      if (!D.scope.valid) return [];
       if (D.scope.level === 2) return [D.scope.name];
-      const sub = D.subOrgs.filter(function (s) { return s.name === D.scope.name; })[0];
-      return sub ? [sub.parent] : null;
+      return D.scope.org2 ? [D.scope.org2] : [];
     },
-    /* R2：明细行是否可见（超权限不返回数据） */
+    /* R2：明细行是否可见（超权限不返回数据；未知组织一律拒绝） */
     canSeeRow: function (row) {
       if (D.scope.level === 1) return true;
+      if (!D.scope.valid) return false;
       if (D.scope.level === 2) return row.org2 === D.scope.name;
-      const sub = D.subOrgs.filter(function (s) { return s.name === D.scope.name; })[0];
-      return sub ? (row.org3 === D.scope.name || (row.org2 === sub.parent && row.org3 === D.scope.name)) : true;
+      return !!D.scope.org2 && row.org2 === D.scope.org2 && row.org3 === D.scope.name;
     },
     /* R3：驾驶舱排名是否隐藏其他单位具体数值（仅显示名次） */
     maskRank: function () { return D.scope.level !== 1; },
     isSelf: function (name) {
       if (D.scope.level === 1) return false;
+      if (!D.scope.valid) return false;
       if (D.scope.level === 2) return name === D.scope.name;
-      const sub = D.subOrgs.filter(function (s) { return s.name === D.scope.name; })[0];
-      return sub ? (name === D.scope.name || name === sub.parent) : false;
+      return name === D.scope.name || name === D.scope.org2;
     }
   };
 
   function setScope(name) {
-    D.scope.name = name || '局总部';
-    if (D.scope.name === '局总部') D.scope.level = 1;
-    else if (D.orgMap[D.scope.name] && D.orgMap[D.scope.name].level === 2) D.scope.level = 2;
-    else D.scope.level = 3;
+    const raw = String(name || '局总部').trim() || '局总部';
+    let level = 1;
+    let org2 = '';
+    let sub = null;
+    let valid = true;
+    let resolved = raw;
+
+    if (raw !== '局总部') {
+      const org = D.orgMap[raw];
+      if (org && org.level === 2) {
+        level = 2;
+        resolved = org.name;
+        org2 = org.name;
+      } else {
+        sub = D.subOrgs.filter(function (s) { return s.name === raw; })[0] || null;
+        if (sub) {
+          level = 3;
+          org2 = sub.parent;
+        } else {
+          /* 非法 / 越权组织：保持三级视角但不映射任何二级单位，后续数据一律为空 */
+          level = 3;
+          valid = false;
+        }
+      }
+    }
+
+    D.scope.name = valid ? resolved : raw;
+    D.scope.level = level;
+    D.scope.org2 = org2;
+    D.scope.sub = sub;
+    D.scope.valid = valid;
+
     const el = document.getElementById('orgCurrent');
-    if (el) el.textContent = D.scope.name;
+    if (el) el.textContent = valid ? D.scope.name : '未知组织';
     const u = document.getElementById('userName');
     if (u) {
-      u.textContent = D.scope.level === 1 ? '李彬 · 局供应链管理部'
-        : D.scope.level === 2 ? '王建国 · ' + D.scope.name + '供应链管理部'
-          : '张伟 · ' + D.scope.name + '物资管理部';
+      u.textContent = !valid ? '未知组织 · 无数据权限'
+        : level === 1 ? '李彬 · 局供应链管理部'
+          : level === 2 ? '王建国 · ' + D.scope.name + '供应链管理部'
+            : '张伟 · ' + D.scope.name + '物资管理部';
     }
     markScopeMenu();
   }
@@ -266,15 +303,24 @@
     const container = document.getElementById('pageContainer');
     if (D.beginRender) D.beginRender(container);
     container.innerHTML = '';
-    const isScreen = q.page === 'screen';
+    /* 未知组织：身份无法解析时 fail-closed，不渲染任何业务数据（含全局口径卡片） */
+    const denied = !D.scope.valid;
+    const isScreen = q.page === 'screen' && !denied;
     container.classList.toggle('dsc-content--screen', isScreen);
-    const html = fn(q);
+    const html = denied
+      ? D.emptyView({
+        title: '无数据权限',
+        desc: '当前身份所属组织「' + D.scope.name + '」不在组织权限范围内，无法查看该页面数据。',
+        link: { page: D.route.page, params: Object.assign({}, D.route.params, { org: '' }), label: '切换为局总部视角' }
+      })
+      : fn(q);
     container.innerHTML = typeof html === 'string' ? html : '';
     /* 通用绑定 */
     D.bindMultiselect(container);
     D.bindPager(container, function (o) { if (D.__pagerCb) D.__pagerCb(o); });
     D.bindSort(container, function (k) { if (D.__sortCb) D.__sortCb(k); });
-    if (fn.after) fn.after(container, q);
+    if (denied) D.bindEmptyView(container);
+    if (!denied && fn.after) fn.after(container, q);
     markKeyFocus(container);          // P2-3：给可点区域补键盘可达性
     /* 内容被清空重填的那一瞬间文档高度会塌陷，滚动位置会被浏览器夹取 —— 这里显式还原 */
     if (opt && opt.scroll === 'top') window.scrollTo(0, 0);

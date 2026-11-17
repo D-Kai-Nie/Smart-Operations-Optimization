@@ -324,10 +324,10 @@
       '<div class="dsc-page__sub">' + esc(sub) + '</div></div>';
   }
 
-  /* 组织权限提示（两个页面共用） */
-  function scopeNote() {
-    return D.scope.level === 1 ? '' : '<div class="dsc-note dsc-note--warn u-mb-md">已按组织权限过滤（R1/R2/R3）：' +
-      '仅统计权限范围内的单位与项目；排名与明细中其他单位数值已隐藏。</div>';
+  /* 组织权限提示：按页面实际过滤范围如实说明（全部过滤 / 部分过滤 / 全局口径） */
+  function scopePartialNote(text) {
+    return D.scope.level === 1 ? '' :
+      '<div class="dsc-note dsc-note--warn u-mb-md">' + esc(text) + '</div>';
   }
   /* 两个视图共用的交互绑定 */
   function commonAfter(root) {
@@ -408,7 +408,7 @@
   /* 供独立的驾驶舱 / 看板模块复用的共享 helper */
   Object.assign(D.ckUI, {
     pageHead: pageHead,
-    scopeNote: scopeNote,
+    scopePartialNote: scopePartialNote,
     field: field,
     dateRange: dateRange,
     actions: actions,

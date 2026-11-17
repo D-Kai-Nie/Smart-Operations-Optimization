@@ -7,7 +7,7 @@
   const UI = D.ckUI;
   const section = UI.section, subHead = UI.subHead;
   const field = UI.field, dateRange = UI.dateRange, actions = UI.actions, advActions = UI.advActions;
-  const pageHead = UI.pageHead, scopeNote = UI.scopeNote, commonAfter = UI.commonAfter;
+  const pageHead = UI.pageHead, scopePartialNote = UI.scopePartialNote, commonAfter = UI.commonAfter;
   const MONTHS = UI.MONTHS;
 
   /* 局驾驶舱各图表的图例熄灭状态（key → { 系列下标: true }）：
@@ -234,7 +234,8 @@
     CS.view = 'overview';
     return '<div class="dsc-page cockpit-page">' +
       pageHead('局级驾驶舱', '局级采购全景：采购金额构成 → 采购物资 → 采购榜单') +
-      scopeNote() + overviewView() + '</div>';
+      scopePartialNote('局级驾驶舱当前为全局口径，未按组织权限过滤；受限视角下仍展示全部单位的汇总数据。') +
+      overviewView() + '</div>';
   };
 
   D.pages.cockpit.after = function (root) {

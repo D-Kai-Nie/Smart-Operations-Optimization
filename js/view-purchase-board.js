@@ -7,7 +7,7 @@
   const CARET = UI.CARET;
   const section = UI.section, metricCards = UI.metricCards, field = UI.field, advActions = UI.advActions;
   const metricTabs = UI.metricTabs, detailListHead = UI.detailListHead;
-  const pageHead = UI.pageHead, scopeNote = UI.scopeNote;
+  const pageHead = UI.pageHead, scopePartialNote = UI.scopePartialNote;
   const metricListTable = UI.metricListTable, metricColPicker = UI.metricColPicker;
   const bindMetricTips = UI.bindMetricTips, commonAfter = UI.commonAfter;
   const MONTHS = UI.MONTHS;
@@ -96,10 +96,11 @@
   }
 
   function unitTable() {
-    /* R2：受限视角下只返回本单位行（超权限行不返回） */
-    const scope = D.scope.name;
+    /* R2：受限视角下只返回本单位行；三级单位视角下沉到父级二级单位 */
+    const org2 = D.scope.secondLevel();
+    /* UNIT_ROWS 存法定全称，组织权限用的是看板简称（D.reportShortOf），两边统一后再比对 */
     const visible = UNIT_ROWS.filter(function (r) {
-      return D.scope.level === 1 || r[0].indexOf(scope.replace(/公司$/, '')) >= 0;
+      return D.scope.level === 1 || (!!org2 && D.reportShortOf(r[0]) === org2);
     });
     const names = visible.map(function (r) { return D.reportShortOf(r[0]); });
     const metric = CS.metric;                 // 指标页签（8 个指标各自一套字段，随页签切换）
@@ -166,7 +167,8 @@
     CS.view = 'metrics';
     return '<div class="dsc-page cockpit-page">' +
       pageHead('采购管理看板', '核心指标：指标卡与页签联动，含指标明细表与招采分析') +
-      scopeNote() + metricsView() + '</div>';
+      scopePartialNote('指标明细表已按组织权限过滤；顶部指标卡与招采分析为全局口径。') +
+      metricsView() + '</div>';
   }
 
   function metricsAfter(root) {

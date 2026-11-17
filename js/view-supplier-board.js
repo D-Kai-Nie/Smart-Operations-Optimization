@@ -5,7 +5,7 @@
   const CS = D.cockpitState;
   const UI = D.ckUI;
   const CARET = UI.CARET;
-  const section = UI.section, subHead = UI.subHead, pageHead = UI.pageHead, scopeNote = UI.scopeNote;
+  const section = UI.section, subHead = UI.subHead, pageHead = UI.pageHead, scopePartialNote = UI.scopePartialNote;
   const field = UI.field, actions = UI.actions;
   const bindMetricTips = UI.bindMetricTips, commonAfter = UI.commonAfter;
   /* ============================================================
@@ -281,7 +281,8 @@
   D.pages['supplier-board'] = function () {
     return '<div class="dsc-page cockpit-page">' +
       pageHead('资源管理看板', '核心数据 · 资源：分供商规模 / 使用 / 履约') +
-      scopeNote() + supplierBoardView() + '</div>';
+      scopePartialNote('资源管理看板当前为全局口径，未按组织权限过滤；受限视角下卡片与图表仍展示全局统计值。') +
+      supplierBoardView() + '</div>';
   };
 
 

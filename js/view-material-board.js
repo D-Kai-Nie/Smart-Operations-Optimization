@@ -6,7 +6,7 @@
   const UI = D.ckUI;
   const CARET = UI.CARET;
   const section = UI.section, subHead = UI.subHead, field = UI.field, advActions = UI.advActions;
-  const pageHead = UI.pageHead, scopeNote = UI.scopeNote;
+  const pageHead = UI.pageHead, scopePartialNote = UI.scopePartialNote;
   const metricCards = UI.metricCards, metricTabs = UI.metricTabs, detailListHead = UI.detailListHead;
   const metricListTable = UI.metricListTable, metricColPicker = UI.metricColPicker;
   const bindMetricTips = UI.bindMetricTips, commonAfter = UI.commonAfter;
@@ -108,15 +108,17 @@
 
   /* 合计取全部 21 行之和；比率类指标不可累加，合计行显示「—」 */
   const MB_RANK_TOTAL = ['41,970.07', '48,542.70'];
-  const MB_TOTAL_N = MB_RANK.length;
 
   /* 二级单位排行 = 当前指标的明细列表（字段随指标切换，齿轮走 metricColPicker 的同一套 store）
      与采购/资产看板同构：D.metricRows 生成「基本信息 + 指标信息」，metricListTable 渲染 合计 + 分页行 */
-  function mbRankTable() {
-    const scope = D.scope.name;
-    const visible = MB_RANK.filter(function (r) {
-      return D.scope.level === 1 || r[0].indexOf(scope.replace(/公司$/, '')) >= 0;
+  function mbVisibleRank() {
+    const org2 = D.scope.secondLevel();
+    return MB_RANK.filter(function (r) {
+      return D.scope.level === 1 || (!!org2 && r[0] === org2);
     });
+  }
+  function mbRankTable() {
+    const visible = mbVisibleRank();
     const pages = Math.max(1, Math.ceil(visible.length / MS.size));
     if (MS.rankPage > pages) MS.rankPage = pages;
     const paged = visible.slice((MS.rankPage - 1) * MS.size, (MS.rankPage - 1) * MS.size + MS.size);
@@ -127,13 +129,14 @@
       return hit ? hit[3] : null;      // 该单位在当前指标上的取值
     });
     return metricListTable({ metric: metric, rows: rows, ds: 'material',
-      page: MS.rankPage, size: MS.size, totalName: '全部 ' + MB_TOTAL_N + ' 个单位' });
+      page: MS.rankPage, size: MS.size, totalName: '全部 ' + visible.length + ' 个单位' });
   }
 
   /* 物资管理看板主体：指标卡带 → 主筛选 → 指标页签 + 红色趋势 → 指标明细表 → 六项降本 → 废旧物资处理 */
 
   function materialBoardView() {
     const m = mbMetric(MS.metric);
+    const rankN = mbVisibleRank().length;
     return '<div class="ck-view ck-view--metrics">' +
       /* 核心指标：指标卡 / 页签 / 趋势 / 指标明细表统一放在一个区块内 */
       section('核心指标',
@@ -162,9 +165,9 @@
       '<div class="dsc-chart" id="mbTrend" style="height:280px"></div>' +
 
       /* 指标明细表：同一「核心指标」区块内的明细列表 */
-      detailListHead({ count: MB_RANK.length, gear: 'data-mb-rank-cols' }) +
+      detailListHead({ count: rankN, gear: 'data-mb-rank-cols' }) +
       mbRankTable() +
-      '<div data-mb-pager="rankPage">' + D.pager({ page: MS.rankPage, size: MS.size, total: MB_RANK.length }) + '</div>') +
+      '<div data-mb-pager="rankPage">' + D.pager({ page: MS.rankPage, size: MS.size, total: rankN }) + '</div>') +
 
       /* 六项降本（含降本明细清单：卡片 → 统一查询 → 趋势 → 清单） */
       D.materialSaveUI.section() +
@@ -177,7 +180,8 @@
   D.pages['material-board'] = function () {
     return '<div class="dsc-page cockpit-page">' +
       pageHead('物资管理看板', '核心数据 · 物资：降本与结算指标，含六项降本、降本明细与闲废物资') +
-      scopeNote() + materialBoardView() + '</div>';
+      scopePartialNote('二级单位排行已按组织权限过滤；顶部指标卡、六项降本与闲废物资为全局口径。') +
+      materialBoardView() + '</div>';
   }
 
   function materialBoardAfter(root) {

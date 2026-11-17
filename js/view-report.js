@@ -375,7 +375,7 @@
           { name: 'project', label: '项目名称', type: 'text', ph: '请输入' },
           { name: 'pFormat', label: '项目业态', type: 'multi', options: D.FORMATS },
           { name: 'pType', label: '项目类型', type: 'multi', options: D.TYPES },
-          { name: 'finishDate', label: '项目竣工日期', type: 'daterange' },
+          { name: 'finishDate', label: '项目竣工日期', type: 'daterange', wide: true },
           { name: 'pStatus', label: '项目状态', type: 'multi', options: D.STATUS },
           { name: 'settleCode', label: '结算单号', type: 'text', ph: '请输入' },
           { name: 'settleType', label: '结算单类型', type: 'select', options: D.settleTypes },
@@ -395,13 +395,13 @@
           { name: 'brand', label: '品牌', type: 'text', ph: '请输入' },
           { name: 'area', label: '项目区域', type: 'tree', options: D.areaTree() },
           { name: 'pMode', label: '承包模式', type: 'multi', options: D.MODES },
-          { name: 'signDate', label: '合同签订日期', type: 'daterange' },
-          { name: 'date', label: '结算日期', type: 'daterange' }
+          { name: 'signDate', label: '合同签订日期', type: 'daterange', wide: true },
+          { name: 'date', label: '结算日期', type: 'daterange', wide: true }
         ];
       }
       /* 物资报表-总览 */
       return [
-        { name: 'date', label: '统计日期-范围', type: 'daterange', value: D.defaultRange,
+        { name: 'date', label: '统计日期-范围', type: 'daterange', value: D.defaultRange, wide: true,
           grain: ['日', '月', '季', '年'], grainValue: RS.matGrain },
         { name: 'org2', label: '二级单位', type: 'select', options: orgOpts },
         { name: 'org3', label: '三级单位', type: 'select', options: D.subOrgs.map(function (s) { return s.name; }) },
@@ -425,8 +425,8 @@
           { name: 'contract', label: '合同', type: 'text', ph: '请输入' },
           { name: 'partyA', label: '甲方', type: 'text', ph: '请输入' },
           { name: 'partyB', label: '乙方', type: 'text', ph: '请输入' },
-          { name: 'signDate', label: '合同签订日期', type: 'daterange' },
-          { name: 'createDate', label: '合同创建日期', type: 'daterange' },
+          { name: 'signDate', label: '合同签订日期', type: 'daterange', wide: true },
+          { name: 'createDate', label: '合同创建日期', type: 'daterange', wide: true },
           { name: 'pType', label: '项目类型', type: 'multi', options: ['房屋建筑工程', '基础设施', '工业厂房', '市政公用工程'] },
           { name: 'pStatus', label: '项目状态', type: 'multi', options: ['在建', '竣工', '停工'] },
           { name: 'agent', label: '经办人', type: 'text', ph: '请输入' },
@@ -444,7 +444,7 @@
       }
       /* 采购报表-总览 */
       return [
-        { name: 'date', label: '统计日期-范围', type: 'daterange', value: D.defaultRange,
+        { name: 'date', label: '统计日期-范围', type: 'daterange', value: D.defaultRange, wide: true,
           grain: ['日', '月', '季', '年'], grainValue: RS.purGrain },
         { name: 'org2', label: '二级单位', type: 'select', options: orgOpts },
         { name: 'org3', label: '三级单位', type: 'select', options: D.subOrgs.map(function (s) { return s.name; }) },
@@ -881,7 +881,9 @@
       '    <button class="dsc-btn" data-rp-export>导出</button>' +
       '  </div>' +
       '</div>' +
-      (D.scope.level === 1 ? '' : '<div class="dsc-note dsc-note--warn u-mb-md">已按组织权限过滤（R2）：仅返回本单位及下属数据，超权限明细行不返回。</div>') +
+      (D.scope.level === 1 ? '' : '<div class="dsc-note dsc-note--warn u-mb-md">已按组织权限过滤（R2）：' +
+        (D.scope.level === 3 ? '仅返回本单位数据' : '仅返回本单位及下属数据') +
+        '，超权限明细行不返回。</div>') +
       ((q.ds === 'purchase' || q.ds === 'material') ? '<div class="dsc-tabs" data-rp-view>' +
         [['overview', '局级总览'], ['detail', '明细']].map(function (v) {
           return '<div class="dsc-tabs__item' + (view === v[0] ? ' dsc-tabs__item--active' : '') +
