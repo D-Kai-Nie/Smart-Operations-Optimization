@@ -127,8 +127,9 @@
       ? pjListBlock({ title: '资产调拨台账', key: 'pj-atrans', rows: atRows, last: true,
         tip: '调拨总额 / 原值总额 双口径',
         fields: [['资产调拨单'], ['资产编号'], ['调出公司'], ['调入公司']],
-        more: [['调出项目'], ['调出项目实施单位'], ['调入项目'], ['调入项目实施单位'], ['资产属性'],
-          ['资产类别'], ['资产状态'], ['调拨申请时间'], ['调拨完成时间']],
+        more: [['调出项目'], ['调出项目实施单位'], ['调入项目'], ['调入项目实施单位'],
+          ['资产属性', D.DICT.assetTransferAttrs], ['资产类别', D.DICT.assetTransferCategories],
+          ['资产状态'], ['调拨申请时间'], ['调拨完成时间']],
         /* 排名单位是万元，源字段 amtNoTax 是元（表格列不标单位），需先换算 */
         rank: { title: '调出单位金额排名TOP8',
           rows: pjAggTop(atRows.map(function (r) {
@@ -137,15 +138,19 @@
       : pjListBlock({ title: '资产处置台账', key: 'pj-adisp', rows: pjScopeRows(D.genAssetDisposeRows(), p), last: true,
         tip: '达处置条件的资产方可发起处置',
         fields: [['资产处置单'], ['资产编号'], ['资产状态'], ['达处置条件']],
-        more: [['资产属性'], ['资产类别'], ['品牌'], ['其他采购属性'], ['存放地点'], ['保管人'],
-          ['处置日期']] });
+        more: [['资产属性', D.DICT.assetTransferAttrs], ['资产类别', D.DICT.assetTransferCategories],
+          ['品牌'], ['其他采购属性'], ['存放地点'], ['保管人'], ['处置日期']] });
     /* 区块名与 Axure《项目驾驶舱 › 资产页签》的区块标题（fs=20）逐字对齐：
        资产周转情况 → 资产调拨与处置 → 资产台账全数据 */
     return assetTurnoverSection(p) +
       section('资产调拨与处置', docBar + docBlock) +
       section('资产台账全数据',
-        pjFilter([['资产状态'], ['资产属性'], ['资产类别'], ['存放地点']],
-          [['保管单位'], ['使用人'], ['是否验收'], ['是否盘点'], ['是否调拨'], ['是否处置']],
+        pjFilter([['资产状态'], ['资产属性', D.DICT.assetAttrs], ['资产类别'],
+            ['存放地点', D.DICT.assetLocations]],
+          [['保管单位'], ['使用人'],
+            ['是否验收', D.DICT.assetAcceptStatuses],
+            ['是否盘点', D.DICT.assetInvStatuses],
+            ['是否调拨', D.DICT.assetTransferDirections], ['是否处置']],
           undefined, 'pj-asset') +
         '<div class="dsc-card"><div class="dsc-card__header">' +
         '<div class="dsc-card__title">资产台账</div>' +

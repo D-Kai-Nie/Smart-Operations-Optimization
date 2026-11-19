@@ -127,8 +127,6 @@ input.ck-field { display: inline-block; min-width: 190px; }
 }
 .ck-legend__line--red { background: #D0021B; }
 .ck-legend__line--rose { background: #D98C8C; }
-.ck-legend__line--green { background: #17B98A; }
-.ck-legend__line--green::after { border-color: #17B98A; }
 .ck-legend__line--red::after { border-color: #D0021B; }
 .ck-legend__line--rose::after { border-color: #D98C8C; }
 
@@ -383,23 +381,15 @@ input.ck-field { display: inline-block; min-width: 190px; }
 /* 明细筛出 0 行时的表内空态（不整页空态，保留筛选条以便调整条件） */
 .ck-table__empty { padding: 48px 0; text-align: center; font-size: 13px; color: #8C93A0; }
 
-/* P1-6：饼图去掉引线标注，改为「饼 + 右侧图例列表」两栏 */
-.ck-pie-split { display: grid; grid-template-columns: minmax(0, 1fr) 252px; gap: var(--sp-lg); align-items: center; }
+/* P1-6：饼图去掉引线标注，改为右侧图例列表 */
 .ck-pielegend { display: flex; flex-direction: column; gap: 5px; font-size: 12px; color: #333; min-width: 0; }
 .ck-pielegend__item { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .ck-pielegend__item i { width: 10px; height: 10px; border-radius: 2px; flex: 0 0 auto; }
 .ck-pielegend__name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ck-pielegend__item b { flex: 0 0 auto; font-weight: 600; color: #334155; font-variant-numeric: tabular-nums; }
 @media (max-width: 1500px) {
-  /* 窄屏（最低 1360）下给饼图多留一点直径，图例列收窄 */
-  .ck-pie-split { grid-template-columns: minmax(0, 1fr) 196px; gap: var(--sp-md); }
+  /* 窄屏（最低 1360）下图例字号收紧 */
   .ck-pielegend { font-size: 11px; gap: 4px; }
-}
-/* P2-12：估算 / 示意数据角标——与取数结果区分开，避免被当作实际值引用 */
-.ck-demo-tag {
-  display: inline-block; margin-right: 6px; padding: 0 6px; line-height: 16px;
-  border-radius: 3px; font-size: 11px; font-weight: 600; color: #B26A00;
-  background: #FFF4E5; border: 1px solid #FFD8A8; vertical-align: 1px;
 }
 /* 分供商履约情况：统计横向置顶 + 全宽双轴图；字段名与值同行左右排布 */
 .ck-perfhead { display: flex; align-items: center; gap: var(--sp-xxl); flex-wrap: wrap; margin: 0 0 var(--sp-lg); }

@@ -215,19 +215,6 @@ select.dsc-field {
 .dsc-strip__value--danger { color: var(--color-danger); }
 
 /* ============================================================
-   轮播
-   ============================================================ */
-.rank-carousel { position: relative; }
-.rank-carousel__page { display: none; }
-.rank-carousel__page--active { display: block; }
-.rank-carousel__foot {
-  display: flex; align-items: center; justify-content: center; gap: var(--sp-sm);
-  padding-top: var(--sp-sm); font-size: var(--fs-sm); color: var(--color-text-tertiary);
-}
-.rank-carousel__dot { width: 6px; height: 6px; border-radius: 50%; background: var(--color-border); cursor: pointer; }
-.rank-carousel__dot--active { background: var(--color-primary); }
-
-/* ============================================================
    表格
    ============================================================ */
 .dsc-table-wrap {
@@ -372,31 +359,6 @@ select.dsc-field {
 }
 .org-select__opt:hover { background: var(--color-primary-bg); }
 .org-select__opt small { color: var(--color-text-tertiary); font-size: 12px; }
-
-/* ============================================================
-   时间滑块
-   ============================================================ */
-.dsc-timeslider { padding: var(--sp-md) 0 var(--sp-sm); user-select: none; }
-.dsc-timeslider__track {
-  position: relative; height: 6px; border-radius: 3px;
-  background: #EDEDED; margin: 0 8px;
-}
-.dsc-timeslider__range {
-  position: absolute; top: 0; bottom: 0; border-radius: 3px;
-  background: linear-gradient(90deg, #69C0FF, var(--color-primary));
-}
-.dsc-timeslider__handle {
-  position: absolute; top: 50%; width: 14px; height: 14px; margin-left: -7px;
-  border-radius: 50%; background: #FFF; border: 2px solid var(--color-primary);
-  transform: translateY(-50%); cursor: grab; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
-}
-.dsc-timeslider__handle:active { cursor: grabbing; }
-.dsc-timeslider__ticks {
-  display: flex; justify-content: space-between;
-  margin: 10px 8px 0; font-size: 11px; color: var(--color-text-tertiary);
-}
-.dsc-timeslider__value { text-align: center; font-size: var(--fs-13); color: var(--color-text-secondary); margin-bottom: 8px; }
-.dsc-timeslider__value b { color: var(--color-primary); font-family: var(--font-family-number); }
 
 /* ============================================================
    弹窗

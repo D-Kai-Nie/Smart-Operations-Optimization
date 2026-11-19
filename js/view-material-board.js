@@ -4,36 +4,20 @@
   const esc = D.esc;
   const CS = D.cockpitState;
   const UI = D.ckUI;
+  const late = UI.late;
   const CARET = UI.CARET;
-  const section = UI.section, subHead = UI.subHead, field = UI.field, advActions = UI.advActions;
-  const pageHead = UI.pageHead, scopePartialNote = UI.scopePartialNote;
+  const section = UI.section, subHead = UI.subHead;
   const metricCards = UI.metricCards, metricTabs = UI.metricTabs, detailListHead = UI.detailListHead;
-  const metricListTable = UI.metricListTable, metricColPicker = UI.metricColPicker;
-  const bindMetricTips = UI.bindMetricTips, commonAfter = UI.commonAfter;
+  const field = late('field'), advActions = late('advActions');
+  const pageHead = late('pageHead'), scopePartialNote = late('scopePartialNote');
+  const metricListTable = late('metricListTable'), metricColPicker = late('metricColPicker');
+  const bindMetricTips = late('bindMetricTips'), commonAfter = late('commonAfter');
   /* ============================================================
      物资管理 › 物资管理看板
      内容基准：`物资管理看板.png`（页面标题「核心数据 · 物资」）
      版式：沿用「采购管理看板」的 ck-* 语言（指标卡带 → 筛选 → 页签 + 红色趋势 → 明细 → 区块）
      ============================================================ */
-  const MS = {
-    /* 降本明细的本页内下钻路径（二级单位 → 三级单位 → 项目）；与「跳数据报表」无关 */
-    drill: { org2: '', org3: '', project: '' },
-    metric: 'bargain',   // 顶部指标带 / 页签当前项
-    save: 'total',       // 六项降本当前项
-    rankPage: 1, detailPage: 1, size: 10,
-    hide: {},              // 六项降本趋势图例的熄灭状态（下标 → true 表示已熄灭）
-    sign: '全部',           // 降本金额正负：全部 / 正数 / 负数
-    items: null,           // 降本明细项查询：勾选的小项集合（null = 全选）
-    msOpen: false,         // 复选下拉面板是否展开（重绘后保持展开）
-    kpiMode: 'amt',         // 卡片放大口径：amt = 放大降本金额；rate = 放大产值占比
-    more: false,
-    /* 闲废物资：已生效的查询条件 + 两份台账各自页码 */
-    idle: { doc: 'transfer', org2: '', org3: '', matSmall: '', from: '', to: '',
-      project: '', pageT: 1, pageR: 1 },
-    idleHide: [false, false],   // 闲废物资柱图图例：物资调拨 / 废旧处理两系列的熄灭状态
-    idleSize: 10
-  };
-  D.materialBoardState = MS;   // 与 projectState / reportState / complianceState 一致：导出供测试与联动使用
+  const MS = D.materialBoardState;
 
   const MB_METRICS = [
     { key: 'bargain', name: '二次议价采购成本降低率', value: 5.85, unit: '%', dec: 2,
@@ -49,9 +33,7 @@
     { key: 'totalSettle', name: '总结算完成率', value: 45.57, unit: '%', dec: 2,
       desc: '已完成结算金额 ÷ 应结算总额 × 100%', src: '物资系统' }
   ];
-  const MB_MONTHS = ['2025.04', '2025.05', '2025.06', '2025.07', '2025.08', '2025.09',
-    '2025.10', '2025.11', '2025.12', '2026.01', '2026.02', '2026.03'];
-  D.materialBoardMonths = MB_MONTHS;   // 六项降本模块复用同一组带年度的月份标签
+  const MB_MONTHS = D.materialBoardMonths;
   /* 截图实测：二次议价采购成本降低率 2025.04—2026.03 月度序列 */
   const MB_TREND_BARGAIN = [3.51, 2.83, 6.35, 4.58, 4.37, 3.86, 3.05, 2.01, 1.98, 1.97, 2.03, 3.24];
   function mbMetricTrend(m) {
@@ -96,19 +78,6 @@
     ['北京公司', 610.32, 823.93, 20.25],
     ['文旅博览公司', 552.34, 745.66, 21.30]
   ];
-  /* 二级单位排行的动态列（字段对齐 Axure 局驾驶舱核心数据「设置列」的基本信息 + 指标信息） */
-  const MB_RANK_COLS = [
-    { key: 'name', name: '二级单位', width: 200 },
-    { key: 'saveAmt', name: '二次议价成本降低额（万元）', width: 220, num: true },
-    { key: 'totalAmt', name: '总采购金额（万元）', width: 190, num: true },
-    { key: 'rate', name: '二次议价成本降低率', width: 180, num: true, danger: true },
-    { key: 'share', name: '议价降本占采购额比', width: 170, num: true, pct: true }
-  ];
-  const MB_RANK_DEF = ['name', 'saveAmt', 'totalAmt', 'rate'];
-
-  /* 合计取全部 21 行之和；比率类指标不可累加，合计行显示「—」 */
-  const MB_RANK_TOTAL = ['41,970.07', '48,542.70'];
-
   /* 二级单位排行 = 当前指标的明细列表（字段随指标切换，齿轮走 metricColPicker 的同一套 store）
      与采购/资产看板同构：D.metricRows 生成「基本信息 + 指标信息」，metricListTable 渲染 合计 + 分页行 */
   function mbVisibleRank() {

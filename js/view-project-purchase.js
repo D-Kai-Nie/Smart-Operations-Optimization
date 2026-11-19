@@ -10,9 +10,6 @@
   const STATUS_DIST = [['已完成', 4], ['已下达', 5], ['编制中', 2], ['已关闭', 1], ['待下达', 3], ['待审批', 2], ['已作废', 0]];
 
   function procSection(p) {
-    const matDist = D.material.mid.map(function (m, i) {
-      return { name: m, value: D.round(45.16 - i * 5.2, 2) };
-    }).sort(function (a, b) { return b.value - a.value; });
     return section('招采分析',
       '<div class="dsc-card u-mb-lg"><div class="dsc-card__body">' +
       '  <div class="ck-filter pj-proc-filter"><div class="ck-filter__row">' +
@@ -144,8 +141,7 @@
       '      ' + dateInputs('日期范围') + '</div>' +
       '    <div class="dsc-filter-inline__item"><span class="dsc-filter-inline__label">合同类型</span>' +
       '      <select class="dsc-field" data-pj-field="合同类型"><option value="">请选择合同类型</option>' +
-      ['物资采购合同', '设备采购合同', '劳务分包合同', '专业分包合同', '专业服务合同',
-        '物资租赁合同', '机械设备租赁合同', '运输类合同', '调拨采购合同', '废旧物资销售合同']
+      D.DICT.contractRowTypes
         .map(function (t) { return '<option value="' + esc(t) + '">' + esc(t) + '</option>'; }).join('') +
       '</select></div>' +
       '    <div class="dsc-filter-inline__item"><span class="dsc-filter-inline__label">乙方</span>' +
@@ -165,8 +161,8 @@
   }
 
   /* ---------- 履约分析 ---------- */
-  /* 集采情况按当前项目的合同物料分类汇总（此前误用 genMaterialMarket，
-     类目是各二级单位 / 三级单位 / 项目名称——项目页不应出现其它单位的数据） */
+  /* 集采情况按当前项目的合同物料分类汇总（类目为物料大类 / 中类 / 小类，
+     项目页不应出现其它单位的数据） */
   function pjFulfillMix(level) {
     const key = level === 1 ? 'matBig' : level === 2 ? 'matMid' : 'matSmall';
     const m = {};

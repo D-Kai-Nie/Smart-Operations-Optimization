@@ -266,4 +266,10 @@
       el.addEventListener('click', function () { SS.period = el.getAttribute('data-v'); D.render(); });
     });
   };
+
+  /* 离开 / 重绘前清理大屏时钟与动态轮播，避免页面销毁后定时器继续运行 */
+  D.pages.screen.leave = function () {
+    if (D.__clockTimer) { clearInterval(D.__clockTimer); D.__clockTimer = null; }
+    if (D.__newsTimer) { clearInterval(D.__newsTimer); D.__newsTimer = null; }
+  };
 })(window.APP);

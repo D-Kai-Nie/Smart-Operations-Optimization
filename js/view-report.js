@@ -9,6 +9,7 @@
   /* 列定义 / 默认列 / 筛选字段见 view-report-config.js（配置与渲染分离） */
   const RC = D.reportConfig;
   const COLS = RC.COLS, DEFAULT_SHOWN = RC.DEFAULT_SHOWN, SUP_MAT_SMALL = RC.SUP_MAT_SMALL;
+  const ASSET_STATS_COLS = RC.ASSET_STATS_COLS;
   const filterFields = function (ds, view) { return RC.filterFields(ds, view, RS); };
 
   const RS = {
@@ -26,6 +27,7 @@
     pageKey: '',           // 「数据集+页签」标识：只有换页签/换报表才把页码复位到 1
     condText: '',          // 就地展示的条件摘要（看板同款反馈）
     supTab: 'resource',
+    assetTab: 'stats',     // 资产报表：资产统计报表（按项目）/ 资产明细表（按资产编码）
     sortKey: '', sortDir: 'asc'
   };
   D.reportState = RS;
@@ -34,7 +36,7 @@
     material: { name: '物资数据报表', note: '局级总览：物资 6 项核心指标（二级单位，可逐级下钻到三级/项目）　·　明细：物资结算明细全量表（45+ 字段）' },
     purchase: { name: '采购数据报表', note: '总览：采购指标汇总（二级单位，含局合计，可逐级下钻到三级/项目）　·　明细：合同全量清单（70+ 字段）' },
     supplier: { name: '资源数据报表', note: '资源明细 / 合作分析' },
-    asset: { name: '资产数据报表', note: '资产明细全量表（30+ 字段）· 支持筛选、列设置与导出' }
+    asset: { name: '资产数据报表' }
   };
 
   /* 同一分供商固定映射到同一小类，避免汇总后物料小类随机跳动。
@@ -93,7 +95,6 @@
 
   /* ---------- 组织下钻路径（BR-1：全局→二级→三级→项目） ---------- */
   function drillPath(ds) {
-    const orgNames = D.scope.dataOrgs();
     const scopeName = D.scope.level === 1 ? '' : D.scope.name;
     const lv = RS.overviewLevel;
     const cur = RS.overviewOrg || scopeName;
@@ -121,6 +122,18 @@
        · 行上没有该字段 → 该条件不参与过滤（避免把表清空）
        · 日期范围（长度 2 的数组）→ 按字符串区间比较（ISO 日期可直接比大小）
        · 其余 → 值包含匹配 */
+  /* 筛选名与行字段的显式映射：配置使用业务名，不要求行对象字段同名 */
+  const COND_ALIAS = {
+    contract: { contract: 'name', contractType: 'type', contractStatus: 'status' }
+  };
+  /* 金额区间条件按数值比较；此前文本包含匹配无法表达 >= / <= */
+  const NUMERIC_FILTERS = { amtMin: ['amtTax', 'gte'], amtMax: ['amtTax', 'lte'] };
+  /* 筛选项值与行值域的口径兼容：报表把租赁合同归为「租赁类合同」，
+     行上的类型仍是物资租赁 / 机械设备租赁两种，不能只靠字符串包含 */
+  const VALUE_ALIAS = {
+    contractType: { '租赁类合同': /租赁合同$/ }
+  };
+
   function applyConds(rows, conds, alias) {
     const pairs = Object.keys(conds || {}).filter(function (k) {
       const v = conds[k];
@@ -130,6 +143,13 @@
     if (!pairs.length) return rows;
     return rows.filter(function (r) {
       return pairs.every(function (k) {
+        const num = NUMERIC_FILTERS[k];
+        if (num) {
+          const n = parseFloat(r[num[0]]);
+          const v = parseFloat(conds[k]);
+          if (isNaN(n) || isNaN(v)) return true;
+          return num[1] === 'gte' ? n >= v : n <= v;
+        }
         const key = (alias && alias[k]) || k;
         const rv = r[key];
         if (rv === undefined) return true;
@@ -140,8 +160,13 @@
         }
         if (Array.isArray(v)) {
           const list = v.filter(Boolean);
-          return list.some(function (x) { return String(rv).indexOf(String(x)) >= 0; });
+          return list.some(function (x) {
+            const va = VALUE_ALIAS[k] && VALUE_ALIAS[k][x];
+            return va ? va.test(String(rv)) : String(rv).indexOf(String(x)) >= 0;
+          });
         }
+        const scalarAlias = VALUE_ALIAS[k] && VALUE_ALIAS[k][v];
+        if (scalarAlias) return scalarAlias.test(String(rv));
         return rv != null && String(rv).indexOf(String(v)) >= 0;
       });
     });
@@ -149,23 +174,37 @@
   /* 局级总览的行是「单位」，条件里的二级单位要落到 name 上 */
   const OVERVIEW_ALIAS = { org2: 'name' };
 
+  /* 当前报表页签的最终结果集：条件过滤 + 组织权限 + 按页签聚合。
+     查询命中数、表体、合计都从这里取，避免四条管线各写一遍。 */
+  function reportRows(dsKey) {
+    const visible = function (rows) {
+      return rows.filter(function (r) { return D.scope.canSeeRow(r); });
+    };
+    if (dsKey === 'supplier') {
+      if (RS.supTab === 'cooperation') {
+        return aggregateSupplierRows(visible(applyConds(supplierReportRows(), RS.conds)));
+      }
+      if (RS.supTab === 'resource') {
+        return aggregateResourceRows(visible(applyConds(D.genResourceRows(80), RS.conds)));
+      }
+      return [];
+    }
+    /* 资产统计报表按项目聚合：命中数也要按项目数算，不能报 80 条资产却只显示 N 个项目 */
+    if (dsKey === 'asset' && RS.assetTab === 'stats') {
+      return aggregateAssetRows(visible(applyConds(rowsOf('asset'), RS.conds)));
+    }
+    return visible(applyConds(rowsOf(dsKey), RS.conds, COND_ALIAS[dsKey]));
+  }
+
   /* 条件命中数：让「查询」的结果可被核对（反馈里直接写出筛掉后剩多少条）
      必须与表格用同一套口径：表格还要过 D.scope.canSeeRow 的组织权限（R2），
      否则会出现「提示命中 36 条、表里一行都没有」的自相矛盾 */
   function condHits(dsKey, view) {
-    const visible = function (rows) {
-      return rows.filter(function (r) { return D.scope.canSeeRow(r); });
-    };
     if ((dsKey === 'contract' || dsKey === 'settlement') && view !== 'detail') {
       return applyConds(D.scopeOrgs(D.scope.dataOrgs()).map(function (o) { return { name: o.name }; }),
         RS.conds, OVERVIEW_ALIAS).length;
     }
-    if (dsKey === 'supplier') {
-      if (RS.supTab === 'resource') return visible(applyConds(D.genResourceRows(80), RS.conds)).length;
-      if (RS.supTab === 'cooperation') return visible(applyConds(supplierReportRows(), RS.conds)).length;
-      return 0;
-    }
-    return visible(applyConds(rowsOf(dsKey), RS.conds)).length;
+    return reportRows(dsKey).length;
   }
 
   /* A2：把已提交的条件回填进字段默认值，重绘（查询 / 翻页 / 切页签）后不再被清空 */
@@ -181,17 +220,23 @@
   /* 资产编码链接的详情：直接用当前行数据，不再套用通用「单据详情」模板 */
   function assetDetailHTML(r) {
     const kv = [
-      ['资产编码', r.assetCode], ['项目', r.project], ['二级单位', r.org2], ['三级单位', r.org3 || '—'],
-      ['资产类别', (r.assetCat || r.category) + (r.assetSubCat || r.subCategory ? ' / ' + (r.assetSubCat || r.subCategory) : '')], ['资产属性', r.attr],
-      ['资产品牌', r.brand], ['资产描述', r.desc],
+      ['资产编码', r.assetCode], ['资产名称', r.desc],
+      ['数量', r.qty == null ? '—' : D.fmtInt(r.qty) + (r.unit || '')],
+      ['项目', r.project], ['二级单位', r.org2], ['三级单位', r.org3 || '—'],
+      ['资产类别', r.assetCat || r.category], ['资产属性', r.attr],
+      ['资产品牌', r.brand],
       ['资产总额', D.fmtNum(r.assetAmt, 2) + ' 万元'], ['资产总数', D.fmtInt(r.assetCount)],
       ['在用 / 闲置', D.fmtInt(r.usingCount) + ' / ' + D.fmtInt(r.idleCount)],
       ['维保 / 报废', D.fmtInt(r.repairCount) + ' / ' + D.fmtInt(r.scrapCount)],
       ['资产购置金额', D.fmtNum(r.buyAmt, 2) + ' 万元'], ['处置金额', D.fmtNum(r.disposeAmt, 2) + ' 万元'],
       ['调拨摊销折旧', D.fmtNum(r.depAmt, 2) + ' 万元'],
-      ['使用人 / 保管', r.user + ' / ' + r.keeper], ['存放地点', r.location],
-      ['验收状态 / 时间', r.acceptStatus + ' / ' + r.acceptDate],
-      ['盘点状态', r.invStatus], ['调拨单号', r.transferCode || '—']
+      ['存放地点', r.location],
+      ['保管单位', r.keeper],
+      ['保管人', r.keeperUser || '—'],
+      ['使用人', r.user],
+      ['验收单', r.acceptCode],
+      ['资产盘点', Array.isArray(r.invPlanCode) ? r.invPlanCode.join('、') : r.invPlanCode],
+      ['调拨单号', r.transferCode || '—']
     ];
     return '<div class="dsc-asset-kv">' + kv.map(function (p) {
       return '<div class="dsc-asset-kv__k">' + esc(p[0]) + '</div><div class="dsc-asset-kv__v">' + esc(p[1]) + '</div>';
@@ -213,6 +258,24 @@
       if (typeof x === 'number' && typeof y === 'number') return (x - y) * dir;
       return String(x).localeCompare(String(y), 'zh') * dir;
     });
+  }
+  /* 报表分页：所有表体共用“排序 → 截取当前页 → 行号偏移”的口径 */
+  function pagedRows(rows, cols, size) {
+    const sorted = sortRows(rows, cols);
+    const start = (RS.page - 1) * size;
+    return { sorted: sorted, paged: sorted.slice(start, start + size), start: start };
+  }
+  function numberedRows(rows, start) {
+    return rows.map(function (r, i) { return Object.assign({ idx: start + i + 1 }, r); });
+  }
+  /* 报表表卡：标题 / 字段状态 / 齿轮 / 表体共用同一套外壳 */
+  function reportTableCard(o) {
+    return '<div class="dsc-card' + (o.wrap === false ? '' : ' report-page__table-wrap') + '">' +
+      '<div class="dsc-card__header">' +
+      '<div class="dsc-card__title">' + esc(o.title) + '</div>' +
+      '<div class="dsc-card__extra">' + (o.extra || '') +
+      D.colGear(o.gear, o.gearTip) + '</div></div>' +
+      D.table(o.table) + '</div>';
   }
 
   /* ds 取归一化后的数据集键（settlement / contract / asset / supplier），view 仅采购报表使用 */
@@ -431,6 +494,10 @@
   const SUP_TABS = [
     ['resource', '资源数据明细'], ['cooperation', '分供商合作分析']
   ];
+  /* ---------- F7 资产 2 页签：统计报表（按项目）/ 明细表（按资产编码） ---------- */
+  const ASSET_TABS = [
+    ['stats', '资产统计报表'], ['detail', '资产明细表']
+  ];
   /* 资源数据明细：三级单位级资源指标（项目字段已移除；10 个数量列 + 3 个额度列） */
   function resCol(k, n, w, o) { return Object.assign({ key: k, name: n, width: w, num: true }, o || {}); }
   const RES_COLS = [
@@ -495,41 +562,85 @@
     });
   }
 
+  /* 资产统计报表：把资产级行按「二级单位 + 三级单位 + 项目」汇总，最小颗粒度 = 项目。
+     汇总字段从统计列定义派生，新增统计列时不再需要同步维护第二份 key 清单 */
+  const ASSET_SUM_KEYS = ASSET_STATS_COLS.filter(function (c) { return c.num; })
+    .map(function (c) { return c.key; });
+  function aggregateAssetRows(rows) {
+    const map = {}, order = [];
+    rows.forEach(function (r) {
+      const key = (r.org2 || '') + '|' + (r.org3 || '') + '|' + (r.project || '');
+      let t = map[key];
+      if (!t) {
+        t = map[key] = { org2: r.org2, org3: r.org3, project: r.project };
+        order.push(key);
+      }
+      ASSET_SUM_KEYS.forEach(function (k) {
+        if (typeof r[k] === 'number') t[k] = (t[k] || 0) + r[k];
+      });
+    });
+    return order.map(function (k) {
+      const r = map[k];
+      ASSET_SUM_KEYS.forEach(function (key) { r[key] = D.round(r[key] || 0, 2); });
+      return r;
+    });
+  }
+  function assetStatsBody() {
+    const all = reportRows('asset');
+    const total = all.length;
+    const size = sizeOf('asset');
+    /* 统计报表也提供设置列：字段清单只含 13 个有效列，默认全部显示 */
+    const allKeys = ASSET_STATS_COLS.map(function (c) { return c.key; });
+    const cols = D.colsOf('asset-stats', ASSET_STATS_COLS, allKeys);
+    const page = pagedRows(all, ASSET_STATS_COLS, size);
+    const totalRow = D.totalOf(cols, page.sorted);
+    return reportTableCard({
+      title: '资产统计报表',
+      extra: '最小颗粒度：项目　·　共 ' + total + ' 个项目',
+      gear: 'data-rp-stats-cols', gearTip: '设置列：资产统计报表的显示字段',
+      table: {
+        cols: cols, rows: numberedRows(page.paged, page.start),
+        maxHeight: 620, totalRow: totalRow, sortKey: RS.sortKey, sortDir: RS.sortDir,
+        foot: '<div class="dsc-table__footnote">合计行按全部 ' + total + ' 个项目汇总（含所有页），不是当前页之和</div>' +
+          D.pager({ page: RS.page, size: size, total: total })
+      }
+    });
+  }
+
   function supplierBody() {
     if (RS.supTab === 'resource') {
-      const all = aggregateResourceRows(applyConds(D.genResourceRows(80), RS.conds)
-        .filter(function (r) { return D.scope.canSeeRow(r); }));
+      const all = reportRows('supplier');
       const total = all.length;
       const size = sizeOf('supplier');
-      const sorted = sortRows(all, RES_COLS);
-      const paged = sorted.slice((RS.page - 1) * size, (RS.page - 1) * size + size);
       const rcols = D.colsOf('sup-resource', RES_COLS, RES_COLS.map(function (c) { return c.key; }));
-      const rtotal = D.totalOf(RES_COLS, sorted);
-      return '<div class="dsc-card"><div class="dsc-card__header">' +
-        '<div class="dsc-card__title">资源数据明细</div>' +
-        '<div class="dsc-card__extra">' +
-        D.colGear('data-rp-cols="sup-resource"', '设置列：资源数据明细的显示字段') + '</div></div>' +
-        D.table({ cols: sortableCols(rcols), rows: paged.map(function (r, i) { return Object.assign({ idx: (RS.page - 1) * size + i + 1 }, r); }),
+      const page = pagedRows(all, RES_COLS, size);
+      const rtotal = D.totalOf(RES_COLS, page.sorted);
+      return reportTableCard({
+        wrap: false, title: '资源数据明细', extra: '',
+        gear: 'data-rp-cols="sup-resource"', gearTip: '设置列：资源数据明细的显示字段',
+        table: {
+          cols: sortableCols(rcols), rows: numberedRows(page.paged, page.start),
           maxHeight: 520, totalRow: rtotal, sortKey: RS.sortKey, sortDir: RS.sortDir,
-          foot: D.pager({ page: RS.page, size: size, total: total }) }) + '</div>';
+          foot: D.pager({ page: RS.page, size: size, total: total })
+        }
+      });
     }
     /* cooperation：按分供商汇总；项目字段已移除，改为履约合作项目数 */
-    const ds = 'supplier';
-    const all = aggregateSupplierRows(applyConds(supplierReportRows(), RS.conds)
-      .filter(function (r) { return D.scope.canSeeRow(r); }));
+    const all = reportRows('supplier');
     const total = all.length;
-    const size = sizeOf(ds);
-    const sorted = sortRows(all, colsOf(ds));
-    const paged = sorted.slice((RS.page - 1) * size, (RS.page - 1) * size + size);
-    const cols = sortableCols(colsOf(ds));
-    return '<div class="dsc-card"><div class="dsc-card__header">' +
-      '<div class="dsc-card__title">分供商合作分析</div>' +
-      '<div class="dsc-card__extra">' +
-      D.colGear('data-rp-columns', '设置列：分供商合作分析的显示字段') + '</div></div>' +
-      D.table({ cols: cols, rows: paged.map(function (r, i) { return Object.assign({ idx: (RS.page - 1) * size + i + 1 }, r); }),
-        /* 合计按「全量结果集」算：此前用 paged（当前页），合计只有第 1 页那 10 行的和 */
-        maxHeight: 520, totalRow: D.totalOf(cols, sorted), sortKey: RS.sortKey, sortDir: RS.sortDir,
-        foot: D.pager({ page: RS.page, size: size, total: total }) }) + '</div>';
+    const size = sizeOf('supplier');
+    const cols = sortableCols(colsOf('supplier'));
+    const page = pagedRows(all, cols, size);
+    return reportTableCard({
+      wrap: false, title: '分供商合作分析', extra: '',
+      gear: 'data-rp-columns', gearTip: '设置列：分供商合作分析的显示字段',
+      table: {
+        cols: cols, rows: numberedRows(page.paged, page.start),
+        /* 合计按「全量结果集」算，不能用当前页 */
+        maxHeight: 520, totalRow: D.totalOf(cols, page.sorted), sortKey: RS.sortKey, sortDir: RS.sortDir,
+        foot: D.pager({ page: RS.page, size: size, total: total })
+      }
+    });
   }
 
   /* ============================================================
@@ -544,9 +655,10 @@
     if (q.ds === 'supplier' && !SUP_TABS.some(function (t) { return t[0] === RS.supTab; })) {
       RS.supTab = 'resource';
     }
+    if (q.ds === 'asset' && RS.assetTab !== 'detail') RS.assetTab = 'stats';
     /* A1：页码只在「换报表 / 换页签」时复位——此前每次渲染都 RS.page = 1，
        把分页器刚写入的页码覆盖掉，导致报表分页整页失效 */
-    const pageKey = dsKey + '|' + view + '|' + RS.supTab;
+    const pageKey = dsKey + '|' + view + '|' + RS.supTab + '|' + RS.assetTab;
     if (RS.pageKey !== pageKey) { RS.page = 1; RS.pageKey = pageKey; RS.sortKey = ''; }
 
     let body = '';
@@ -554,17 +666,18 @@
       body = overviewSection(dsKey);
     } else if (q.ds === 'supplier') {
       body = supplierBody();
+    } else if (q.ds === 'asset' && RS.assetTab === 'stats') {
+      body = assetStatsBody();
     } else {
       const tabbed = q.ds === 'purchase' || q.ds === 'material';
-      const all = applyConds(rowsOf(dsKey), RS.conds).filter(function (r) { return D.scope.canSeeRow(r); });
+      const all = reportRows(dsKey);
       const total = all.length;
       const size = sizeOf(dsKey);
-      const sorted = sortRows(all, colsOf(dsKey));
-      const paged = sorted.slice((RS.page - 1) * size, (RS.page - 1) * size + size);
       const cols = sortableCols(colsOf(dsKey));
+      const page = pagedRows(all, cols, size);
       /* 当前显示列里没有数值列时不出现空的合计行；合计按全量结果集而非当前页 */
-      const totalRow = cols.some(function (c) { return c.num; }) ? D.totalOf(cols, sorted) : null;
-      const title = dsKey === 'contract' ? '合同明细' : dsKey === 'settlement' ? '结算明细' : '资产明细';
+      const totalRow = cols.some(function (c) { return c.num; }) ? D.totalOf(cols, page.sorted) : null;
+      const title = dsKey === 'contract' ? '合同明细' : dsKey === 'settlement' ? '结算明细' : '资产明细表';
       /* 资产明细：表卡右上只写字段显隐，不再重复页头与分页里的「共 N 条」 */
       const extra = dsKey === 'asset'
         ? '显示 ' + cols.length + ' / ' + COLS.asset.length + ' 字段　·　可自定义显示与排序'
@@ -572,21 +685,21 @@
       /* 合计行是全量口径，页脚写明，避免被当成当前页 10 行之和 */
       const totalNote = dsKey === 'asset' && totalRow
         ? '<div class="dsc-table__footnote">合计行按全部 ' + total + ' 条汇总（含所有页），不是当前页之和</div>' : '';
-      body = '<div class="dsc-card report-page__table-wrap"><div class="dsc-card__header">' +
-        '<div class="dsc-card__title">' + esc(title) + '</div>' +
-        '<div class="dsc-card__extra">' + extra +
-        D.colGear('data-rp-columns', '设置列：' + title + '的显示字段') + '</div></div>' +
-        D.table({
-          cols: cols, rows: paged.map(function (r, i) { return Object.assign({ idx: (RS.page - 1) * size + i + 1 }, r); }),
+      body = reportTableCard({
+        title: title, extra: extra,
+        gear: 'data-rp-columns', gearTip: '设置列：' + title + '的显示字段',
+        table: {
+          cols: cols, rows: numberedRows(page.paged, page.start),
           maxHeight: tabbed ? 660 : 560, totalRow: totalRow, sortKey: RS.sortKey, sortDir: RS.sortDir,
           foot: totalNote + D.pager({ page: RS.page, size: size, total: total })
-        }) + '</div>';
+        }
+      });
     }
 
     return '<div class="dsc-page report-page">' +
       '<div class="dsc-page__header report-page__header">' +
       '  <div class="dsc-page__title">' + esc(meta.name) + '</div>' +
-      '  <div class="dsc-page__sub">' + esc(meta.note) + '</div>' +
+      (meta.note ? '  <div class="dsc-page__sub">' + esc(meta.note) + '</div>' : '') +
       '  <div class="dsc-page__actions report-page__action-bar">' +
       /* A4：汇总 / 固定口径页签（局级总览、资源数据明细）的列不可增删，
          此前仍显示「列设置」且弹出的是另一个页签的字段——改成明示口径，不再给假入口 */
@@ -605,13 +718,17 @@
         return '<div class="dsc-tabs__item' + (RS.supTab === t[0] ? ' dsc-tabs__item--active' : '') +
           '" data-st="' + t[0] + '">' + esc(t[1]) + '</div>';
       }).join('') + '</div>' : '') +
+      (q.ds === 'asset' ? '<div class="dsc-tabs" data-rp-assettab>' + ASSET_TABS.map(function (t) {
+        return '<div class="dsc-tabs__item' + (RS.assetTab === t[0] ? ' dsc-tabs__item--active' : '') +
+          '" data-at="' + t[0] + '">' + esc(t[1]) + '</div>';
+      }).join('') + '</div>' : '') +
       /* 组织下钻路径只属于采购 / 物资「局级总览」——资产报表是逐行明细，用筛选条里的实施单位定位 */
       ((q.ds === 'purchase' || q.ds === 'material') && view !== 'detail' ? drillPath(q.ds) : '') +
       D.filterBar({ id: 'rpFilter', cls: 'report-page__filter-bar', fields: withConds(filterFields(dsKey, view)),
         conds: RS.condText,
         visibleCount: (q.ds === 'purchase' || q.ds === 'material') ? 8
           : q.ds === 'supplier' ? (RS.supTab === 'resource' ? 2 : 4)
-            : q.ds === 'asset' ? 3 : 6 }) +
+            : q.ds === 'asset' ? 4 : 6 }) +
       body +
       '</div>';
   };
@@ -715,6 +832,13 @@
         if (next !== RS.supTab) { RS.conds = {}; RS.condText = ''; RS.sortKey = ''; }
         RS.supTab = next; RS.page = 1; D.render(); return;
       }
+      /* 资产报表：统计报表（按项目）/ 明细表（按资产编码） */
+      const at = t.closest('[data-at]');
+      if (at) {
+        const next = at.getAttribute('data-at');
+        if (next !== RS.assetTab) { RS.conds = {}; RS.condText = ''; RS.sortKey = ''; }
+        RS.assetTab = next; RS.page = 1; D.render(); return;
+      }
 
       /* AC25 总览逐级下钻 + 返回上一级 */
       const ov = t.closest('[data-overview]');
@@ -772,10 +896,21 @@
         }
         return;
       }
+      /* 资产统计报表的列设置：字段清单仅 13 个统计列 */
+      if (t.closest('[data-rp-stats-cols]')) {
+        D.openColPicker({
+          key: 'asset-stats', title: '资产统计报表', modalTitle: '列设置 · 资产统计报表',
+          all: ASSET_STATS_COLS, def: ASSET_STATS_COLS.map(function (c) { return c.key; }),
+          beforeRender: function () { RS.page = 1; },
+          after: D.render
+        });
+        return;
+      }
       /* 列设置（AC7）：统一走 D.openColPicker / D.colStore，不再维护第二套 RS.shown 状态 */
       if (t.closest('[data-rp-columns]')) {
         const ds = q.ds === 'supplier' ? 'supplier' : dsKey;
-        const title = DS[q.ds] ? DS[q.ds].name : '数据报表';
+        /* 资产明细表的列设置弹窗按表名命名，不再用页名「资产数据报表」 */
+        const title = dsKey === 'asset' ? '资产明细表' : (DS[q.ds] ? DS[q.ds].name : '数据报表');
         D.openColPicker({
           key: colStoreKey(ds), title: title, modalTitle: '列设置 · ' + title,
           okText: '应用', defaultToast: '已恢复默认字段顺序', width: 900,
@@ -803,6 +938,15 @@
         return;
       }
 
+      /* 资产明细的单据编号：验收单 / 资产盘点 / 调拨单。
+         原型不设计单据详情页，点击给出交互提示即可 */
+      const docLk = t.closest('[data-doclink]');
+      if (docLk) {
+        const code = docLk.getAttribute('data-doclink') || docLk.textContent;
+        const type = docLk.getAttribute('data-doc-type') || '单据';
+        D.toast('打开' + type + '详情：' + code + '（原型未设计详情页）');
+        return;
+      }
       /* 单据编号超链接 → 单据详情 */
       const lk = t.closest('.dsc-table__link');
       if (lk) {

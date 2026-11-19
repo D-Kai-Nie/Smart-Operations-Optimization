@@ -17,10 +17,8 @@ window.APP = window.APP || {};
   function pick(rnd, arr) { return arr[Math.floor(rnd() * arr.length)]; }
   function between(rnd, a, b, fix) { return +(a + rnd() * (b - a)).toFixed(fix === undefined ? 2 : fix); }
   function round(v, f) { return +(+v).toFixed(f === undefined ? 2 : f); }
-  D.pick = pick;
   D.round = round;
   D.seedRand = seedRand;
-  D.between = between;
 
   /* ============================================================
      组织（BR-1：局 → 二级单位 → 三级单位 → 项目）
@@ -154,13 +152,6 @@ window.APP = window.APP || {};
     return hit || D.reportAlias[full] || full;
   };
 
-  /* 组织树（供组织选择 / 权限过滤） */
-  D.orgTree = [{ name: '局总部', level: 1, children: D.orgs.map(function (o) {
-    return { name: o.name, level: 2, children: (D.subOrgsByParent[o.name] || []).map(function (s) {
-      return { name: s.name, shortName: s.shortName, level: 3, children: [] };
-    }) };
-  }) }];
-
   /* ============================================================
      项目（BR-1；含五个项目维度）
      ============================================================ */
@@ -190,6 +181,34 @@ window.APP = window.APP || {};
   D.settleTypes = ['月度结算', '总结算', '临时结算', '退料结算'];
   D.settleStatuses = ['待提交', '审批中', '已生效', '已作废'];
   D.detailTypes = ['正常结算', '退货结算', '领料结算', '调拨结算'];
+  /* 跨页面共用的值集：筛选选项与生成数据从同一份定义读取，避免两处各写一份后漂移。
+     contractRowTypes 是台账真实值域；contractFilterTypes 是报表上的归并筛选口径。 */
+  D.DICT = {
+    contractCategories: ['物资类', '分包类', '服务类', '租赁类'],
+    contractRowTypes: ['物资采购合同', '设备采购合同', '劳务分包合同', '专业分包合同', '专业服务合同',
+      '物资租赁合同', '机械设备租赁合同', '运输类合同', '调拨采购合同', '废旧物资销售合同'],
+    contractFilterTypes: ['物资采购合同', '设备采购合同', '劳务分包合同', '专业分包合同', '专业服务合同', '租赁类合同'],
+    assetLedgerCategories: ['项目固定资产', '项目非固定资产'],
+    assetAttrs: ['固定', '非固定'],
+    /* 调拨 / 处置台账沿用的历史值域，与资产台账的「固定 / 非固定」分开 */
+    assetTransferAttrs: ['自有', '租赁', '调拨'],
+    assetTransferCategories: ['固定资产', '非固定资产'],
+    assetSourceTypes: ['采购', '调拨'],
+    assetStatuses: ['在用', '闲置', '报废', '维保'],
+    assetAcceptStatuses: ['已验收', '待验收', '验收不通过'],
+    assetInvStatuses: ['已盘点', '未盘点', '盘盈', '盘亏'],
+    assetTransferDirections: ['调入', '调出'],
+    assetLocations: ['一号库', '二号库', '现场料场', '设备堆场'],
+    people: {
+      core: ['李彬', '王建国', '张伟', '陈晓'],
+      extended: ['李彬', '王建国', '张伟', '陈晓', '刘洋', '赵敏'],
+      three: ['李彬', '王建国', '张伟'],
+      docs: ['李彬', '孙倩', '周磊', '吴迪'],
+      operators5: ['李彬', '孙倩', '周磊', '吴迪', '王建国'],
+      managers5: ['李彬', '王建国', '张伟', '陈晓', '刘洋'],
+      pickOwners: ['李彬', '孙建国', '张伟', '陈晓']
+    }
+  };
   /* 项目资产分类：看板 / 资产数据报表共用同一份 11 类字典。
      share 仅用于看板分类金额的示意拆分；subs 是报表「资产二级类别」的候选值。 */
   D.ASSET_CATEGORIES = [
@@ -206,6 +225,49 @@ window.APP = window.APP || {};
     { key: 'other', name: '其他资产', share: 2, subs: ['变压器', '其他'] }
   ];
   D.ASSET_CAT_NAMES = D.ASSET_CATEGORIES.map(function (c) { return c.name; });
+  /* 资产名称：按资产类别下的二级类别编造（用于资产明细表的「资产名称」列） */
+  const ASSET_NAMES = {
+    '电梯': '乘客电梯 1000kg', '塔式起重机': '塔式起重机 QTZ80', '施工升降机': '施工升降机 SC200/200',
+    '挖掘机': '履带式挖掘机 1.2m³', '装载机': '轮式装载机 ZL50', '压路机': '振动压路机 22t',
+    '打印机': 'A3 激光打印机', '空调': '柜式空调 3匹', '办公家具': '办公工位套装',
+    '宿舍设施': '宿舍双层床', '食堂设备': '食堂蒸饭柜',
+    '消火栓': '室内消火栓 DN65', '投光灯': 'LED 投光灯 200W', '临时配电箱': '临时配电箱 XL-21',
+    '箱式房': '箱式房 标准箱', '活动板房': '活动板房 K式',
+    '电锤': '电锤 26mm', '手工具': '手工具套装',
+    '钢管': '脚手架钢管 Φ48', '扣件': '直角扣件', '模板支撑': '盘扣式模板支撑',
+    '安装拆除费': '安装拆除服务', '消耗性材料': '消耗性材料包',
+    '木方': '木方 40×90', '木模板': '木模板 1830×915',
+    '变压器': '箱式变压器 630kVA', '其他': '其他资产'
+  };
+  /* 数量单位：同一「数量」字段在不同资产下单位不统一，报表里数字后直接带单位 */
+  const ASSET_UNITS = {
+    '电梯': '台', '塔式起重机': '台', '施工升降机': '台',
+    '挖掘机': '台', '装载机': '台', '压路机': '台',
+    '打印机': '台', '空调': '台', '办公家具': '套',
+    '宿舍设施': '套', '食堂设备': '台',
+    '消火栓': '个', '投光灯': '个', '临时配电箱': '台',
+    '箱式房': '间', '活动板房': '平方米',
+    '电锤': '台', '手工具': '套',
+    '钢管': '米', '扣件': '个', '模板支撑': '套',
+    '安装拆除费': '项', '消耗性材料': '批',
+    '木方': '立方米', '木模板': '张',
+    '变压器': '台', '其他': '个'
+  };
+  /* 按资产二级类别生成数量：固定设备 1~6 台，周转料具按米 / 平方米 / 立方米计 */
+  function assetQty(i, sub) {
+    const unit = ASSET_UNITS[sub] || '个';
+    let n;
+    if (unit === '米') n = 60 + (i * 37) % 540;
+    else if (unit === '平方米') n = 40 + (i * 53) % 760;
+    else if (unit === '立方米') n = 2 + (i * 11) % 58;
+    else if (unit === '张') n = 10 + (i * 13) % 110;
+    else if (unit === '批') n = 2 + (i * 3) % 18;
+    else if (unit === '项') n = 1 + (i * 2) % 4;
+    else if (unit === '套') n = 2 + (i * 7) % 24;
+    else if (unit === '个') n = 5 + (i * 11) % 60;
+    else n = 1 + (i * 3) % 6;
+    return { qty: n, unit: unit };
+  }
   const CITY_BY_AREA = {
     '华东地区': ['杭州市', '宁波市', '温州市', '南京市', '苏州市', '济南市', '青岛市', '合肥市', '上海市'],
     '华北地区': ['北京市', '天津市', '石家庄市', '太原市', '呼和浩特市'],
@@ -251,10 +313,6 @@ window.APP = window.APP || {};
     '沈阳市': '辽宁', '大连市': '辽宁', '长春市': '吉林', '哈尔滨市': '黑龙江',
     '西安市': '陕西', '兰州市': '甘肃', '西宁市': '青海', '银川市': '宁夏', '乌鲁木齐市': '新疆'
   };
-  D.provinceOf = function (city) {
-    return D.CITY_PROVINCE[city] || (city || '').replace(/市$/, '');
-  };
-
   /* ============================================================
      物料（大类 → 中类 → 小类）
      ============================================================ */
@@ -323,13 +381,6 @@ window.APP = window.APP || {};
   /* ============================================================
      指标定义（附录 A）+ 合规阈值（BR-4）
      ============================================================ */
-  D.tabs = [
-    { key: 'purchase', name: '采购', count: 9 },
-    { key: 'material', name: '物资', count: 6 },
-    { key: 'resource', name: '资源', count: 0 },
-    { key: 'asset', name: '资产', count: 5 }
-  ];
-
   D.metrics = {
     purchase: [
       { key: 'costDown', name: '采购成本降低率', unit: '%', ctrl: [0, 50], desc: '（标准成本 - 总采购金额）/ 标准成本', src: '结算单 / 合同' },
@@ -360,37 +411,13 @@ window.APP = window.APP || {};
     ]
   };
 
-  /* 六项降本（F2.4） */
-  D.sixSave = [
-    { key: 'bargain', name: '结算降本', formula: '（集采单价 - 采购单价）× 结算数量', src: '系统自动抓取', amount: 8620.42, rate: 2.14 },
-    { key: 'consume', name: '消耗降本', formula: '（图纸用量 - 实际用量）× 结算单价', src: '图纸用量数字商务填报', amount: 5842.36, rate: 1.45 },
-    { key: 'asset', name: '资产降本', formula: '（购买单价 - 调拨单价）× 调拨数量', src: '手动填写', amount: 1746.28, rate: 0.43 },
-    { key: 'verify', name: '验收降本', formula: '（到货数量 - 实收数量）× 结算单价', src: '系统自动抓取', amount: 3264.18, rate: 0.81 },
-    { key: 'turnover', name: '周转降本', formula: '（购买单价 - 调拨单价）× 调拨数量', src: '手动填写', amount: 2183.94, rate: 0.54 },
-    { key: 'idle', name: '闲废降本', formula: '（常规材料采购价 - 回收再利用采购价）', src: '手动填写', amount: 962.51, rate: 0.24 }
-  ];
-
-  /* 招采方式（F2.5） */
-  D.procModes = ['直接采购', '询比价', '竞价', '竞争性谈判', '公开招标'];
-
   /* ============================================================
-     日期与趋势
+     日期
      ============================================================ */
   D.today = '2026-09-15';
   D.defaultRange = ['2026-01-01', '2026-09-15'];
   D.months12 = ['2025-10', '2025-11', '2025-12', '2026-01', '2026-02', '2026-03',
     '2026-04', '2026-05', '2026-06', '2026-07', '2026-08', '2026-09'];
-
-  D.trend = function (base, swing, seed, n) {
-    const rnd = seedRand(seed || 88);
-    const out = [];
-    let v = base;
-    for (let i = 0; i < (n || 12); i++) {
-      v = Math.max(0.2, v + (rnd() - 0.5) * swing);
-      out.push(round(v));
-    }
-    return out;
-  };
 
   /* ============================================================
      看板聚合
@@ -426,36 +453,6 @@ window.APP = window.APP || {};
       out.qualityRate = round(out.quality / (out.onStock || 1) * 100);
     }
     return out;
-  };
-
-  D.rank = function (tab, metricKey, orgNames) {
-    const bucket = BUCKET[tab] || 'kpi';
-    const rows = D.scopeOrgs(orgNames).map(function (o) {
-      let v = (o[bucket] || {})[metricKey];
-      if (v === undefined) v = 0;
-      return { name: o.name, code: o.code, value: round(v), amount: o.amount };
-    });
-    rows.sort(function (a, b) { return b.value - a.value; });
-    return rows;
-  };
-
-  D.matrix = function (tab, orgNames) {
-    const bucket = BUCKET[tab] || 'kpi';
-    const defs = D.metrics[tab] || [];
-    return D.scopeOrgs(orgNames).map(function (o) {
-      const row = { code: o.code, name: o.name, amount: o.amount };
-      defs.forEach(function (m) { row[m.key] = (o[bucket] || {})[m.key]; });
-      return row;
-    });
-  };
-
-  D.monthTrend = function (tab, metricKey, orgNames) {
-    const def = (D.metrics[tab] || []).filter(function (m) { return m.key === metricKey; })[0];
-    const base = D.summary(tab, orgNames)[metricKey] || 10;
-    return D.months12.map(function (m, i) {
-      const rnd = seedRand(9000 + i * 31 + String(metricKey).length);
-      return { month: m, value: round(Math.max(0.1, base + (rnd() - 0.5) * base * 0.22)) };
-    });
   };
 
   /* 地图分布（项目按省计数） */
@@ -505,9 +502,8 @@ window.APP = window.APP || {};
         suppCode: rnd() > 0.7 ? 'BC-' + (1000 + i) : '—',
         treasuryCode: 'SK' + (202600000 + i * 31),
         status: rnd() > 0.12 ? '已生效' : pick(rnd, ['草稿', '审批中', '已终止']),
-        type: pick(rnd, ['物资采购合同', '设备采购合同', '劳务分包合同', '专业分包合同', '专业服务合同',
-          '物资租赁合同', '机械设备租赁合同', '运输类合同', '调拨采购合同', '废旧物资销售合同']),
-        category: pick(rnd, ['物资类', '分包类', '服务类', '租赁类']),
+        type: pick(rnd, D.DICT.contractRowTypes),
+        category: pick(rnd, D.DICT.contractCategories),
         source: pick(rnd, ['招标', '询比价', '单一来源', '框架协议']),
         sourceCode: 'ZB-' + (20260000 + i * 29),
         tpl: pick(rnd, ['物资采购标准模板A', '分包合同标准模板', '设备采购模板B', '租赁合同模板']),
@@ -518,6 +514,7 @@ window.APP = window.APP || {};
         partyB: pick(rnd, D.suppliers).name,
         belong: p.org,
         org2: p.org, org3: p.subOrg, project: p.name, projectCode: p.code,
+        pType: p.type, pStatus: p.status,
         area: p.area, addr: p.city + '·' + p.name.slice(0, 10),
         dept: pick(rnd, ['物资管理部', '采购管理部', '商务管理部', '工程管理部']),
         signDate: '2026-0' + (1 + Math.floor(rnd() * 9)) + '-' + String(1 + Math.floor(rnd() * 27)).padStart(2, '0'),
@@ -527,8 +524,8 @@ window.APP = window.APP || {};
         trade: pick(rnd, ['FOB', 'CIF', 'EXW', '—']),
         transport: pick(rnd, ['供方送货', '需方自提', '第三方物流']),
         fundFlow: pick(rnd, ['支出', '收入']),
-        creator: pick(rnd, ['李彬', '孙倩', '周磊', '吴迪']),
-        agent: pick(rnd, ['李彬', '王建国', '张伟', '陈晓', '刘洋', '赵敏']),
+        creator: pick(rnd, D.DICT.people.docs),
+        agent: pick(rnd, D.DICT.people.extended),
         rowType: pick(rnd, ['主材', '辅材', '设备', '周转材料']),
         brand: pick(rnd, ['宝武', '沙钢', '海螺', '鞍钢', '马钢', '—']),
         otherAttr: pick(rnd, ['—', '甲供', '甲控', '乙供']),
@@ -575,6 +572,15 @@ window.APP = window.APP || {};
       return {
         settleCode: 'JS' + (202600000 + i * 17),
         org2: p.org, org3: p.subOrg, project: p.name, supplier: pick(rnd, D.suppliers).name,
+        /* 报表筛选用的项目字段：此前查询条件里有 org / 项目属性 / 日期，
+           行上却没有对应字段，applyConds 会把条件当作「不参与过滤」放行 */
+        org: p.org + '|' + (p.subOrg || ''),
+        pType: p.type, pFormat: p.format, pStatus: p.status, pMode: p.mode,
+        area: p.area + '|' + p.city,
+        finishDate: '2026-' + String(1 + i % 9).padStart(2, '0') + '-' +
+          String(1 + (i * 3) % 27).padStart(2, '0'),
+        signDate: '2025-' + String(1 + i % 9).padStart(2, '0') + '-' +
+          String(1 + (i * 5) % 27).padStart(2, '0'),
         settleType: pick(rnd, ['月度结算', '总结算', '临时结算', '退料结算']),
         settleStatus: pick(rnd, ['待提交', '审批中', '已生效', '已作废']),
         settleMonth: pick(rnd, D.months12), settleCycle: pick(rnd, ['月结30天', '月结60天', '季度结算']),
@@ -613,31 +619,57 @@ window.APP = window.APP || {};
       const idle = Math.floor((total - using) * between(rnd, 0.2, 0.8));
       const repair = Math.floor((total - using - idle) * between(rnd, 0.2, 0.9));
       const scrap = Math.max(0, total - using - idle - repair);
+      const sub = ac.subs[(i * 3 + 1) % ac.subs.length];
+      /* 资产属性 = 固定 / 非固定；来源类型 = 采购 / 调拨（仅调拨有调拨单） */
+      const attr = pick(rnd, [D.DICT.assetAttrs[0], D.DICT.assetAttrs[0], D.DICT.assetAttrs[1]]);
+      const sourceType = pick(rnd, [D.DICT.assetSourceTypes[0], D.DICT.assetSourceTypes[0],
+        D.DICT.assetSourceTypes[0], D.DICT.assetSourceTypes[1]]);
+      const transferType = sourceType === '调拨' ? pick(rnd, D.DICT.assetTransferDirections) : '—';
+      const transferDate = sourceType === '调拨'
+        ? '2026-0' + (1 + Math.floor(rnd() * 9)) + '-' + String(1 + Math.floor(rnd() * 27)).padStart(2, '0')
+        : '—';
+      const acceptPrefix = attr === '固定' ? 'GZYS-2026-' : 'FGZYS-2026-';
+      const qu = assetQty(i, sub);
       return {
         org2: p.org, org3: p.subOrg, implOrg: p.org, project: p.name,
-        assetCode: 'ZC' + (202600000 + i * 37), batchCode: 'PC' + (202600 + i * 7),
+        /* 资产编码规则：PC-YYYYMMDD-########（中段日期，后段 8 位流水） */
+        assetCode: 'PC-2025' + String(1 + i % 9).padStart(2, '0') + String(1 + (i * 7) % 28).padStart(2, '0') +
+          '-' + String(235573 + i * 37).padStart(8, '0'),
+        batchCode: 'PC' + (202600 + i * 7),
         origCode: rnd() > 0.6 ? 'ZC' + (202500000 + i * 41) : '—',
-        category: pick(rnd, ['项目固定资产', '项目非固定资产']),
+        category: pick(rnd, D.DICT.assetLedgerCategories),
         subCategory: pick(rnd, ['临建设施', '办公设备', '生活设施', '施工机械', '测量仪器']),
         brand: pick(rnd, ['三一', '中联', '徐工', '柳工', '卡特', '—']),
-        attr: pick(rnd, ['自有', '租赁', '调拨']),
-        desc: pick(rnd, ['塔式起重机', '施工升降机', '配电箱', '活动板房', '全站仪', '挖掘机']),
-        sourceType: pick(rnd, ['采购', '调拨', '租赁', '现场']),
+        attr: attr,
+        desc: ASSET_NAMES[sub] || sub,
+        qty: qu.qty, unit: qu.unit,
+        sourceType: sourceType,
         sourceOrg: pick(rnd, D.orgs).name,
-        location: p.city + '·' + pick(rnd, ['一号库', '二号库', '现场料场', '设备堆场']),
-        keeper: p.org + '物资部', user: pick(rnd, ['李彬', '王建国', '张伟', '陈晓']),
+        location: p.city + '·' + pick(rnd, D.DICT.assetLocations),
+        keeper: p.org + '物资部',
+        keeperUser: pick(rnd, D.DICT.people.extended),
+        user: pick(rnd, D.DICT.people.core),
         buyAmt: between(rnd, 120, 3800, 1), assetAmt: between(rnd, 60, 4200, 1),
         depAmt: between(rnd, 30, 960, 1), disposeAmt: between(rnd, 6, 320, 1),
         assetCount: total, usingCount: using, idleCount: idle, repairCount: repair, scrapCount: scrap,
-        acceptStatus: pick(rnd, ['已验收', '待验收', '验收不通过']),
-        acceptCode: 'YS' + (20260000 + i * 7),
+        acceptStatus: pick(rnd, D.DICT.assetAcceptStatuses),
+        /* 验收单编号：固定资产 GZYS-2026-#######，非固定资产 FGZYS-2026-####### */
+        acceptCode: acceptPrefix + String(676 + i * 31).padStart(7, '0'),
         acceptDate: '2026-0' + (1 + Math.floor(rnd() * 9)) + '-' + String(1 + Math.floor(rnd() * 27)).padStart(2, '0'),
-        invStatus: pick(rnd, ['已盘点', '未盘点', '盘盈', '盘亏']),
-        invPlanCode: 'PD' + (20260000 + i * 5),
+        invStatus: pick(rnd, D.DICT.assetInvStatuses),
+        /* 资产盘点：同一资产可多次盘点，方案编号 1~4 个；ZCPD-YYYYMMDD-########。
+           多值在报表里按「物料小类」样式展示（最多 3 项 + 省略号气泡） */
+        invPlanCode: Array.from({ length: 1 + i % 4 }, function (_, k) {
+          return 'ZCPD-2026' +
+            String(1 + (i * 3 + k * 2) % 9).padStart(2, '0') +
+            String(1 + (i * 7 + k * 5) % 28).padStart(2, '0') +
+            '-' + String(3300 + i * 170 + k * 13).padStart(8, '0');
+        }),
         invDate: '2026-0' + (1 + Math.floor(rnd() * 9)) + '-' + String(1 + Math.floor(rnd() * 27)).padStart(2, '0'),
-        transferCode: rnd() > 0.5 ? 'DB' + (20260000 + i * 9) : '—',
-        transferType: pick(rnd, ['调入', '调出']),
-        transferDate: '2026-0' + (1 + Math.floor(rnd() * 9)) + '-' + String(1 + Math.floor(rnd() * 27)).padStart(2, '0'),
+        /* 调拨单：仅来源类型为「调拨」时有值；编号 ZCDB-2026-####### */
+        transferCode: sourceType === '调拨' ? 'ZCDB-2026-' + String(8747 + i * 13).padStart(7, '0') : '—',
+        transferType: transferType,
+        transferDate: transferDate,
         /* 报表筛选用的行字段：实施单位（二级|三级）、项目属性、统计日期。
            此前这些条件只在筛选条里，行上没有对应字段，查询被 applyConds 当作"不参与过滤"放行 */
         org: p.org + '|' + (p.subOrg || ''),
@@ -645,11 +677,12 @@ window.APP = window.APP || {};
         pArea: p.area + '|' + p.city,
         date: '2026-0' + (1 + Math.floor(rnd() * 9)) + '-' + String(1 + Math.floor(rnd() * 15)).padStart(2, '0'),
         /* 资产台账筛选用的状态字段（原先只有是否验收/盘点/调拨，没有「资产状态」「是否处置」） */
-        assetStatus: pick(rnd, ['在用', '在用', '在用', '闲置', '闲置', '维保', '报废']),
+        assetStatus: pick(rnd, [D.DICT.assetStatuses[0], D.DICT.assetStatuses[0], D.DICT.assetStatuses[0],
+          D.DICT.assetStatuses[1], D.DICT.assetStatuses[1], D.DICT.assetStatuses[3], D.DICT.assetStatuses[2]]),
         disposed: pick(rnd, ['是', '否', '否']),
         /* 资产数据报表 / 看板共用的 11 类口径；category / subCategory 保留给项目驾驶舱资产台账 */
         assetCat: ac.name,
-        assetSubCat: ac.subs[(i * 3 + 1) % ac.subs.length]
+        assetSubCat: sub
       };
     }).filter(function (r) { return filter ? filter(r) : true; });
   };
@@ -744,7 +777,7 @@ window.APP = window.APP || {};
         autoPlan: i % 3 === 0 ? '是' : '否',
         pickUnit: ['一分公司', '二分公司', '安装分公司', '装饰分公司'][i % 4],
         madeDate: '2026-0' + (1 + i % 8) + '-' + String(2 + i % 25).padStart(2, '0'),
-        maker: ['李彬', '孙倩', '周磊', '吴迪'][i % 4]
+        maker: D.DICT.people.docs[i % 4]
       };
     });
   };
@@ -758,7 +791,7 @@ window.APP = window.APP || {};
         supplier: D.suppliers[i % D.suppliers.length].name,
         matSmall: sm, unit: D.material.unitOf(sm),
         qty: +(120 + i * 37.5).toFixed(2), acceptQty: +(118 + i * 36.2).toFixed(2),
-        status: ['已验收', '待验收', '验收不通过'][i % 3],
+        status: D.DICT.assetAcceptStatuses[i % 3],
         date: '2026-0' + (1 + i % 9) + '-' + String(1 + i % 27).padStart(2, '0'),
         /* Axure「物资页签 › 领料 / 结算明细」的其余字段 */
         pickCode: 'LL' + (20260000 + i * 17),
@@ -770,7 +803,7 @@ window.APP = window.APP || {};
         part: ['主体结构', '基础工程', '装饰装修', '机电安装', '室外工程'][i % 5],
         pickQty: +(110 + i * 33.8).toFixed(2),
         level1: ['一公司本级库', '局本级库', '二公司本级库'][i % 3],
-        owner: ['李彬', '王建国', '张伟', '陈晓'][i % 4],
+        owner: D.DICT.people.core[i % 4],
         isRecon: i % 2 === 0 ? '已对账' : '未对账',
         settleCode: 'JS' + (20260000 + i * 23),
         settleMonth: '2026-0' + (1 + i % 9),
@@ -790,7 +823,7 @@ window.APP = window.APP || {};
         /* Axure「物资页签 › 领料」字段 */
         pickUnit: ['一分公司', '二分公司', '安装分公司', '装饰分公司'][i % 4],
         level1: ['局本级库', '一公司本级库', '二公司本级库'][i % 3],
-        owner: ['李彬', '孙建国', '张伟', '陈晓'][i % 4],
+        owner: D.DICT.people.pickOwners[i % 4],
         brand: ['宝武', '沙钢', '海螺', '鞍钢'][i % 4],
         bizType: ['采购入库', '调拨入库', '退料入库'][i % 3],
         otherAttr: ['甲供', '甲控', '乙供'][i % 3],
@@ -898,7 +931,7 @@ window.APP = window.APP || {};
         price: price, amt: round(qty * price),
         buyer: ['废宝回收有限公司', '循环资源利用中心', '再生资源公司'][i % 3],
         date: '2026-0' + (1 + i % 9) + '-' + String(1 + i % 27).padStart(2, '0'),
-        handler: ['李彬', '王建国', '张伟'][i % 3]
+        handler: D.DICT.people.three[i % 3]
       };
     });
   };
@@ -925,10 +958,10 @@ window.APP = window.APP || {};
           '配电箱 XL-21', '全站仪 徕卡 TS16', '挖掘机 履带式 1.2m³']),
         brand: pick(rnd, ['三一', '中联', '徐工', '柳工', '卡特', '—']),
         otherAttr: pick(rnd, ['甲供', '甲控', '乙供']),
-        assetStatus: pick(rnd, ['在用', '闲置', '报废', '维保']),
-        attr: pick(rnd, ['自有', '租赁', '调拨']),
-        category: pick(rnd, ['固定资产', '非固定资产']),
-        location: p.city + '·' + pick(rnd, ['一号库', '二号库', '现场料场', '设备堆场']),
+        assetStatus: pick(rnd, D.DICT.assetStatuses),
+        attr: pick(rnd, D.DICT.assetTransferAttrs),
+        category: pick(rnd, D.DICT.assetTransferCategories),
+        location: p.city + '·' + pick(rnd, D.DICT.assetLocations),
         applyQty: q, outQty: Math.max(0, q - Math.floor(rnd() * 3)),
         priceNoTax: round(price), amtNoTax: amt, taxRate: taxRate, amtTax: round(amt * (1 + taxRate / 100)),
         origPriceNoTax: round(price * between(rnd, 1.0, 1.18)), origAmt: round(amt * between(rnd, 1.02, 1.25)),
@@ -952,114 +985,23 @@ window.APP = window.APP || {};
         batchCode: 'PC-' + (20240807 + i * 3) + '-' + String(204475 + i * 7).padStart(9, '0'),
         brand: pick(rnd, ['三一', '中联', '徐工', '柳工', '—']),
         otherAttr: pick(rnd, ['甲供', '甲控', '乙供']),
-        assetStatus: pick(rnd, ['在用', '闲置', '报废', '维保']),
-        attr: pick(rnd, ['自有', '租赁', '调拨']),
-        category: pick(rnd, ['固定资产', '非固定资产']),
+        assetStatus: pick(rnd, D.DICT.assetStatuses),
+        attr: pick(rnd, D.DICT.assetTransferAttrs),
+        category: pick(rnd, D.DICT.assetTransferCategories),
         desc: pick(rnd, ['彩钢板房', '塔式起重机', '施工升降机', '活动板房', '全站仪', '挖掘机']),
         countType: pick(rnd, ['数量', '面积', '重量']),
         actualQty: cnt, disposeQty: Math.max(1, Math.round(cnt * between(rnd, 0.3, 1))), turnedTimes: Math.floor(between(rnd, 0, 9, 0)),
         condition: pick(rnd, ['已达到', '未达到']),
         origAmt: orig, usedYears: years, residual: round(orig * between(rnd, 0.02, 0.2)),
         netAmt: round(orig * Math.max(0, 1 - years / 15) * between(rnd, 0.85, 1.0)),
-        keeper: p.org + '物资部', keeperUser: pick(rnd, ['李彬', '王建国', '张伟', '陈晓']),
+        keeper: p.org + '物资部', keeperUser: pick(rnd, D.DICT.people.core),
         disposeDate: '2026-0' + (1 + Math.floor(rnd() * 9)) + '-' + String(1 + Math.floor(rnd() * 27)).padStart(2, '0'),
         status: pick(rnd, ['待审批', '已审批', '已处置'])
       };
     });
   };
 
-  /* --- 提诉 / 反向评价 / 黑名单 --- */
-  /* 提诉报表：两种口径，列集对齐 Axure「分供商提诉报表」的 4 个视角
-     ① 单位 / 单位-项目经理：占比 + 平均时耗；② 提诉分供商 / 提诉人：状态分布 */
-  D.genComplaintRows = function (view) {
-    const orgView = view === 'targetOrg' || view === 'targetManager';
-    const MANAGERS = ['李彬', '王建国', '张伟', '陈晓', '刘洋'];
-    if (orgView) {
-      return D.orgs.map(function (o, i) {
-        const rnd = seedRand(4100 + i);
-        const total = Math.round(between(rnd, 60, 620, 0));
-        const overdue = Math.round(total * between(rnd, 0.08, 0.36));
-        const open = Math.round(total * between(rnd, 0.12, 0.42));
-        const done = total - open;
-        return {
-          name: view === 'targetManager' ? (o.name + '-' + MANAGERS[i % MANAGERS.length]) : o.name,
-          total: total, overdue: overdue, overduePct: round(overdue / total * 100, 2),
-          open: open, openPct: round(open / total * 100, 2),
-          openHours: Math.round(between(rnd, 240, 1800, 0)),
-          done: done, donePct: round(done / total * 100, 2),
-          doneHours: Math.round(between(rnd, 120, 900, 0)),
-          contractAmt: Math.round(between(rnd, 1.2e8, 9.6e8, 0)),
-          disputeAmt: Math.round(between(rnd, 2e6, 6e7, 0))
-        };
-      });
-    }
-    const persons = ['赵敏', '孙倩', '周磊', '吴迪', '郑凯', '何静'];
-    return D.suppliers.slice(0, 20).map(function (s, i) {
-      const rnd = seedRand(4500 + i);
-      const total = Math.round(between(rnd, 6, 88, 0));
-      const open = Math.round(total * between(rnd, 0.2, 0.7));
-      return {
-        name: view === 'supplierPerson' ? (s.name + '-' + (13482600000 + i * 137)) : s.name,
-        total: total, overdue: Math.round(total * between(rnd, 0.05, 0.4)),
-        open: open,
-        pending: Math.round(open * between(rnd, 0.2, 0.6)),
-        handling: Math.round(open * between(rnd, 0.2, 0.5)),
-        withdrawn: Math.round(open * between(rnd, 0.05, 0.25)),
-        waitConfirm: Math.round(open * between(rnd, 0.05, 0.2)),
-        done: total - open,
-        appeal: Math.round(between(rnd, 0, 12, 0)), urge: Math.round(between(rnd, 0, 20, 0)),
-        contractAmt: Math.round(between(rnd, 2e7, 6e8, 0)),
-        disputeAmt: Math.round(between(rnd, 1e6, 4e7, 0))
-      };
-    });
-  };
-
-  /* 反向评价：按「项目 × 评价项」逐条列出（列集对齐 Axure「分供商反向评价」） */
-  D.REVIEW_ITEMS = [
-    ['项目采购过程中是否做到先签订合同后进场供应', '做到了先签合同后供货', '项目要求先供货后签合同'],
-    ['是否按要求开展分供商考察评价', '已按要求开展考察评价', '未开展考察评价'],
-    ['是否使用局合格分供商名录内单位', '全部使用名录内单位', '存在名录外单位'],
-    ['是否按月开展分供商履约评价', '已按月开展履约评价', '未按月开展履约评价'],
-    ['是否按规定收取履约保证金', '已按规定收取', '未按规定收取']
-  ];
-  D.genReviewRows = function (n) {
-    const items = D.REVIEW_ITEMS;
-    const list = D.projects.slice(0, n || 20);
-    return list.map(function (p, i) {
-      const it = items[i % items.length];
-      const rnd = seedRand(5200 + i);
-      const score = rnd() > 0.28 ? 10 : 0;
-      return {
-        org2: p.org, org3: p.subOrg, project: p.name,
-        item: it[0], score: score, meaning: score === 10 ? it[1] : it[2],
-        supCount: Math.round(between(rnd, 60, 420, 0))
-      };
-    });
-  };
-
-  D.genBlacklistRows = function () {
-    return D.suppliers.filter(function (s) { return s.frozen; }).map(function (s, i) {
-      return { name: s.name, creditNo: s.creditNo, status: '冻结', reason: ['供货不及时', '质量不合格', '虚假资料', '恶意报价'][i % 4], date: '2026-0' + (1 + i % 9) + '-' + String(1 + i % 27).padStart(2, '0') };
-    });
-  };
-
-  /* --- 主材进场 / 结算平均价格 --- */
-  D.genMaterialMarket = function (mainKey, level) {
-    const conf = D.material.main.filter(function (m) { return m.name === mainKey; })[0] || D.material.main[0];
-    const rnd = seedRand(500 + mainKey.length * 17 + level * 7);
-    const rows = (level === 1 ? D.orgs : level === 2 ? D.subOrgs.slice(0, 12) : D.projects.slice(0, 12)).map(function (o, i) {
-      const k = 0.5 + ((i * 37) % 70) / 100;
-      return {
-        name: o.name || o.shortName,
-        qty: round(2860 * k, 2),
-        amt: round(2860 * k * between(rnd, 3.2, 5.4), 2),
-        price: round(between(rnd, 3800, 5200), 2)
-      };
-    });
-    rows.sort(function (a, b) { return b.qty - a.qty; });
-    return rows;
-  };
-
+  /* --- 结算平均价格 --- */
   D.genSettlePriceRows = function () {
     return [
       { name: '普通钢筋', unit: '元/吨', value: 4722.89 }, { name: '普通混凝土', unit: '元/m³', value: 365.28 },
@@ -1069,15 +1011,4 @@ window.APP = window.APP || {};
     ];
   };
 
-  /* --- 用户活跃度（F2.9） --- */
-  D.genActiveRows = function () {
-    return D.orgs.map(function (o, i) {
-      const rnd = seedRand(6000 + i);
-      const total = Math.floor(between(rnd, 180, 4200, 0));
-      const active = Math.floor(total * between(rnd, 0.35, 0.92));
-      return { org2: o.name, active: active, total: total, rate: round(active / total * 100, 1) };
-    }).sort(function (a, b) { return b.active - a.active; });
-  };
-
-  D.ready = true;
-})(window.APP);
+  })(window.APP);

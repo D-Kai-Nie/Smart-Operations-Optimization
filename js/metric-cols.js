@@ -46,7 +46,6 @@
 
   /* 三个分包口径的金额（元 → 万元） */
   const W = function (yuan) { return D.round((yuan || 0) / 1e4, 2); };
-  const r1 = function (v) { return D.round(v, 1); };
   const r2 = function (v) { return D.round(v, 2); };
 
   D.METRIC_COLS = {

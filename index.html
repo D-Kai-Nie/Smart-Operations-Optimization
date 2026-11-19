@@ -93,16 +93,19 @@
   <script src="js/ui.js"></script>
   <script src="js/metric-cols.js"></script>
   <script src="js/view-screen.js"></script>
+  <!-- 看板模块只依赖 view-cockpit-shared；view-cockpit.js 负责补充 helper，可安全放在 board 之后 -->
   <script src="js/view-cockpit-shared.js"></script>
-  <script src="js/view-cockpit.js"></script>
   <script src="js/view-cockpit-overview.js"></script>
   <script src="js/view-purchase-board.js"></script>
-  <script src="js/view-material-board.js"></script>
+  <!-- 物资 state 提前到 shared；save / idle 可先于 material-board 加载 -->
+  <script src="js/view-material-shared.js"></script>
   <script src="js/view-material-save-model.js"></script>
   <script src="js/view-material-save.js"></script>
   <script src="js/view-material-idle.js"></script>
+  <script src="js/view-material-board.js"></script>
   <script src="js/view-supplier-board.js"></script>
   <script src="js/view-asset-board.js"></script>
+  <script src="js/view-cockpit.js"></script>
   <script src="js/view-project.js"></script>
   <script src="js/view-project-purchase.js"></script>
   <script src="js/view-project-material.js"></script>

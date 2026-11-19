@@ -7,6 +7,20 @@ window.APP = window.APP || {};
   'use strict';
   const esc = D.esc;
   const CARET = '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 6.5l4 4 4-4"/></svg>';
+  const MONTHS = ['2026年01月', '2026年02月', '2026年03月', '2026年04月', '2026年05月',
+    '2026年06月', '2026年07月', '2026年08月', '2026年09月'];
+  /* 看板共享状态提前到基础片段，board 模块不再依赖 view-cockpit.js 先执行 */
+  const CS = {
+    view: 'overview',          // overview | metrics
+    metric: 'costDown',        // 指标总览当前页签
+    settleGrain: '日',         // 结算日期粒度
+    inGrain: '日',             // 招标开始日期粒度
+    matSmall: '普通钢筋',      // 物资小类
+    boardTab: 'project',
+    advanced: false,
+    sortKey: '', sortDir: 'asc'
+  };
+  D.cockpitState = CS;
 
   function section(title, body, extra) {
     return '<section class="ck-sec">' +
@@ -81,6 +95,10 @@ window.APP = window.APP || {};
 
   D.ckUI = {
     CARET: CARET,
+    MONTHS: MONTHS,
+    late: function (name) {
+      return function () { return D.ckUI[name].apply(D.ckUI, arguments); };
+    },
     section: section,
     subHead: subHead,
     metricCard: metricCard,

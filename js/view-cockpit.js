@@ -8,7 +8,6 @@
 (function (D) {
   'use strict';
   const esc = D.esc;
-  const R = D.round;
   /* 基础片段由 view-cockpit-shared.js 提供 */
   const CK = D.ckUI;
   const CARET = CK.CARET;
@@ -20,29 +19,18 @@
   const detailListHead = CK.detailListHead;
   const filterFoot = CK.filterFoot;
   const setFilterMore = CK.setFilterMore;
+  const MONTHS = CK.MONTHS;
 
   /* ============================================================
-     视图状态
+     视图状态（状态对象由 view-cockpit-shared.js 提前提供）
      ============================================================ */
-  const CS = {
-    view: 'overview',          // overview | metrics
-    metric: 'costDown',        // 指标总览当前页签
-    settleGrain: '日',         // 结算日期粒度
-    inGrain: '日',             // 招标开始日期粒度
-    matSmall: '普通钢筋',      // 物资小类
-    boardTab: 'project',
-    advanced: false,
-    sortKey: '', sortDir: 'asc'
-  };
-  D.cockpitState = CS;
+  const CS = D.cockpitState;
 
   /* ============================================================
      指标定义（指标总览-采购，截图实测文案与数值）
      ============================================================ */
   /* 每个指标附口径气泡（AC9：指标定义 / 统计口径 / 数据来源）；
      口径按 PRD BR-3 与 §7 数据来源填写，未明确的一律标注"待确认"，不臆造规则 */
-  const MONTHS = ['2026年01月', '2026年02月', '2026年03月', '2026年04月', '2026年05月',
-    '2026年06月', '2026年07月', '2026年08月', '2026年09月'];
 
   /* ============================================================
      通用片段
@@ -69,7 +57,7 @@
       case '市': return Object.keys(D.CITY_PROVINCE);
       case '物料分类': return D.material.mid;
       case '物料小类': return D.material.small;
-      case '采购类别': return ['物资类', '分包类', '服务类', '租赁类'];
+      case '采购类别': return D.DICT.contractCategories;
       case '采购方式': return ['公开招标', '邀请招标', '竞争性谈判', '单一来源', '询价'];
       case '采购模式': return ['集中采购', '分散采购', '厂家直采'];
       case '统计月份': return ['2026-01', '2026-02', '2026-03', '2026-04'];
@@ -83,13 +71,14 @@
       case '局评价等级': return D.supplierGrades;
       case '领用单位': case '保管单位': return ['一分公司', '二分公司', '安装分公司', '装饰分公司', '第一分公司'];
       case '一级库': return ['局本级库', '一公司本级库', '二公司本级库', '三级单位本级库'];
-      case '编制人': case '责任人': case '使用人': return ['李彬', '孙倩', '周磊', '吴迪', '王建国'];
+      case '编制人': case '责任人': case '使用人': return D.DICT.people.operators5;
       case '结算周期': return ['月结30天', '月结60天', '季度结算', '节点结算'];
       case '结算明细类型': return D.detailTypes;
       case '是否对账': return ['已对账', '未对账'];
-      case '资产状态': return ['在用', '闲置', '报废', '维保'];
-      case '资产属性': return ['自有', '租赁', '调拨'];
-      case '资产类别': return ['项目固定资产', '项目非固定资产'];
+      case '资产状态': return D.DICT.assetStatuses;
+      /* 调拨 / 处置台账沿用历史值域；资产台账通过显式 options 传固定 / 非固定 */
+      case '资产属性': return D.DICT.assetTransferAttrs;
+      case '资产类别': return D.DICT.assetLedgerCategories;
       case '存放地点': return ['现场', '库房', '临建区', '加工区'];
       case '是否验收': case '是否盘点': case '是否调拨': case '是否处置':
         return ['是', '否'];
@@ -98,7 +87,7 @@
       /* Axure《项目驾驶舱》各列表筛选条（物资 / 资产页签） */
       case '供应商': case '收购方': return D.suppliers.slice(0, 30).map(function (x) { return x.name; });
       case '退货类型': return ['质量退货', '规格退货', '多发货退货', '项目变更退货'];
-      case '调拨类型': return ['调入', '调出'];
+      case '调拨类型': return D.DICT.assetTransferDirections;
       case '调出公司': case '调入公司': return D.orgs.map(function (x) { return x.name; });
       case '调出项目实施单位': case '调入项目实施单位':
         return D.subOrgs.slice(0, 20).map(function (x) { return x.name; });
@@ -106,7 +95,7 @@
       case '项目名称': return D.projects.slice(0, 30).map(function (x) { return x.name; });
       case '处理方式': return ['销售', '销毁'];
       case '废宝类型': return ['废钢筋', '废木材', '其他废料'];
-      case '处理人': return ['李彬', '王建国', '张伟'];
+      case '处理人': return D.DICT.people.three;
       case '盘点类型': return ['全盘', '半明盘', '暗盘'];
       case '盘点范围': case '库房名称':
         return ['全部库房', '现场料场', '周转材料库', '一号库', '二号库'];
@@ -308,18 +297,6 @@
     });
   }
 
-  /* 二级单位明细的动态列：字段取自 Axure《局驾驶舱 › 核心数据》「设置列」面板（基本信息 + 指标信息），
-     列出该表真实可算的字段——原来那张「列设置」只弹一个提示、不改变任何内容 */
-  const PB_UNIT_COLS = [
-    { key: 'name', name: '二级单位名称', width: 260 },
-    { key: 'stdAmt', name: '不含税标准成本金额（元）', width: 200, num: true },
-    { key: 'buyAmt', name: '不含税采购金额（元）', width: 190, num: true },
-    { key: 'saveAmt', name: '采购成本降低额（元）', width: 190, num: true },
-    { key: 'rate', name: '采购成本降低率', width: 150, num: true, danger: true },
-    { key: 'share', name: '标准成本占比', width: 130, num: true, pct: true }
-  ];
-  const PB_UNIT_DEF = ['name', 'stdAmt', 'buyAmt', 'saveAmt', 'rate', 'share'];
-
   /* 页面级标题（与数据报表页同构件）：看板类页面原先没有标题，只能靠面包屑判断所在位置 */
   function pageHead(title, sub) {
     return '<div class="dsc-page__header"><div class="dsc-page__title">' + esc(title) + '</div>' +
@@ -415,7 +392,6 @@
     dateRange: dateRange,
     actions: actions,
     advActions: advActions,
-    MONTHS: MONTHS,
     bindMetricTips: bindMetricTips,
     metricColPicker: metricColPicker,
     metricListTable: metricListTable,

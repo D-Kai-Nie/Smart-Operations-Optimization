@@ -5,9 +5,10 @@
   const esc = D.esc;
   const CS = D.cockpitState;
   const UI = D.ckUI;
+  const late = UI.late;
   const section = UI.section, subHead = UI.subHead;
-  const field = UI.field, dateRange = UI.dateRange, actions = UI.actions, advActions = UI.advActions;
-  const pageHead = UI.pageHead, scopePartialNote = UI.scopePartialNote, commonAfter = UI.commonAfter;
+  const field = late('field'), dateRange = late('dateRange'), actions = late('actions'), advActions = late('advActions');
+  const pageHead = late('pageHead'), scopePartialNote = late('scopePartialNote'), commonAfter = late('commonAfter');
   const MONTHS = UI.MONTHS;
 
   /* 局驾驶舱各图表的图例熄灭状态（key → { 系列下标: true }）：

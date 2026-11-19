@@ -174,7 +174,7 @@
           matBig: D.material.big[(oi + i) % D.material.big.length],
           matMid: D.material.mid[(oi * 2 + i) % D.material.mid.length],
           matSmall: D.material.small[(oi * 3 + i * 2) % D.material.small.length],
-          creator: ['李彬', '王建国', '张伟', '陈晓', '刘洋'][i % 5], empNo: '8001' + String(20 + i * 3).padStart(3, '0'),
+          creator: D.DICT.people.managers5[i % 5], empNo: '8001' + String(20 + i * 3).padStart(3, '0'),
           level: ['严重', '较重', '一般'][i % 3],
           date: '2026-0' + (1 + i) + '-' + String(1 + (oi * 3 + i) % 27).padStart(2, '0')
         });
@@ -313,7 +313,6 @@
   function bidDecision() {
     const rows = BID_ROWS;
     const bidCnt = rows.reduce(function (a, r) { return a + r.bidCount; }, 0);
-    const validCnt = rows.reduce(function (a, r) { return a + r.validCount; }, 0);
     const winCnt = rows.filter(function (r) { return r.status === '已定标'; }).length;
     const failCnt = rows.filter(function (r) { return r.status === '已废标'; }).length;
     const avgBid = D.round(bidCnt / rows.length, 1);
@@ -537,7 +536,7 @@
             [0, 1, 2].map(function (i) {
               const m = cfg.metrics[i % cfg.metrics.length];
               return '<tr><td>DJ' + (20260000 + i * 23) + '</td><td>' + esc(m.name) + '</td>' +
-                '<td>' + ['李彬', '王建国', '张伟'][i] + '</td><td>8001' + (20 + i * 3) + '</td></tr>';
+                '<td>' + D.DICT.people.three[i] + '</td><td>8001' + (20 + i * 3) + '</td></tr>';
             }).join('') + '</tbody></table>' +
             '<div class="u-mt-md"><label class="dsc-metric__label">通知内容模板</label>' +
             '<textarea class="dsc-field" rows="3" style="height:auto;padding:8px">【数字供应链服务通知】您创建的{单据编号}所属{项目名称}的{指标名称}为{指标值}，已触发异常规则「{异常规则}」，请及时核实处理。</textarea></div>',

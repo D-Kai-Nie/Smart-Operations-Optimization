@@ -5,9 +5,11 @@
   const esc = D.esc;
   const CS = D.cockpitState;
   const UI = D.ckUI;
+  const late = UI.late;
   const CARET = UI.CARET;
-  const section = UI.section, subHead = UI.subHead, field = UI.field, advActions = UI.advActions;
-  const bindMetricTips = UI.bindMetricTips;
+  const section = UI.section, subHead = UI.subHead;
+  const field = late('field'), advActions = late('advActions');
+  const bindMetricTips = late('bindMetricTips');
   const MS = D.materialBoardState;
   const MB_MONTHS = D.materialBoardMonths;
 

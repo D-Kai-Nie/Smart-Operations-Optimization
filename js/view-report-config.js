@@ -11,6 +11,30 @@
 
   function C(k, n, w, o) { return Object.assign({ key: k, name: n, width: w || 120 }, o || {}); }
 
+  /* 单据编号链接：点击后由页面统一提示「详情页」（原型不设计详情页） */
+  function docLink(code, type) {
+    return '<span class="dsc-table__link" data-doclink="' + esc(code) +
+      '" data-doc-type="' + esc(type) + '">' + esc(code) + '</span>';
+  }
+  function docCell(type) {
+    return function (v) {
+      return v && v !== '—' ? docLink(v, type) : '—';
+    };
+  }
+  /* 多值字段：最多显示 3 项，超出部分收进 title（物料小类 / 资产盘点编号共用）。
+     传入 linkType 时，每个可见编号渲染为可点击的单据链接 */
+  function multiValue(linkType) {
+    return function (v) {
+      const list = Array.isArray(v) ? v : (v ? String(v).split('、') : []);
+      if (!list.length) return '—';
+      const one = function (s) { return linkType ? docLink(s, linkType) : esc(s); };
+      const head = list.slice(0, 3).map(one).join('、');
+      if (list.length <= 3) return head;
+      return head + '<span class="dsc-more" title="全部 ' + list.length + ' 项：' +
+        esc(list.join('、')) + '">…</span>';
+    };
+  }
+
   const COLS = {
     /* 附录 D 物资结算明细（列序对齐 Axure「物资数据报表 › 明细」：
        单据信息 → 物料信息 → 金额信息 → 降本指标 → 关联单据） */
@@ -94,25 +118,23 @@
     ],
     /* 附录 E 资产明细（列序对齐 Axure「资产数据报表」：
        序号 → 项目 → 二级 → 三级 → 资产编码 → 金额/数量 → 属性/来源 → 状态/单据） */
+    /* 资产明细表：最小颗粒度 = 资产编码；只保留业务办理字段，
+       金额 / 数量类统计字段归入「资产统计报表」（ASSET_STATS_COLS） */
     asset: [
       C('idx', '序号', 56, { sticky: true }),
-      C('project', '项目', 220, { sticky2: true }),
-      C('org2', '二级单位', 110), C('org3', '三级单位', 130),
-      C('assetCode', '资产编码', 160, { link: true }),
-      C('assetAmt', '资产总额(万元)', 140, { num: true }), C('assetCount', '资产总数', 110, { num: true }),
-      C('usingCount', '在用数量', 100, { num: true }), C('idleCount', '闲置数量', 100, { num: true }),
-      C('repairCount', '维保数量', 100, { num: true }), C('scrapCount', '报废数量', 100, { num: true }),
-      C('buyAmt', '资产购置金额(万元)', 160, { num: true }), C('disposeAmt', '处置金额(万元)', 140, { num: true }),
-      C('depAmt', '调拨摊销折旧金额(万元)', 180, { num: true }),
+      C('assetCode', '资产编码', 180, { sticky2: true, link: true }),
+      C('desc', '资产名称', 180),
+      C('qty', '数量', 100, { sortable: true, render: function (v, r) {
+        return v == null || v === '' ? '—' : esc(D.fmtInt(v) + (r.unit || ''));
+      } }),
+      C('org2', '二级单位', 110), C('org3', '三级单位', 130), C('project', '项目', 220),
       C('sourceType', '来源类型', 100), C('attr', '资产属性', 100), C('brand', '资产品牌', 100),
-      C('assetCat', '资产类别', 130), C('assetSubCat', '资产二级类别', 130),
-      C('sourceOrg', '来源单位', 130), C('location', '存放地点', 150),
-      C('origCode', '原资产编码', 140), C('batchCode', '批次编码', 110),
-      C('implOrg', '实施单位', 130),
-      C('acceptStatus', '验收状态', 110), C('acceptCode', '验收单号', 140, { link: true }), C('acceptDate', '验收时间', 110),
-      C('invStatus', '盘点状态', 100), C('invPlanCode', '盘点方案编号', 150), C('invDate', '盘点完成时间', 120),
-      C('transferCode', '调拨单号', 140, { link: true }), C('transferType', '调拨类型', 100), C('transferDate', '调拨完成时间', 120),
-      C('desc', '资产描述', 150), C('keeper', '保管单位', 130), C('user', '使用人', 90)
+      C('assetCat', '资产类别', 130),
+      C('location', '存放地点', 150),
+      C('acceptCode', '验收单', 160, { render: docCell('验收单') }),
+      C('invPlanCode', '资产盘点', 180, { render: multiValue('资产盘点') }),
+      C('transferCode', '调拨单号', 160, { render: docCell('调拨单') }),
+      C('keeper', '保管单位', 130), C('keeperUser', '保管人', 90), C('user', '使用人', 90)
     ],
     /* 附录 F 分供商合作分析（列序对齐 Axure「分供商合作分析」） */
     supplier: [
@@ -128,18 +150,28 @@
       C('contractAmt', '签订合同额(万元)', 150, { num: true }),
       C('perfAmt', '履约额(万元)', 130, { num: true }),
       C('grade', '局评价等级', 110),
-      C('matSmall', '物料小类', 190, { render: function (v) {
-        const list = Array.isArray(v) ? v : (v ? String(v).split('、') : []);
-        if (!list.length) return '—';
-        const head = esc(list.slice(0, 3).join('、'));
-        if (list.length <= 3) return head;
-        return head + '<span class="dsc-more" title="全部 ' + list.length + ' 项：' +
-          esc(list.join('、')) + '">…</span>';
-      } }),
+      C('matSmall', '物料小类', 190, { render: multiValue() }),
       C('badCount', '不良行为次数', 130, { num: true }), C('banCount', '禁用次数', 100, { num: true }),
       C('code', '分供商编码', 110), C('cat', '分供商分类', 120)
     ]
   };
+
+  /* 资产统计报表：最小颗粒度 = 项目；固定统计字段（不含可增删的列设置） */
+  const ASSET_STATS_COLS = [
+    C('idx', '序号', 56, { sticky: true }),
+    C('org2', '二级单位', 130, { sticky2: true }),
+    C('org3', '三级单位', 160),
+    C('project', '项目', 240),
+    C('assetAmt', '资产总额（万元）', 150, { num: true }),
+    C('assetCount', '资产总数', 110, { num: true }),
+    C('usingCount', '在用数量', 110, { num: true }),
+    C('idleCount', '闲置数量', 110, { num: true }),
+    C('repairCount', '维保数量', 110, { num: true }),
+    C('scrapCount', '报废数量', 110, { num: true }),
+    C('buyAmt', '资产购置金额（万元）', 170, { num: true }),
+    C('disposeAmt', '处置金额（万元）', 150, { num: true }),
+    C('depAmt', '调拨摊销折旧金额（万元）', 190, { num: true })
+  ];
 
   const DEFAULT_SHOWN = {
     /* 物资结算明细：列序同 Axure（单据信息 → 物料 → 金额 → 降本），默认展示常用列，
@@ -149,10 +181,9 @@
     /* 采购报表明细：默认 13 列（对齐样例表头） */
     contract: ['idx', 'name', 'org2', 'org3', 'project', 'code', 'category', 'type', 'status',
       'source', 'sourceCode', 'tpl', 'owner'],
-    /* 默认列对齐 Axure：项目 / 资产编码前置（原先资产编码在第 14 列，默认视口看不到） */
-    asset: ['idx', 'project', 'org2', 'org3', 'assetCode', 'assetAmt', 'assetCount', 'usingCount',
-      'idleCount', 'repairCount', 'scrapCount', 'buyAmt', 'disposeAmt', 'depAmt',
-      'assetCat', 'acceptStatus'],
+    /* 资产明细表：资产编码 / 资产名称在首屏；其余业务字段在「设置列」里可加 */
+    asset: ['idx', 'assetCode', 'desc', 'qty', 'org2', 'org3', 'project', 'assetCat', 'attr',
+      'sourceType', 'location', 'keeper', 'keeperUser', 'acceptCode', 'invPlanCode', 'transferCode'],
     supplier: ['idx', 'name', 'org2', 'org3', 'perfProjCount', 'bidCount', 'winCount', 'winAmt',
       'frameCount', 'execCount', 'signCount', 'contractAmt', 'perfAmt', 'grade', 'matSmall',
       'badCount', 'banCount']
@@ -221,12 +252,12 @@
           { name: 'partyB', label: '乙方', type: 'text', ph: '请输入' },
           { name: 'signDate', label: '合同签订日期', type: 'daterange', wide: true },
           { name: 'createDate', label: '合同创建日期', type: 'daterange', wide: true },
-          { name: 'pType', label: '项目类型', type: 'multi', options: ['房屋建筑工程', '基础设施', '工业厂房', '市政公用工程'] },
-          { name: 'pStatus', label: '项目状态', type: 'multi', options: ['在建', '竣工', '停工'] },
+          { name: 'pType', label: '项目类型', type: 'multi', options: D.TYPES },
+          { name: 'pStatus', label: '项目状态', type: 'multi', options: D.STATUS },
           { name: 'agent', label: '经办人', type: 'text', ph: '请输入' },
           { name: 'creator', label: '创建人', type: 'text', ph: '请输入' },
-          { name: 'category', label: '合同分类', type: 'select', options: ['物资类', '分包类', '服务类', '租赁类'] },
-          { name: 'contractType', label: '合同类型', type: 'multi', options: ['物资采购合同', '设备采购合同', '劳务分包合同', '专业分包合同', '专业服务合同', '租赁类合同'] },
+          { name: 'category', label: '合同分类', type: 'select', options: D.DICT.contractCategories },
+          { name: 'contractType', label: '合同类型', type: 'multi', options: D.DICT.contractFilterTypes },
           { name: 'contractStatus', label: '合同状态', type: 'multi', options: ['已生效', '审批中', '草稿', '已终止'] },
           { name: 'source', label: '合同来源', type: 'multi', options: ['招标', '询比价', '单一来源', '框架协议'] },
           { name: 'sourceCode', label: '合同来源单号', type: 'text', ph: '请输入' },
@@ -242,8 +273,8 @@
           grain: ['日', '月', '季', '年'], grainValue: RS.purGrain },
         { name: 'org2', label: '二级单位', type: 'select', options: orgOpts },
         { name: 'org3', label: '三级单位', type: 'select', options: D.subOrgs.map(function (s) { return s.name; }) },
-        { name: 'pStatus', label: '项目状态', type: 'multi', options: ['在建', '竣工', '停工'] },
-        { name: 'pType', label: '项目类型', type: 'multi', options: ['房屋建筑工程', '基础设施', '工业厂房', '市政公用工程'] },
+        { name: 'pStatus', label: '项目状态', type: 'multi', options: D.STATUS },
+        { name: 'pType', label: '项目类型', type: 'multi', options: D.TYPES },
         { name: 'matBig', label: '物料大类', type: 'tree', options: D.material.big.map(function (x) { return { value: x, label: x }; }) },
         { name: 'matMid', label: '物料中类', type: 'tree', options: D.material.mid.map(function (x) { return { value: x, label: x }; }) },
         { name: 'matSmall', label: '物料小类', type: 'tree', options: [
@@ -252,25 +283,31 @@
       ];
     }
     if (ds === 'asset') {
-      /* 资产明细：首屏按 Axure 只保留「日期 / 实施单位 / 项目」，其余属性收进「展开」；
-         日期区间占两格，避免两个原生日期输入溢出遮住下一列标签 */
-      return [
+      /* 查询条件与两张表的列对应：二级 / 三级单位 + 项目及项目属性；
+         统计报表没有资产类别列，不提供该条件；明细表按资产编码查询并保留类别 / 属性 / 验收状态。
+         日期区间占两格，避免原生日期输入溢出 */
+      const base = [
         { name: 'date', label: '日期选择', type: 'daterange', value: D.defaultRange, wide: true,
           grain: ['日', '月', '季', '年'], grainValue: RS.assetGrain },
-        { name: 'org', label: '实施单位', type: 'org', ph: '输入单位名称联想选择',
-          /* 资产报表不复用总览的 RS.overviewOrg，避免从采购总览带过来的下钻单位串到本页 */
-          value: D.scope.level === 1 ? '' : D.scope.name },
+        { name: 'org2', label: '二级单位', type: 'select', options: D.orgs.map(function (o) { return o.name; }) },
+        { name: 'org3', label: '三级单位', type: 'select', options: D.subOrgs.map(function (s) { return s.name; }) },
         { name: 'project', label: '项目', type: 'text', ph: '请输入项目名称' },
         { name: 'pType', label: '项目类型', type: 'multi', options: D.TYPES },
         { name: 'pFormat', label: '项目业态', type: 'multi', options: D.FORMATS },
         { name: 'pStatus', label: '项目状态', type: 'multi', options: D.STATUS },
         { name: 'pMode', label: '承包模式', type: 'multi', options: D.MODES },
-        { name: 'pArea', label: '项目区域(到地级市)', type: 'tree', options: D.areaTree() },
+        { name: 'pArea', label: '项目区域(到地级市)', type: 'tree', options: D.areaTree() }
+      ];
+      if (RS.assetTab !== 'detail') return base;
+      return base.concat([
         { name: 'assetCode', label: '资产编码', type: 'text', ph: '请输入资产编码' },
         { name: 'assetCat', label: '资产类别', type: 'multi', options: D.ASSET_CAT_NAMES },
-        { name: 'attr', label: '资产属性', type: 'multi', options: ['自有', '租赁', '调拨'] },
-        { name: 'acceptStatus', label: '验收状态', type: 'multi', options: ['已验收', '待验收', '验收不通过'] }
-      ];
+        { name: 'sourceType', label: '来源类型', type: 'multi', options: D.DICT.assetSourceTypes },
+        { name: 'attr', label: '资产属性', type: 'multi', options: D.DICT.assetAttrs },
+        { name: 'acceptCode', label: '验收单', type: 'text', ph: '请输入验收单编号' },
+        { name: 'invPlanCode', label: '资产盘点', type: 'text', ph: '请输入盘点方案编号' },
+        { name: 'keeperUser', label: '保管人', type: 'text', ph: '请输入保管人' }
+      ]);
     }
     /* supplier：筛选字段随子页签变化（对齐 Axure 各页签的查询条件） */
     const supOrgs = D.orgs.map(function (o) { return o.name; });
@@ -300,6 +337,7 @@
   D.reportConfig = {
     COLS: COLS,
     DEFAULT_SHOWN: DEFAULT_SHOWN,
+    ASSET_STATS_COLS: ASSET_STATS_COLS,
     SUP_MAT_SMALL: SUP_MAT_SMALL,
     filterFields: filterFields
   };

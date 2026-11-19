@@ -445,7 +445,24 @@ window.APP = window.APP || {};
         D.toast('已应用 ' + keys.length + ' 个显示字段（会话内保持）');
       }
     });
-    if (!o.groups) D.bindColumnDialog(document.getElementById('modalBody'));
+    if (!o.groups) {
+      const body = document.getElementById('modalBody');
+      /* 弹窗内联「恢复默认」派发 cd-reset；这里补上真正的复位动作。
+         modalBody 在多次打开间复用，监听只绑一次，当前 picker 配置每次更新。 */
+      body.__colPicker = o;
+      if (!body.__cdResetBound) {
+        body.__cdResetBound = true;
+        body.addEventListener('cd-reset', function () {
+          const cur = body.__colPicker;
+          if (!cur) return;
+          D.resetCols(cur.key);
+          D.closeModal();
+          if (cur.after) cur.after();
+          D.toast(cur.defaultToast || '已恢复默认字段');
+        });
+      }
+      D.bindColumnDialog(body);
+    }
   };
 
   /* ============================================================
@@ -692,148 +709,6 @@ window.APP = window.APP || {};
   }
   function hideTip() { tipEl().style.display = 'none'; }
   D.hideMetricTip = hideTip;
-
-  /* ============================================================
-     排名轮播（AC8：自动轮播，点击停止、离开恢复）
-     ============================================================ */
-  D.rankCarousel = function (id, pages, opt) {
-    opt = opt || {};
-    const per = opt.per || 10;
-    const chunks = [];
-    for (let i = 0; i < pages.length; i += per) chunks.push(pages.slice(i, i + per));
-    if (!chunks.length) chunks.push([]);
-    return '<div class="rank-carousel" data-carousel="' + id + '" data-interval="' + (opt.interval || 8000) + '">' +
-      chunks.map(function (ch, ci) {
-        return '<div class="rank-carousel__page' + (ci === 0 ? ' rank-carousel__page--active' : '') + '" data-page="' + ci + '">' +
-          ch.map(function (o) { return o; }).join('') + '</div>';
-      }).join('') +
-      (chunks.length > 1 ? '<div class="rank-carousel__foot">' +
-        chunks.map(function (_, ci) {
-          return '<span class="rank-carousel__dot' + (ci === 0 ? ' rank-carousel__dot--active' : '') + '" data-dot="' + ci + '"></span>';
-        }).join('') + '<span style="margin-left:8px">' + chunks.length + ' 页自动轮播</span></div>' : '') +
-      '</div>';
-  };
-  D.startCarousels = function (root) {
-    (root || document).querySelectorAll('[data-carousel]').forEach(function (box) {
-      if (box.__timer) clearInterval(box.__timer);
-      const pages = box.querySelectorAll('.rank-carousel__page');
-      if (pages.length <= 1) return;
-      const dots = box.querySelectorAll('.rank-carousel__dot');
-      let cur = 0, paused = false;
-      function goto(i) {
-        pages[cur].classList.remove('rank-carousel__page--active');
-        if (dots[cur]) dots[cur].classList.remove('rank-carousel__dot--active');
-        cur = (i + pages.length) % pages.length;
-        pages[cur].classList.add('rank-carousel__page--active');
-        if (dots[cur]) dots[cur].classList.add('rank-carousel__dot--active');
-      }
-      const interval = +(box.getAttribute('data-interval') || 8000);
-      box.__timer = setInterval(function () { if (!paused) goto(cur + 1); }, interval);
-      box.addEventListener('mouseenter', function () { paused = true; });
-      box.addEventListener('mouseleave', function () { paused = false; });
-      box.addEventListener('click', function (e) {
-        const dot = e.target.closest('[data-dot]');
-        if (dot) { goto(+dot.getAttribute('data-dot')); return; }
-        paused = true;                       /* AC8：点击列表区域后停止轮播 */
-        setTimeout(function () { paused = false; }, 12000);
-      });
-    });
-  };
-
-  /* ============================================================
-     大屏轮播（页签切换 + 自动轮播，点击后停止）
-     ============================================================ */
-  D.startScreenCarousel = function (box, onSwitch) {
-    if (!box) return;
-    const tabs = box.querySelectorAll('[data-viewtab]');
-    const panes = box.querySelectorAll('[data-viewpane]');
-    if (!tabs.length) return;
-    let cur = 0, paused = false;
-    function goto(i) {
-      cur = (i + tabs.length) % tabs.length;
-      tabs.forEach(function (t, ti) { t.classList.toggle('scr-viewtab--active', ti === cur); });
-      panes.forEach(function (p, pi) { p.classList.toggle('u-hidden', pi !== cur); });
-      if (onSwitch) onSwitch(cur);
-    }
-    goto(0);
-    if (box.__timer) clearInterval(box.__timer);
-    box.__timer = setInterval(function () { if (!paused) goto(cur + 1); }, 8000);
-    tabs.forEach(function (t, ti) {
-      t.addEventListener('click', function () {
-        goto(ti);
-        paused = true;                        /* 点击页签后停止重复 */
-        setTimeout(function () { paused = false; }, 20000);
-      });
-    });
-    box.addEventListener('mouseenter', function () { paused = true; });
-    box.addEventListener('mouseleave', function () { paused = false; });
-  };
-
-  /* ============================================================
-     时间滑块（双手柄）
-     ============================================================ */
-  D.timeSlider = function (id, cats, range) {
-    return '<div class="dsc-timeslider" data-slider="' + id + '" data-cats="' + esc(cats.join(',')) + '">' +
-      '<div class="dsc-timeslider__value">区间：<b data-sl-from>' + esc(cats[range[0]]) + '</b> ~ <b data-sl-to>' + esc(cats[range[1]]) + '</b></div>' +
-      '<div class="dsc-timeslider__track">' +
-      '<div class="dsc-timeslider__range" data-sl-range></div>' +
-      '<div class="dsc-timeslider__handle" data-sl-handle="from"></div>' +
-      '<div class="dsc-timeslider__handle" data-sl-handle="to"></div></div>' +
-      '<div class="dsc-timeslider__ticks"><span>' + esc(cats[0]) + '</span><span>' + esc(cats[cats.length - 1]) + '</span></div>' +
-      '</div>';
-  };
-  D.bindTimeSlider = function (root, id, init, onChange) {
-    const box = (typeof root === 'string' ? document.querySelector(root) : root).querySelector('[data-slider="' + id + '"]');
-    if (!box) return;
-    const cats = box.getAttribute('data-cats').split(',');
-    const track = box.querySelector('.dsc-timeslider__track');
-    const rangeEl = box.querySelector('[data-sl-range]');
-    const hFrom = box.querySelector('[data-sl-handle="from"]');
-    const hTo = box.querySelector('[data-sl-handle="to"]');
-    const valFrom = box.querySelector('[data-sl-from]');
-    const valTo = box.querySelector('[data-sl-to]');
-    let from = init[0], to = init[1];
-
-    function paint() {
-      const n = Math.max(1, cats.length - 1);
-      const pf = from / n * 100, pt = to / n * 100;
-      rangeEl.style.left = pf + '%';
-      rangeEl.style.width = (pt - pf) + '%';
-      hFrom.style.left = pf + '%';
-      hTo.style.left = pt + '%';
-      valFrom.textContent = cats[from];
-      valTo.textContent = cats[to];
-    }
-    paint();
-    function start(which) {
-      function move(e) {
-        const r = track.getBoundingClientRect();
-        const x = (e.clientX != null ? e.clientX : e.touches[0].clientX) - r.left;
-        const n = Math.max(1, cats.length - 1);
-        let idx = Math.round(x / r.width * n);
-        idx = Math.max(0, Math.min(cats.length - 1, idx));
-        if (which === 'from') from = Math.min(idx, to); else to = Math.max(idx, from);
-        paint();
-        onChange(from, to);
-      }
-      function up() {
-        document.removeEventListener('mousemove', move);
-        document.removeEventListener('mouseup', up);
-      }
-      document.addEventListener('mousemove', move);
-      document.addEventListener('mouseup', up);
-    }
-    hFrom.addEventListener('mousedown', function (e) { e.preventDefault(); start('from'); });
-    hTo.addEventListener('mousedown', function (e) { e.preventDefault(); start('to'); });
-    track.addEventListener('click', function (e) {
-      if (e.target.closest('[data-sl-handle]')) return;
-      const r = track.getBoundingClientRect();
-      const n = Math.max(1, cats.length - 1);
-      const idx = Math.max(0, Math.min(cats.length - 1, Math.round((e.clientX - r.left) / r.width * n)));
-      if (Math.abs(idx - from) <= Math.abs(idx - to)) from = Math.min(idx, to); else to = Math.max(idx, from);
-      paint(); onChange(from, to);
-    });
-  };
 
   /* ============================================================
      地区树多选（全国 → 大区 → 省 → 市）

@@ -28,11 +28,10 @@
     ] },
     { key: 'asset', name: '资产管理', desc: '资产管理看板 / 资产数据报表', children: [
       { key: 'asset-board', name: '资产管理看板', page: 'asset-board', desc: '核心数据·资产 / 周转率与闲置率' },
-      { key: 'report-asset', name: '资产数据报表', page: 'report', params: { ds: 'asset' }, desc: '资产明细 30+ 字段' }
+      { key: 'report-asset', name: '资产数据报表', page: 'report', params: { ds: 'asset' }, desc: '资产统计报表 / 资产明细表' }
     ] },
     { key: 'compliance', name: '合规分析看板', page: 'compliance', desc: '5 页签 + 异常数穿透' }
   ];
-  D.MENU = MENU;
 
   /* ============================================================
      组织权限（PRD §6 R1–R3）
@@ -300,6 +299,8 @@
     /* 视图入参 = 查询参数 + 当前页（视图内直接读 q.ds / q.project / q.view） */
     const q = Object.assign({}, D.route.params, { page: D.route.page });
     const fn = D.pages[q.page] || D.pages.cockpit;
+    /* 页面级生命周期：离开 / 重绘前清理上一页的定时器等资源 */
+    if (D.__activePage && D.__activePage.leave) D.__activePage.leave();
     const container = document.getElementById('pageContainer');
     if (D.beginRender) D.beginRender(container);
     container.innerHTML = '';
@@ -314,6 +315,7 @@
         link: { page: D.route.page, params: Object.assign({}, D.route.params, { org: '' }), label: '切换为局总部视角' }
       })
       : fn(q);
+    D.__activePage = fn;
     container.innerHTML = typeof html === 'string' ? html : '';
     /* 通用绑定 */
     D.bindMultiselect(container);

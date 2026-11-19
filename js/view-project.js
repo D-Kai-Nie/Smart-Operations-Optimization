@@ -294,10 +294,10 @@
     return '<div class="ck-filter ck-filter--panel"' +
       (listKey ? ' data-pj-filter="' + esc(listKey) + '"' : '') + '>' +
       '<div class="ck-filter__row">' + fields.map(function (f) {
-        return pjCkField(f[0], cur[f[0]] || '');
+        return pjCkField(f[0], cur[f[0]] || '', f[1]);
       }).join('') + '</div>' +
       '<div class="ck-filter__more"' + (moreOpen ? '' : ' hidden') + '>' +
-      moreFields.map(function (f) { return pjCkField(f[0], cur[f[0]] || ''); }).join('') + '</div>' +
+      moreFields.map(function (f) { return pjCkField(f[0], cur[f[0]] || '', f[1]); }).join('') + '</div>' +
       pjFilterActions(listKey, adv !== false, moreOpen) + '</div>';
   }
 
@@ -339,25 +339,27 @@
   /* 筛选下拉同样按项目收口：单位 / 项目类条件只列当前项目及其所属单位，
      不再让用户选到其它单位 / 项目（即使选了也必然 0 条） */
   let PJ_SCOPE_PROJECT = null;
-  function pjCkField(label, value) {
+  function pjCkField(label, value, options) {
     const p = PJ_SCOPE_PROJECT;
-    if (!p) return D.ckField(label, value);
+    if (!p) return D.ckField(label, value, options);
     const unit = p.subOrg || p.org;
-    let list = null;
-    if (label === '实施单位' || label === '调出项目实施单位' || label === '调入项目实施单位') {
-      list = [unit];
-    } else if (label === '领用单位') {
-      list = ['主体结构施工队', '基础工程施工队', '装饰装修施工队', '机电安装施工队', '室外工程施工队'];
-    } else if (label === '一级库') {
-      list = [p.org + '本级库'];
-    } else if (label === '保管单位') {
-      list = [unit + '物资部'];
-    } else if (label === '调出公司' || label === '调入公司') {
-      list = [p.org, unit];
-    } else if (label === '调出项目' || label === '调入项目' || label === '项目名称') {
-      list = [p.name];
+    let list = options || null;
+    if (!list) {
+      if (label === '实施单位' || label === '调出项目实施单位' || label === '调入项目实施单位') {
+        list = [unit];
+      } else if (label === '领用单位') {
+        list = ['主体结构施工队', '基础工程施工队', '装饰装修施工队', '机电安装施工队', '室外工程施工队'];
+      } else if (label === '一级库') {
+        list = [p.org + '本级库'];
+      } else if (label === '保管单位') {
+        list = [unit + '物资部'];
+      } else if (label === '调出公司' || label === '调入公司') {
+        list = [p.org, unit];
+      } else if (label === '调出项目' || label === '调入项目' || label === '项目名称') {
+        list = [p.name];
+      }
     }
-    if (!list) return D.ckField(label, value);
+    if (!list) return D.ckField(label, value, options);
     return '<div class="ck-filter__item"><span class="ck-filter__label">' + esc(label) + '</span>' +
       '<select class="ck-field ck-field--select" data-ck-field="' + esc(label) + '">' +
       '<option value="">请选择</option>' + list.map(function (o) {

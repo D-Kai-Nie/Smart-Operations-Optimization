@@ -89,7 +89,6 @@
       });
     });
   }
-  let PJ_SUP_DIST = [];
   function supplierTab(p) {
     const rowsAll = pjScaleSupplier(pjScopeRows(D.genSupplierRows(30), p), p.purchase);
     PS.supDist = pjSupplierDist(rowsAll);

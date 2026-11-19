@@ -4,12 +4,14 @@
   const esc = D.esc;
   const CS = D.cockpitState;
   const UI = D.ckUI;
+  const late = UI.late;
   const CARET = UI.CARET;
-  const section = UI.section, subHead = UI.subHead, pageHead = UI.pageHead, scopePartialNote = UI.scopePartialNote;
-  const field = UI.field, metricCards = UI.metricCards, metricTabs = UI.metricTabs;
+  const section = UI.section, subHead = UI.subHead;
+  const metricCards = UI.metricCards, metricTabs = UI.metricTabs;
   const detailListHead = UI.detailListHead, filterFoot = UI.filterFoot, setFilterMore = UI.setFilterMore;
-  const bindMetricTips = UI.bindMetricTips, metricColPicker = UI.metricColPicker,
-        metricListTable = UI.metricListTable, commonAfter = UI.commonAfter;
+  const field = late('field'), pageHead = late('pageHead'), scopePartialNote = late('scopePartialNote');
+  const bindMetricTips = late('bindMetricTips'), metricColPicker = late('metricColPicker');
+  const metricListTable = late('metricListTable'), commonAfter = late('commonAfter');
   /* ============================================================
      资产管理 › 资产管理看板
      内容基准：`资产管理看板.png`（源页面「核心数据 · 资产」，截图左下角的缩略框为 Axure 面板，忽略）
@@ -31,13 +33,15 @@
      与「指标明细表 · 合计行」同一个口径——卡片与列表不会再出现 73.53% / 6.46% 这种两套数 */
   const AB_IND = [
     { key: 'turnover', name: '资产周转率', value: 0, unit: '%', dec: 2,
-      desc: '资产周转额 ÷ 资产平均原值 × 100%', src: '物管系统资产模块' },
+      desc: '项目调出资产总金额 ÷ 项目资产总原值 × 100%', src: '物管系统资产模块' },
     { key: 'idle', name: '资产闲置率', value: 0, unit: '%', dec: 2,
-      desc: '闲置资产原值 ÷ 资产总原值 × 100%', src: '物管系统资产模块' },
+      desc: '项目闲置资产总金额 ÷ 项目资产总原值 × 100%', src: '物管系统资产模块' },
     { key: 'doneTurnover', name: '竣工项目资产周转率', value: 0, unit: '%', dec: 2,
-      desc: '竣工项目资产周转额 ÷ 竣工项目资产平均原值 × 100%（口径待确认 Q-08）', src: '物管系统资产模块' },
+      desc: '项目状态为竣工的项目调出总金额 ÷ 项目状态为竣工的项目资产总金额 × 100%',
+      src: '物管系统资产模块' },
     { key: 'doneIdle', name: '竣工项目资产闲置率', value: 0, unit: '%', dec: 2,
-      desc: '竣工项目闲置资产原值 ÷ 竣工项目资产总原值 × 100%（口径待确认 Q-08）', src: '物管系统资产模块' },
+      desc: '竣工项目闲置资产额 ÷ 竣工项目资产总金额 × 100%',
+      src: '物管系统资产模块' },
     { key: 'depRate', name: '资产折旧率', value: 0, unit: '%', dec: 2,
       desc: '当期折旧额 ÷ 资产原值 × 100%', src: '财务系统' }
   ];
@@ -85,7 +89,6 @@
     ['北京公司', 8256.67, 8713.60, 1.04],
     ['文旅博览公司', 7168.90, 8133.30, 1.60]
   ];
-  const AB_RANK_N = AB_RANK.length;
   /* 全局项目资产合计金额（万元）：与指标明细表合计行同口径，供「项目资产类别」柱图与区块头部共用 */
   const AB_TOTAL_AMT = D.round(AB_RANK.reduce(function (a, r) { return a + r[2]; }, 0), 2);
   /* 各指标的二级单位率值 = 该单位资产周转率 × 指标系数（量级对齐源图：周转 ~5%、闲置 ~4%、竣工周转 ~60%、折旧 ~5%） */
@@ -204,15 +207,6 @@
     if (s) ASB.period[0] = s.value || '';
     if (e) ASB.period[1] = e.value || '';
   }
-  /* 二级单位资产周转率明细的动态列（Axure 局驾驶舱核心数据 · 资产「设置列」口径） */
-  const AB_COLS = [
-    { key: 'org2', name: '二级单位', width: 160 },
-    { key: 'outAmt', name: '项目调出资产总金额（万元）', width: 220, num: true },
-    { key: 'totalAmt', name: '项目资产总金额（万元）', width: 200, num: true },
-    { key: 'rate', name: '资产周转率（%）', width: 150, num: true, danger: true },
-    { key: 'share', name: '调出占资产额比（%）', width: 170, num: true, pct: true }
-  ];
-  const AB_COLS_DEF = ['idx', 'org2', 'outAmt', 'totalAmt', 'rate'];
   /* 项目资产分类：按《项目资产类别》数据字典的 11 个枚举值（顺序与字典一致）。
      字典只定义分类，未提供金额；柱图金额按「全局项目资产合计金额 × 示意占比」拆分，
      占比合计 100%，仅用于演示趋势，不冒充取数结果。 */

@@ -2,12 +2,13 @@
 (function (D) {
   'use strict';
   const esc = D.esc;
-  const CS = D.cockpitState;
   const UI = D.ckUI;
+  const late = UI.late;
   const CARET = UI.CARET;
-  const section = UI.section, subHead = UI.subHead, pageHead = UI.pageHead, scopePartialNote = UI.scopePartialNote;
-  const field = UI.field, actions = UI.actions;
-  const bindMetricTips = UI.bindMetricTips, commonAfter = UI.commonAfter;
+  const section = UI.section, subHead = UI.subHead;
+  const pageHead = late('pageHead'), scopePartialNote = late('scopePartialNote');
+  const field = late('field'), actions = late('actions');
+  const bindMetricTips = late('bindMetricTips'), commonAfter = late('commonAfter');
   /* ============================================================
      资源管理 › 资源管理看板
      内容基准：`分供商管理看板.png`（源页面「核心数据 · 资源」）

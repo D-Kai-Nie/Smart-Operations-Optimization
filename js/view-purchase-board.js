@@ -4,12 +4,14 @@
   const esc = D.esc;
   const CS = D.cockpitState;
   const UI = D.ckUI;
+  const late = UI.late;
   const CARET = UI.CARET;
-  const section = UI.section, metricCards = UI.metricCards, field = UI.field, advActions = UI.advActions;
-  const metricTabs = UI.metricTabs, detailListHead = UI.detailListHead;
-  const pageHead = UI.pageHead, scopePartialNote = UI.scopePartialNote;
-  const metricListTable = UI.metricListTable, metricColPicker = UI.metricColPicker;
-  const bindMetricTips = UI.bindMetricTips, commonAfter = UI.commonAfter;
+  const section = UI.section, metricCards = UI.metricCards, metricTabs = UI.metricTabs;
+  const detailListHead = UI.detailListHead;
+  const field = late('field'), advActions = late('advActions');
+  const pageHead = late('pageHead'), scopePartialNote = late('scopePartialNote');
+  const metricListTable = late('metricListTable'), metricColPicker = late('metricColPicker');
+  const bindMetricTips = late('bindMetricTips'), commonAfter = late('commonAfter');
   const MONTHS = UI.MONTHS;
   /* 指标卡与报表总览共用 data.js 的局口径（BUREAU_KPI），避免同一指标两处各写一个数 */
   const B = D.REPORT_BUREAU;
@@ -100,15 +102,6 @@
     ['中建八局装饰工程有限公司', 16.94, 15.93, 6.00], ['中建八局西南分公司', 44.87, 42.29, 5.73],
     ['中建八局新型建造工程公司', 12.94, 12.33, 4.68]
   ];
-
-  /* C1 / E2：看板单位名的统一表达——短名为主（应用内主键），法定全称进 tooltip；
-     点击切到该单位的组织视角并打开对应数据报表 */
-  function unitLink(shortName, ds) {
-    const full = (D.REPORT_UNITS[shortName] || [])[0] || '';
-    return '<span class="ck-table__unit dsc-table__link" data-goto-report="' + ds +
-      '" data-goto-org="' + esc(shortName) + '" title="' +
-      esc((full ? full + '　·　' : '') + '在数据报表中查看该单位') + '">' + esc(shortName) + '</span>';
-  }
 
   function unitTable() {
     /* R2：受限视角下只返回本单位行；三级单位视角下沉到父级二级单位 */
